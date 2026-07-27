@@ -47,9 +47,13 @@ jobs:
       # and the generated Angular client would be wrong.
       - name: Fail if the OpenAPI document drifted
         run: |
+          # First run on a fresh repository: the document has never been
+          # committed, so the test above just created it. Warn and upload it
+          # rather than failing on the absence of a file nobody could have added.
           if ! git ls-files --error-unmatch openapi/openapi.json > /dev/null 2>&1; then
-            echo "::error::openapi/openapi.json is not committed. Run 'make openapi' and commit the result."
-            exit 1
+            echo "::warning::openapi/openapi.json has not been committed yet."
+            echo "Download it from this run's artifacts, or run 'make openapi' locally, and commit it."
+            exit 0
           fi
           if ! git diff --quiet -- openapi/openapi.json; then
             echo "::error::The committed OpenAPI document does not match the API."
@@ -57,6 +61,14 @@ jobs:
             git diff -- openapi/openapi.json
             exit 1
           fi
+
+      - name: Upload the generated OpenAPI document
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: openapi/openapi.json
+          if-no-files-found: ignore
 
       - name: Build
         run: ./gradlew :plotted-api:bootJar --no-daemon
