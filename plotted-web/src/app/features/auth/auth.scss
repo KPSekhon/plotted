@@ -1,0 +1,38 @@
+.auth-card {
+  max-width: 28rem;
+  margin: 2rem auto;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 1rem;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+button[type='submit'] {
+  margin-top: 0.5rem;
+}
+
+.form-error {
+  margin: 0 0 0.75rem;
+  color: var(--mat-sys-error, #b3261e);
+  font-size: 0.875rem;
+}
+
+.field-hint {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+mat-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 1rem 1rem;
+}

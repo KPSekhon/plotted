@@ -1,0 +1,17 @@
+# Local development. Assumes `make dev` has brought up Postgres and Redis.
+plotted:
+  security:
+    jwt:
+      # Plain HTTP on localhost, so the Secure attribute would stop the browser
+      # storing the refresh cookie at all.
+      refresh-cookie-secure: false
+
+logging:
+  level:
+    app.plotted: DEBUG
+    org.jooq.tools.LoggerListener: DEBUG
+
+management:
+  endpoint:
+    health:
+      show-details: always

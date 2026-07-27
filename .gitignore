@@ -1,0 +1,45 @@
+# --- Build output ---
+build/
+out/
+dist/
+bin/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# --- Gradle ---
+.gradle/
+!gradle/wrapper/gradle-wrapper.properties
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+.angular/
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+!.vscode/extensions.json
+*.swp
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Secrets and local configuration ---
+# Nothing here is ever committed. Secrets come from the environment locally and
+# from Google Secret Manager in production (spec section 18).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Data ---
+# Availability snapshots are the project's own dataset and are backed up
+# separately, but bulk availability data must never be redistributed through this
+# repository (spec section 7.4).
+data/snapshots/
+*.dump
+*.sql.gz

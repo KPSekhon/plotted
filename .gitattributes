@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+# Must stay LF: it is executed by /bin/sh on Linux CI and in the Docker build.
+gradlew text eol=lf
+*.sh text eol=lf
+Makefile text eol=lf
+
+# Windows batch files need CRLF.
+*.bat text eol=crlf
+
+*.jar binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.woff2 binary
+
+# Generated and committed: readable in review, but not worth reviewing by hand.
+openapi/openapi.json linguist-generated=true
+plotted-web/package-lock.json linguist-generated=true

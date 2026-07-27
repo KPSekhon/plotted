@@ -1,0 +1,207 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Target for the pull-request path. A pipeline slow enough to skip is a
+  # pipeline that gets skipped.
+  JAVA_VERSION: '17'
+  NODE_VERSION: '20'
+
+jobs:
+  api:
+    name: API — lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Lint (ktlint)
+        run: ./gradlew ktlintCheck --no-daemon
+
+      # Runs the full suite. The GitHub runner has Docker, so the Testcontainers
+      # tests that are skipped on a developer machine without it do execute here
+      # — including the OpenAPI drift check.
+      - name: Test
+        run: ./gradlew :plotted-api:test --no-daemon
+
+      # The contract test above regenerates the document. If it now differs from
+      # the committed copy, the API changed without the specification following,
+      # and the generated Angular client would be wrong.
+      - name: Fail if the OpenAPI document drifted
+        run: |
+          if ! git ls-files --error-unmatch openapi/openapi.json > /dev/null 2>&1; then
+            echo "::error::openapi/openapi.json is not committed. Run 'make openapi' and commit the result."
+            exit 1
+          fi
+          if ! git diff --quiet -- openapi/openapi.json; then
+            echo "::error::The committed OpenAPI document does not match the API."
+            echo "Run 'make openapi' and commit the result."
+            git diff -- openapi/openapi.json
+            exit 1
+          fi
+
+      - name: Build
+        run: ./gradlew :plotted-api:bootJar --no-daemon
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-results
+          path: plotted-api/build/reports/tests/test
+          if-no-files-found: ignore
+
+  web:
+    name: Web — lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: plotted-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: plotted-web/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test:ci
+
+      - name: Build
+        run: npm run build
+
+  security:
+    name: Dependency and secret scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Filesystem vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          # Report rather than block: a transitive CVE with no fix available
+          # should not stop unrelated work from merging.
+          exit-code: '0'
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+        continue-on-error: true
+
+  migrations:
+    name: Migrations apply to a clean database
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: plotted
+          POSTGRES_USER: plotted
+          POSTGRES_PASSWORD: plotted
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U plotted -d plotted"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # The fenced DDL — extensions, GiST exclusion constraints, generated
+      # columns, partial indexes — is invisible to the jOOQ generator, so it is
+      # only ever exercised against a real Postgres. This job is that exercise.
+      - name: Apply every migration in order
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+          for file in plotted-api/src/main/resources/db/migration/V*.sql; do
+            echo "--> $file"
+            PGPASSWORD=plotted psql -h localhost -U plotted -d plotted -v ON_ERROR_STOP=1 -f "$file"
+          done
+
+      # These are the constraints that make duplicate availability rows and
+      # overlapping price periods unrepresentable. They are fenced out of the
+      # jOOQ generator's view, so this is the only place they get exercised.
+      - name: Assert the temporal-integrity constraints exist
+        env:
+          PGPASSWORD: plotted
+        run: |
+          psql -h localhost -U plotted -d plotted -v ON_ERROR_STOP=1 \
+            -c "SELECT conrelid::regclass AS table, conname FROM pg_constraint WHERE contype = 'x' ORDER BY 1;"
+          count=$(psql -h localhost -U plotted -d plotted -tAc "SELECT count(*) FROM pg_constraint WHERE contype = 'x';")
+          if [ "$count" -lt 3 ]; then
+            echo "::error::Expected at least 3 exclusion constraints, found $count"
+            exit 1
+          fi
+
+      # Postgres does not index foreign keys automatically. The omission shows up
+      # first as a slow cascading delete, long after the migration was written.
+      # Partial indexes do not count: they do not cover the rows outside their
+      # predicate, which are exactly the ones a cascade still has to find.
+      - name: Assert every foreign key is indexed
+        env:
+          PGPASSWORD: plotted
+        run: |
+          unindexed=$(psql -h localhost -U plotted -d plotted -tAc "
+            SELECT c.conrelid::regclass || ' (' ||
+                   (SELECT string_agg(a.attname, ', ' ORDER BY x.ord)
+                      FROM unnest(c.conkey) WITH ORDINALITY AS x(attnum, ord)
+                      JOIN pg_attribute a
+                        ON a.attrelid = c.conrelid AND a.attnum = x.attnum) || ')'
+              FROM pg_constraint c
+             WHERE c.contype = 'f'
+               AND c.connamespace = 'public'::regnamespace
+               AND NOT EXISTS (
+                     SELECT 1
+                       FROM pg_index i
+                      WHERE i.indrelid = c.conrelid
+                        AND i.indpred IS NULL
+                        AND (i.indkey::int2[])[0:cardinality(c.conkey) - 1] @> c.conkey
+                   )
+             ORDER BY 1;
+          ")
+          if [ -n "$unindexed" ]; then
+            echo "::error::Foreign keys with no covering non-partial index:"
+            echo "$unindexed"
+            exit 1
+          fi
+          echo "Every foreign key is covered."

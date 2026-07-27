@@ -1,0 +1,22 @@
+# Production. Every secret arrives from the environment (Google Secret Manager
+# injected as env vars by Cloud Run); nothing sensitive is committed.
+spring:
+  datasource:
+    hikari:
+      # Scale-to-zero Cloud Run with a serverless Postgres: keep the pool small so
+      # a cold start does not open more connections than the free tier allows.
+      maximum-pool-size: 5
+      minimum-idle: 0
+
+plotted:
+  security:
+    jwt:
+      refresh-cookie-secure: true
+
+server:
+  forward-headers-strategy: framework
+
+logging:
+  level:
+    root: WARN
+    app.plotted: INFO

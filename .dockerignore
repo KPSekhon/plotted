@@ -1,0 +1,14 @@
+.git
+.github
+.gradle
+build
+*/build
+plotted-web/node_modules
+plotted-web/dist
+plotted-web/.angular
+docs
+reports
+*.md
+!README.md
+.env
+.env.*

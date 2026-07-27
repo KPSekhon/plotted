@@ -1,0 +1,89 @@
+spring:
+  application:
+    name: plotted-api
+  profiles:
+    default: dev
+  datasource:
+    url: ${PLOTTED_DB_URL:jdbc:postgresql://localhost:5432/plotted}
+    username: ${PLOTTED_DB_USER:plotted}
+    password: ${PLOTTED_DB_PASSWORD:plotted}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 5000
+      pool-name: plotted-pool
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  jooq:
+    sql-dialect: postgres
+  data:
+    redis:
+      host: ${PLOTTED_REDIS_HOST:localhost}
+      port: ${PLOTTED_REDIS_PORT:6379}
+      timeout: 2s
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  error:
+    # Errors are rendered as RFC 9457 Problem Details by GlobalExceptionHandler.
+    # The default Spring error page must never leak a stack trace.
+    include-message: never
+    include-stacktrace: never
+    include-exception: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: plotted-api
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+plotted:
+  security:
+    jwt:
+      issuer: plotted
+      # Overridden per environment. SecurityConfig refuses to start with the
+      # development value outside the dev profile.
+      secret: ${PLOTTED_JWT_SECRET:ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQtZG8tbm90LXVzZS1pbi1wcm9k}
+      access-token-ttl: 15m
+      refresh-token-ttl: 30d
+      refresh-cookie-secure: true
+  region:
+    supported:
+      - CA
+    default: CA
+    default-timezone: America/Toronto
+    default-currency: CAD
+  cors:
+    allowed-origins:
+      - http://localhost:4200
+
+logging:
+  level:
+    root: INFO
+    app.plotted: INFO
+    org.jooq.Constants: WARN

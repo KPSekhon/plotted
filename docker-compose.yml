@@ -1,0 +1,140 @@
+# Plotted :: local development stack
+#
+# `make dev` brings this up, applies migrations, seeds reference data and prints
+# the URLs. If a reviewer cannot run the project in one command they will not run
+# it at all, and everything else in the repository becomes invisible.
+#
+# Temporal, Prometheus and Grafana are behind profiles: they are not needed until
+# phases 10 and 11, and starting six containers to look at a sign-in page is a
+# poor first impression.
+#   docker compose --profile workflows up -d
+#   docker compose --profile observability up -d
+
+name: plotted
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: plotted-postgres
+    environment:
+      POSTGRES_DB: plotted
+      POSTGRES_USER: plotted
+      POSTGRES_PASSWORD: plotted
+      # Deterministic collation so ORDER BY results match between a developer
+      # laptop and the deployed database.
+      POSTGRES_INITDB_ARGS: '--locale=C --encoding=UTF8'
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U plotted -d plotted']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: plotted-redis
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: plotted-api/Dockerfile
+    container_name: plotted-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      PLOTTED_DB_URL: jdbc:postgresql://postgres:5432/plotted
+      PLOTTED_DB_USER: plotted
+      PLOTTED_DB_PASSWORD: plotted
+      PLOTTED_REDIS_HOST: redis
+    ports:
+      - '8080:8080'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:8080/actuator/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    profiles: ['full']
+
+  web:
+    build:
+      context: plotted-web
+      dockerfile: Dockerfile
+    container_name: plotted-web
+    depends_on:
+      - api
+    ports:
+      - '4200:80'
+    profiles: ['full']
+
+  # --- Phase 10: durable workflows -----------------------------------------
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    container_name: plotted-temporal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: plotted
+      POSTGRES_PWD: plotted
+      POSTGRES_SEEDS: postgres
+    ports:
+      - '7233:7233'
+    profiles: ['workflows']
+
+  temporal-ui:
+    image: temporalio/ui:2.32.0
+    container_name: plotted-temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - '8088:8080'
+    profiles: ['workflows']
+
+  # --- Phase 11: observability ---------------------------------------------
+  # Run locally so the dashboards are demonstrable; not paid for in production,
+  # where Cloud Run's own logging and metrics are sufficient and free.
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: plotted-prometheus
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - '9090:9090'
+    profiles: ['observability']
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: plotted-grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_PASSWORD: plotted
+    ports:
+      - '3000:3000'
+    profiles: ['observability']
+
+volumes:
+  postgres-data:

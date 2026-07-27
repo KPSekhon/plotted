@@ -1,0 +1,52 @@
+@use '@angular/material' as mat;
+
+// Material 3. One theme, defined once; screens pull tokens from it rather than
+// each inventing its own colours.
+$plotted-theme: mat.define-theme(
+  (
+    color: (
+      theme-type: light,
+      primary: mat.$violet-palette,
+      tertiary: mat.$cyan-palette,
+    ),
+    density: (
+      scale: 0,
+    ),
+  )
+);
+
+html {
+  @include mat.core();
+  @include mat.all-component-themes($plotted-theme);
+
+  color-scheme: light;
+  font-family: Roboto, 'Helvetica Neue', system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--mat-sys-surface, #fdfcff);
+  color: var(--mat-sys-on-surface, #1b1b1f);
+}
+
+h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+a {
+  color: inherit;
+}
+
+// Respect a reduced-motion preference rather than assuming everyone wants the
+// Material transitions.
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
