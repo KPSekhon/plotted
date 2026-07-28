@@ -1,7 +1,7 @@
-package app.plotted.catalogue.persistence
+package app.plotted.availability.persistence
 
-import app.plotted.catalogue.domain.Provider
-import app.plotted.catalogue.domain.ProviderType
+import app.plotted.availability.domain.Provider
+import app.plotted.availability.domain.ProviderType
 import app.plotted.generated.jooq.tables.references.PROVIDERS
 import app.plotted.generated.jooq.tables.references.PROVIDER_ALIASES
 import org.jooq.DSLContext

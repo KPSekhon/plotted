@@ -159,7 +159,7 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
 tasks.register<JavaExec>("premiseCheck") {
     group = "verification"
     description = "Probe TMDB for Canadian streaming availability across a sample of titles"
-    mainClass = "app.plotted.catalogue.integration.tmdb.TmdbPremiseCheck"
+    mainClass = "app.plotted.platform.integration.tmdb.TmdbPremiseCheck"
     classpath = sourceSets.main.get().runtimeClasspath
     // Pass titles of your own: ./gradlew premiseCheck --args="'The Wire' 'Slow Horses'"
     environment("TMDB_READ_ACCESS_TOKEN", System.getenv("TMDB_READ_ACCESS_TOKEN") ?: "")

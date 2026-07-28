@@ -1,6 +1,6 @@
-package app.plotted.catalogue.domain
+package app.plotted.availability.domain
 
-import app.plotted.catalogue.persistence.ProviderRepository
+import app.plotted.availability.persistence.ProviderRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 

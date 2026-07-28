@@ -1,4 +1,4 @@
-package app.plotted.catalogue.integration.tmdb
+package app.plotted.platform.integration.tmdb
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration

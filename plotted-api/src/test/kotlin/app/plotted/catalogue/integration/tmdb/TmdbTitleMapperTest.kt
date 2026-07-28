@@ -2,6 +2,12 @@ package app.plotted.catalogue.integration.tmdb
 
 import app.plotted.catalogue.domain.MediaType
 import app.plotted.catalogue.domain.MetadataStatus
+import app.plotted.platform.integration.tmdb.TmdbGenre
+import app.plotted.platform.integration.tmdb.TmdbMovieDetail
+import app.plotted.platform.integration.tmdb.TmdbProperties
+import app.plotted.platform.integration.tmdb.TmdbSearchPage
+import app.plotted.platform.integration.tmdb.TmdbSearchResult
+import app.plotted.platform.integration.tmdb.TmdbSeriesDetail
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -12,8 +18,8 @@ import java.time.LocalDate
  * The mapper is pure, so the awkward upstream shapes can be enumerated cheaply.
  * Almost every case here is one TMDB actually produces.
  */
-class TmdbMapperTest {
-    private val mapper = TmdbMapper(TmdbProperties())
+class TmdbTitleMapperTest {
+    private val mapper = TmdbTitleMapper(TmdbProperties())
 
     @Test
     fun `maps a complete film`() {

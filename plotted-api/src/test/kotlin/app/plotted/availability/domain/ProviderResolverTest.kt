@@ -1,6 +1,6 @@
-package app.plotted.catalogue.domain
+package app.plotted.availability.domain
 
-import app.plotted.catalogue.persistence.ProviderRepository
+import app.plotted.availability.persistence.ProviderRepository
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe

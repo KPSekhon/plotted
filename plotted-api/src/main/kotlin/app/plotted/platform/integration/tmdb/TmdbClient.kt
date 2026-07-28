@@ -1,4 +1,4 @@
-package app.plotted.catalogue.integration.tmdb
+package app.plotted.platform.integration.tmdb
 
 import app.plotted.platform.ratelimit.TokenBucket
 import org.slf4j.LoggerFactory

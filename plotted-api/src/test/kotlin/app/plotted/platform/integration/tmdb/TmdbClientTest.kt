@@ -1,4 +1,4 @@
-package app.plotted.catalogue.integration.tmdb
+package app.plotted.platform.integration.tmdb
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
@@ -62,18 +62,18 @@ class TmdbClientTest {
     // --- happy path --------------------------------------------------------
 
     @Test
-    fun `maps a film, including the image CDN paths TMDB only returns as fragments`() {
+    fun `deserialises a film, including the snake-case fields`() {
         stub("/movie/438631", 200, MOVIE_JSON)
 
         val movie = client().movie(438631)
 
         movie.title shouldBe "Dune"
         movie.runtime shouldBe 155
+        movie.originalLanguage shouldBe "en"
+        // TMDB returns only the path fragment; turning it into a URL is the
+        // mapper's job and is asserted there.
+        movie.posterPath shouldBe "/poster.jpg"
         movie.genres.map { it.name } shouldContainExactly listOf("Science Fiction", "Adventure")
-
-        val mapped = TmdbMapper(TmdbProperties()).toIngestedTitle(movie)
-        mapped.posterUrl shouldBe "https://image.tmdb.org/t/p/w500/poster.jpg"
-        mapped.movie?.runtimeMinutes shouldBe 155
     }
 
     @Test
@@ -223,17 +223,21 @@ class TmdbClientTest {
     fun `a read timeout is treated as a retryable outage`() {
         server.stubFor(
             get(urlPathEqualTo("/movie/1"))
-                .willReturn(okJson(MOVIE_JSON).withFixedDelay(1_500)),
+                .willReturn(okJson(MOVIE_JSON).withFixedDelay(10_000)),
         )
 
         val failure =
             runCatching {
-                client(maxAttempts = 2, readTimeout = Duration.ofMillis(200)).movie(1)
+                client(maxAttempts = 2, readTimeout = Duration.ofMillis(100)).movie(1)
             }.exceptionOrNull()
 
         (failure is TmdbException.Unavailable) shouldBe true
         (failure as TmdbException).retryable shouldBe true
-        server.verify(2, getRequestedFor(urlPathEqualTo("/movie/1")))
+        // Asserted against the recorded backoff rather than WireMock's request
+        // journal: on a loaded machine the connection itself can time out, and
+        // then no request reaches the server at all. Our own retry decision is
+        // what this test is about, and it is deterministic.
+        slept.size shouldBe 1
     }
 
     @Test
@@ -248,14 +252,18 @@ class TmdbClientTest {
     // --- partial data ------------------------------------------------------
 
     @Test
-    fun `a series with no runtime is stored as partial rather than dropped`() {
+    fun `a payload missing most optional fields deserialises rather than failing`() {
         stub("/tv/1", 200, SERIES_WITHOUT_RUNTIME_JSON)
 
-        val mapped = TmdbMapper(TmdbProperties()).toIngestedTitle(client().series(1))
+        val series = client().series(1)
 
-        mapped.series?.averageEpisodeMinutes.shouldBeNull()
-        mapped.series?.totalRuntimeMinutes.shouldBeNull()
-        mapped.metadataStatus.dbValue shouldBe "partial"
+        series.name shouldBe "A Show With No Runtime"
+        series.numberOfSeasons shouldBe 2
+        series.episodeRunTime.shouldContainExactly(emptyList())
+        // Empty string rather than null for an unknown date; the mapper is what
+        // turns that into an absent value.
+        series.firstAirDate shouldBe ""
+        series.overview.shouldBeNull()
     }
 
     @Test

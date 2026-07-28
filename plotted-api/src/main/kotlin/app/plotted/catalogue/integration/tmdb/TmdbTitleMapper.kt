@@ -1,24 +1,27 @@
 package app.plotted.catalogue.integration.tmdb
 
-import app.plotted.catalogue.domain.AccessType
 import app.plotted.catalogue.domain.IngestedTitle
 import app.plotted.catalogue.domain.MediaType
 import app.plotted.catalogue.domain.MetadataStatus
 import app.plotted.catalogue.domain.MovieDetails
-import app.plotted.catalogue.domain.RawProviderOffer
 import app.plotted.catalogue.domain.SeriesDetails
 import app.plotted.catalogue.domain.TitleSearchResult
+import app.plotted.platform.integration.tmdb.TmdbMovieDetail
+import app.plotted.platform.integration.tmdb.TmdbProperties
+import app.plotted.platform.integration.tmdb.TmdbSearchPage
+import app.plotted.platform.integration.tmdb.TmdbSeriesDetail
+import app.plotted.platform.integration.tmdb.parseTmdbDate
 import org.springframework.stereotype.Component
 
 /**
- * The single place TMDB's shape becomes Plotted's.
+ * The single place TMDB's title shape becomes Plotted's.
  *
  * Everything here is pure: no I/O, no clock, no database. That is what makes the
  * awkward cases -- an empty release date, a series with no runtime, a search
  * result that turns out to be a person -- cheap to test exhaustively.
  */
 @Component
-class TmdbMapper(
+class TmdbTitleMapper(
     private val properties: TmdbProperties,
 ) {
     fun toIngestedTitle(movie: TmdbMovieDetail): IngestedTitle = IngestedTitle(
@@ -105,30 +108,6 @@ class TmdbMapper(
             popularityScore = result.popularity,
         )
     }
-
-    /**
-     * Flattens one region's watch providers into a neutral list, so provider
-     * canonicalisation never has to know about TMDB's payload shape.
-     *
-     * A null region is not an error: it means nobody carries the title there,
-     * which is a fact worth recording rather than a failure.
-     */
-    fun toRawOffers(region: TmdbRegionProviders?): List<RawProviderOffer> {
-        if (region == null) return emptyList()
-        return buildList {
-            addAll(region.flatrate.map { it.toOffer(AccessType.SUBSCRIPTION) })
-            addAll(region.free.map { it.toOffer(AccessType.FREE) })
-            addAll(region.ads.map { it.toOffer(AccessType.ADS) })
-            addAll(region.rent.map { it.toOffer(AccessType.RENT) })
-            addAll(region.buy.map { it.toOffer(AccessType.BUY) })
-        }
-    }
-
-    private fun TmdbProvider.toOffer(accessType: AccessType) = RawProviderOffer(
-        tmdbProviderId = providerId,
-        providerName = providerName,
-        accessType = accessType,
-    )
 
     /**
      * TMDB reports a list because anthologies and shows with specials vary.

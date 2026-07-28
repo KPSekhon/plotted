@@ -1,4 +1,4 @@
-package app.plotted.catalogue.integration.tmdb
+package app.plotted.platform.integration.tmdb
 
 import java.time.Duration
 

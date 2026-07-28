@@ -1,4 +1,4 @@
-package app.plotted.catalogue.domain
+package app.plotted.availability.domain
 
 import java.util.UUID
 
