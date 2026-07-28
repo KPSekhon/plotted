@@ -1,12 +1,11 @@
 package app.plotted
 
-import app.plotted.platform.config.PlottedProperties
 import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.boot.runApplication
 
 @SpringBootApplication
-@EnableConfigurationProperties(PlottedProperties::class)
+@ConfigurationPropertiesScan
 class PlottedApplication
 
 fun main(args: Array<String>) {

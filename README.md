@@ -16,7 +16,7 @@ every design decision here protects it.
 
 ---
 
-## Status: phase 1 of 12 complete — the skeleton
+## Status: phase 1 complete, phase 2 in progress
 
 This repository is being built in phases against a written specification. Phase 1
 is the foundation: schema, authentication, module boundaries, local stack, CI.
@@ -24,7 +24,7 @@ is the foundation: schema, authentication, module boundaries, local stack, CI.
 | | Phase | State |
 |---|---|---|
 | 1 | Skeleton — Compose, Flyway, jOOQ, Spring Security, Angular shell, CI | **Done** |
-| 2 | Catalogue — TMDB ingestion, search, availability snapshots | Next |
+| 2 | Catalogue — TMDB ingestion, search, availability snapshots | **In progress** |
 | 3 | Watchlists, subscriptions, coverage dashboard | |
 | 4 | **Queue Theory** — filters, scoring, diversification, explanations | |
 | 5 | **Cancel Culture** — CP-SAT optimiser, plan types, sensitivity | |
@@ -32,7 +32,7 @@ is the foundation: schema, authentication, module boundaries, local stack, CI.
 | 7–11 | Evaluation harness, learned ranking, Pilot Season, Temporal, analytics | |
 
 There is no Tonight Mode screen yet, and the application does not pretend to have
-one. Phase 1 is honest about being a skeleton.
+one.
 
 ### What actually works today
 
@@ -44,6 +44,37 @@ one. Phase 1 is honest about being a skeleton.
 - Module boundaries enforced by ArchUnit, failing the build on a violation
 - RFC 9457 Problem Details on every error path
 - One-command local stack
+
+### Phase 2 so far
+
+The ingestion foundation, not yet the ingestion. There is no catalogue endpoint
+and no search screen; those are the rest of phase 2.
+
+- **TMDB client** with a token bucket, selective retry and a typed failure
+  taxonomy — see [ADR 0006](docs/adr/0006-tmdb-client-fails-typed-and-retries-selectively.md)
+- **Mapping** from TMDB's shape to Plotted's, in one pure, exhaustively tested place
+- **Idempotent title persistence**, including replacing genre links that TMDB has
+  dropped rather than leaving them behind
+- **Provider canonicalisation** — TMDB reports "Crave" and "Crave Amazon Channel"
+  as different services, and five separate Paramount+ entries. Left alone they
+  would inflate the coverage figure the subscription optimiser runs on. See
+  [ADR 0007](docs/adr/0007-canonical-providers.md)
+- **`make premise-check`** — Appendix A's day-one question, answered by probing
+  real Canadian availability for a sample of deliberately awkward titles
+
+#### Answer the premise question before building further
+
+Plotted's value rests entirely on knowing what is streaming where, in Canada,
+today. If that data is thin, nothing downstream can rescue it, so the check runs
+standalone — no database, no Docker, just a token.
+
+```bash
+export TMDB_READ_ACCESS_TOKEN=...
+make premise-check
+```
+
+It reports Canadian availability per title and exits non-zero below 70% coverage.
+Run it before phase 2 goes any further.
 
 ---
 

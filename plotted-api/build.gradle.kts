@@ -63,6 +63,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.springmockk)
     testImplementation(libs.archunit.junit5)
+    testImplementation(libs.wiremock)
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.junit)
     testImplementation(libs.testcontainers.postgresql)
@@ -150,4 +151,16 @@ tasks.withType<Test>().configureEach {
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName = "plotted-api.jar"
+}
+
+// Appendix A, item 1: confirm TMDB returns useful Canadian availability before
+// building anything on top of it. No Spring context and no database, so it runs
+// on a clean checkout with nothing but a token.
+tasks.register<JavaExec>("premiseCheck") {
+    group = "verification"
+    description = "Probe TMDB for Canadian streaming availability across a sample of titles"
+    mainClass = "app.plotted.catalogue.integration.tmdb.TmdbPremiseCheck"
+    classpath = sourceSets.main.get().runtimeClasspath
+    // Pass titles of your own: ./gradlew premiseCheck --args="'The Wire' 'Slow Horses'"
+    environment("TMDB_READ_ACCESS_TOKEN", System.getenv("TMDB_READ_ACCESS_TOKEN") ?: "")
 }

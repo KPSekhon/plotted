@@ -81,6 +81,24 @@ plotted:
   cors:
     allowed-origins:
       - http://localhost:4200
+  tmdb:
+    base-url: https://api.themoviedb.org/3
+    image-base-url: https://image.tmdb.org/t/p
+    # Blank means TMDB is not configured. The application still starts and every
+    # phase 1 feature works; ingestion fails with a message naming this setting.
+    read-access-token: ${TMDB_READ_ACCESS_TOKEN:}
+    region: CA
+    language: en-CA
+    # Well under anything TMDB is known to allow. Ingestion is a background job
+    # with nobody waiting on it, so there is nothing to gain from running near a
+    # limit and the whole catalogue to lose from crossing one.
+    requests-per-second: 20
+    burst: 20
+    connect-timeout: 2s
+    read-timeout: 5s
+    max-attempts: 3
+    retry-base-delay: 250ms
+    retry-max-delay: 20s
 
 logging:
   level:

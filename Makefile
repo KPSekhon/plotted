@@ -89,6 +89,12 @@ format: ## Apply formatting fixes
 .PHONY: verify
 verify: lint test ## What CI runs on a pull request
 
+.PHONY: premise-check
+premise-check: ## Appendix A day one: does TMDB have usable Canadian availability?
+	@test -n "$$TMDB_READ_ACCESS_TOKEN" || \
+		(echo "Set TMDB_READ_ACCESS_TOKEN first. See docs/data-sources.md."; exit 2)
+	$(GRADLE) :plotted-api:premiseCheck
+
 .PHONY: openapi
 openapi: ## Regenerate the committed OpenAPI document (needs Docker)
 	$(GRADLE) :plotted-api:test --tests '*OpenApiContractTest*' -Dplotted.openapi.write=true
