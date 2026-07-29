@@ -65,6 +65,12 @@ reset: ## Stop everything and destroy the database volume
 psql: ## Open a psql shell against the development database
 	$(COMPOSE) exec postgres psql -U plotted -d plotted
 
+.PHONY: seed
+seed: ## Ingest the curated Canadian seed set (needs the database and a TMDB token)
+	@test -n "$$TMDB_READ_ACCESS_TOKEN" || \
+		(echo "Set TMDB_READ_ACCESS_TOKEN first. See docs/data-sources.md."; exit 2)
+	$(GRADLE) :plotted-api:bootRun --args='--plotted.catalogue.seed.enabled=true'
+
 # --- Build and verify -----------------------------------------------------
 
 .PHONY: build

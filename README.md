@@ -47,9 +47,8 @@ one.
 
 ### Phase 2 so far
 
-The catalogue backend works end to end: search TMDB, ingest a title, find out
-where it streams in Canada, and keep re-checking nightly. Still to come in this
-phase: the catalogue screens, and the curated seed set.
+Search TMDB, ingest a title, see where it streams in Canada, and keep
+re-checking nightly — backend and screens both.
 
 - **TMDB client** with a token bucket, selective retry and a typed failure
   taxonomy — see [ADR 0006](docs/adr/0006-tmdb-client-fails-typed-and-retries-selectively.md)
@@ -65,6 +64,9 @@ phase: the catalogue screens, and the curated seed set.
 - **Nightly snapshot collection**, budgeted and off by default
 - **Catalogue search** over PostgreSQL full-text *and* trigram similarity, so a
   typo still finds the title and OpenSearch stays unjustified
+- **Catalogue screens** — search, title pages, and an availability panel that
+  shows each offer's source and last-verified time, and hides prices when the
+  data is stale rather than showing stale money
 - **`make premise-check`** — Appendix A's day-one question, answered by probing
   real Canadian availability for a sample of deliberately awkward titles
 
@@ -77,6 +79,25 @@ GET  /api/v1/titles/{titleId}
 POST /api/v1/titles                         ingest from TMDB
 GET  /api/v1/titles/{titleId}/availability  where to watch it, with provenance
 ```
+
+#### Fill the catalogue
+
+```bash
+export TMDB_READ_ACCESS_TOKEN=...
+make seed
+```
+
+Ingests the curated list in
+[`canadian-seed.txt`](plotted-api/src/main/resources/seed/canadian-seed.txt),
+resolving each title through the same path a user adding to a watchlist takes.
+Idempotent, so it is also how the whole seed gets re-pulled after a schema
+change.
+
+The list is a **starting set, not the 500 hand-verified titles** §7.3 asks for.
+Growing it is manual on purpose: the value of a curated seed is that a person
+checked it. Add what you would actually watch, run the seed, then check the
+availability that comes back against the provider's own app — where they
+disagree is the interesting data.
 
 #### Start collecting snapshots early
 

@@ -99,6 +99,12 @@ plotted:
     max-attempts: 3
     retry-base-delay: 250ms
     retry-max-delay: 20s
+  catalogue:
+    seed:
+      # One-shot: ingests seed/canadian-seed.txt on startup, then the
+      # application keeps running normally. Idempotent, so it is also how the
+      # whole seed gets re-pulled after a schema change.
+      enabled: ${PLOTTED_SEED_ENABLED:false}
   availability:
     snapshot:
       # Off by default so running the application locally does not quietly start

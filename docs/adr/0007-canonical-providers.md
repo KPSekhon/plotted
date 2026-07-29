@@ -68,11 +68,17 @@ data can answer "is Crave cheaper through Amazon?" later without re-deriving
 anything. Provenance survives resolution, so an availability row can still be
 traced to the exact upstream entry.
 
-**Bad.** The mapping is hand-maintained and deliberately partial: 70-odd aliases
-against 135 Canadian providers. Everything unmapped is discarded, so a title
-available only on, say, Hoichoi is currently invisible. That is a known,
-reported gap rather than a silent one, but it is a gap. It also grows: TMDB adds
-services, and nothing automatically notices until an ingestion run logs the id.
+**Bad.** The mapping is hand-maintained and still not exhaustive. V9 covered the
+majors and the Canadian broadcasters; V10 added the speciality, anime and
+world-cinema services, plus the brands that reach Canada only through Amazon or
+Apple channels — roughly 110 aliases against TMDB's ~135 Canadian providers.
+What remains is the very long tail of single-genre services.
+
+Everything unmapped is still discarded, and that is the failure worth watching:
+it surfaces as a title Plotted believes nobody carries. The mapping also decays,
+because TMDB adds services and nothing notices automatically. That is why
+`ProviderResolution.unmapped` is returned as data rather than logged and
+forgotten — the next gap announces itself in an ingestion run instead of hiding.
 
 The subscription-beats-free rule is a judgement call that will occasionally be
 wrong in the user's disfavour, showing a subscription requirement for something

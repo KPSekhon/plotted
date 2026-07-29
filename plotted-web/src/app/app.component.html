@@ -17,10 +17,12 @@
         </a>
         <a routerLink="/search" routerLinkActive="is-active">Search</a>
         <a routerLink="/settings" routerLinkActive="is-active">Settings</a>
+        <a routerLink="/about" routerLinkActive="is-active">About</a>
       </nav>
       <button class="ghost-button" type="button" (click)="signOut()">Sign out</button>
     } @else {
       <nav aria-label="Main" class="nav">
+        <a routerLink="/about" routerLinkActive="is-active">About</a>
         <a routerLink="/sign-in" routerLinkActive="is-active">Sign in</a>
         <a class="cta" routerLink="/sign-up" routerLinkActive="is-active">Create account</a>
       </nav>

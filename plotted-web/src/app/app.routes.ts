@@ -48,6 +48,13 @@ export const routes: Routes = [
     title: 'Create an account · Plotted',
   },
   {
+    // Public: someone evaluating the project should not have to sign up to read
+    // what it is.
+    path: 'about',
+    loadComponent: () => import('./features/about/about.page').then((m) => m.AboutPage),
+    title: 'About · Plotted',
+  },
+  {
     // Public: the attribution obligations apply whether or not anyone is signed in.
     path: 'legal/data-sources',
     loadComponent: () =>
