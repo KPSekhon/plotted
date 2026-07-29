@@ -6,6 +6,7 @@ import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.junit.AnalyzeClasses
 import com.tngtech.archunit.junit.ArchTest
 import com.tngtech.archunit.lang.ArchRule
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 
@@ -91,14 +92,19 @@ class ModuleBoundaryTest {
             .should().dependOnClassesThat().resideInAPackage("..api..")
 
     /**
-     * SQL lives in repositories. This is the rule that keeps a query from being
-     * written inline in a controller "just this once".
+     * SQL lives in persistence packages. This is the rule that keeps a query
+     * from being written inline in a controller "just this once".
+     *
+     * Scoped by package rather than by class name deliberately. A Kotlin lambda
+     * inside a repository compiles to a synthetic class whose name does not end
+     * in `Repository`, so the name-based version of this rule reported a
+     * repository's own internals as violations. The package is what actually
+     * expresses the intent.
      */
     @ArchTest
-    val sqlIsConfinedToRepositories: ArchRule =
+    val sqlIsConfinedToPersistencePackages: ArchRule =
         noClasses()
-            .that().resideOutsideOfPackage("app.plotted.generated..")
-            .and().haveSimpleNameNotEndingWith("Repository")
+            .that().resideOutsideOfPackages("..persistence..", "app.plotted.generated..")
             .should().dependOnClassesThat().haveFullyQualifiedName("org.jooq.DSLContext")
 
     /**
@@ -106,9 +112,16 @@ class ModuleBoundaryTest {
      * service importing them means the schema has leaked into the domain.
      */
     @ArchTest
-    val generatedCodeIsUsedOnlyByRepositories: ArchRule =
+    val generatedCodeIsUsedOnlyInPersistencePackages: ArchRule =
         noClasses()
-            .that().resideOutsideOfPackage("app.plotted.generated..")
-            .and().haveSimpleNameNotEndingWith("Repository")
+            .that().resideOutsideOfPackages("..persistence..", "app.plotted.generated..")
             .should().dependOnClassesThat().resideInAPackage("app.plotted.generated..")
+
+    /** ...and the naming stays honest in the other direction too. */
+    @ArchTest
+    val repositoriesLiveInPersistencePackages: ArchRule =
+        classes()
+            .that().haveSimpleNameEndingWith("Repository")
+            .and().resideOutsideOfPackage("app.plotted.generated..")
+            .should().resideInAPackage("..persistence..")
 }

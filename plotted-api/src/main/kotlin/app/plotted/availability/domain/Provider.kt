@@ -1,5 +1,7 @@
 package app.plotted.availability.domain
 
+import java.math.BigDecimal
+import java.time.Instant
 import java.util.UUID
 
 enum class ProviderType(
@@ -106,4 +108,31 @@ data class ProviderResolution(
     val unmapped: List<RawProviderOffer>,
 ) {
     val hasGaps: Boolean get() = unmapped.isNotEmpty()
+}
+
+/** An availability row as currently stored and still believed to be true. */
+data class StoredAvailability(
+    val id: UUID,
+    val providerId: UUID,
+    val accessType: AccessType,
+    val price: BigDecimal?,
+    val currency: String?,
+    val deepLink: String?,
+    val sourceCheckedAt: Instant,
+    val confidence: BigDecimal,
+)
+
+/**
+ * What changed between what is stored and what upstream now reports.
+ *
+ * Produced as a value rather than applied as it is computed, so the arithmetic
+ * that decides what changed is separable from the writes that act on it -- and
+ * so it can be tested without a database.
+ */
+data class AvailabilityDiff(
+    val added: List<ProviderOffer>,
+    val removed: List<StoredAvailability>,
+    val unchanged: List<StoredAvailability>,
+) {
+    val hasChanges: Boolean get() = added.isNotEmpty() || removed.isNotEmpty()
 }

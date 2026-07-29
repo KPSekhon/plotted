@@ -1,12 +1,12 @@
 package app.plotted.identity.domain
 
 import app.plotted.identity.persistence.UserRepository
-import app.plotted.platform.audit.AuditLogRepository
 import app.plotted.platform.config.PlottedProperties
 import app.plotted.platform.error.EmailAlreadyRegisteredException
 import app.plotted.platform.error.InvalidCredentialsException
 import app.plotted.platform.error.NotFoundException
 import app.plotted.platform.error.UnsupportedRegionException
+import app.plotted.platform.persistence.AuditLogRepository
 import app.plotted.platform.security.AuthenticatedUser
 import app.plotted.platform.security.JwtService
 import org.springframework.dao.DuplicateKeyException

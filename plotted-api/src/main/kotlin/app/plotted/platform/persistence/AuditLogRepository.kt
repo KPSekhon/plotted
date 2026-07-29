@@ -1,4 +1,4 @@
-package app.plotted.platform.audit
+package app.plotted.platform.persistence
 
 import app.plotted.generated.jooq.tables.references.AUDIT_LOG
 import com.fasterxml.jackson.databind.ObjectMapper

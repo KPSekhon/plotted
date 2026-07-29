@@ -1,4 +1,4 @@
-package app.plotted.platform.outbox
+package app.plotted.platform.persistence
 
 import app.plotted.generated.jooq.tables.references.OUTBOX
 import com.fasterxml.jackson.databind.ObjectMapper
