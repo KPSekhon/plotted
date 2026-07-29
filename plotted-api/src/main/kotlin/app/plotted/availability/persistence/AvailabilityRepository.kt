@@ -1,8 +1,12 @@
 package app.plotted.availability.persistence
 
 import app.plotted.availability.domain.AccessType
+import app.plotted.availability.domain.AvailabilityOffer
+import app.plotted.availability.domain.Provider
+import app.plotted.availability.domain.ProviderType
 import app.plotted.availability.domain.StoredAvailability
 import app.plotted.generated.jooq.tables.references.AVAILABILITY_SNAPSHOTS
+import app.plotted.generated.jooq.tables.references.PROVIDERS
 import app.plotted.generated.jooq.tables.references.TITLE_AVAILABILITY
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.jooq.DSLContext
@@ -58,6 +62,57 @@ class AvailabilityRepository(
                 price = record[TITLE_AVAILABILITY.PRICE],
                 currency = record[TITLE_AVAILABILITY.CURRENCY]?.trim(),
                 deepLink = record[TITLE_AVAILABILITY.DEEP_LINK],
+                sourceCheckedAt = record[TITLE_AVAILABILITY.SOURCE_CHECKED_AT]!!.toInstant(),
+                confidence = record[TITLE_AVAILABILITY.CONFIDENCE]!!,
+            )
+        }
+
+    /**
+     * Everything currently known about where a title can be watched, with the
+     * provider joined in.
+     *
+     * `source` and `source_checked_at` are returned rather than hidden because
+     * section 5 requires every displayed availability claim to carry provenance
+     * and a last-verified time. A card that cannot say when it last checked has
+     * no business claiming anything.
+     */
+    fun findOffers(titleId: UUID, regionCode: String): List<AvailabilityOffer> = dsl.select(
+        TITLE_AVAILABILITY.ID,
+        TITLE_AVAILABILITY.ACCESS_TYPE,
+        TITLE_AVAILABILITY.PRICE,
+        TITLE_AVAILABILITY.CURRENCY,
+        TITLE_AVAILABILITY.DEEP_LINK,
+        TITLE_AVAILABILITY.SOURCE,
+        TITLE_AVAILABILITY.SOURCE_CHECKED_AT,
+        TITLE_AVAILABILITY.CONFIDENCE,
+        PROVIDERS.ID,
+        PROVIDERS.NAME,
+        PROVIDERS.SLUG,
+        PROVIDERS.PROVIDER_TYPE,
+        PROVIDERS.LOGO_URL,
+    )
+        .from(TITLE_AVAILABILITY)
+        .join(PROVIDERS).on(PROVIDERS.ID.eq(TITLE_AVAILABILITY.PROVIDER_ID))
+        .where(TITLE_AVAILABILITY.TITLE_ID.eq(titleId))
+        .and(TITLE_AVAILABILITY.REGION_CODE.eq(regionCode))
+        .and(TITLE_AVAILABILITY.ACTIVE.isTrue)
+        .orderBy(TITLE_AVAILABILITY.ACCESS_TYPE, PROVIDERS.NAME)
+        .fetch()
+        .map { record ->
+            AvailabilityOffer(
+                id = record[TITLE_AVAILABILITY.ID]!!,
+                provider = Provider(
+                    id = record[PROVIDERS.ID]!!,
+                    name = record[PROVIDERS.NAME]!!,
+                    slug = record[PROVIDERS.SLUG]!!,
+                    type = ProviderType.fromDb(record[PROVIDERS.PROVIDER_TYPE]!!),
+                ),
+                providerLogoUrl = record[PROVIDERS.LOGO_URL],
+                accessType = AccessType.fromDb(record[TITLE_AVAILABILITY.ACCESS_TYPE]!!),
+                price = record[TITLE_AVAILABILITY.PRICE],
+                currency = record[TITLE_AVAILABILITY.CURRENCY]?.trim(),
+                deepLink = record[TITLE_AVAILABILITY.DEEP_LINK],
+                source = record[TITLE_AVAILABILITY.SOURCE]!!,
                 sourceCheckedAt = record[TITLE_AVAILABILITY.SOURCE_CHECKED_AT]!!.toInstant(),
                 confidence = record[TITLE_AVAILABILITY.CONFIDENCE]!!,
             )

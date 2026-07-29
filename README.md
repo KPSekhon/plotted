@@ -47,20 +47,47 @@ one.
 
 ### Phase 2 so far
 
-The ingestion foundation, not yet the ingestion. There is no catalogue endpoint
-and no search screen; those are the rest of phase 2.
+The catalogue backend works end to end: search TMDB, ingest a title, find out
+where it streams in Canada, and keep re-checking nightly. Still to come in this
+phase: the catalogue screens, and the curated seed set.
 
 - **TMDB client** with a token bucket, selective retry and a typed failure
   taxonomy — see [ADR 0006](docs/adr/0006-tmdb-client-fails-typed-and-retries-selectively.md)
 - **Mapping** from TMDB's shape to Plotted's, in one pure, exhaustively tested place
-- **Idempotent title persistence**, including replacing genre links that TMDB has
+- **Idempotent title ingestion**, including replacing genre links that TMDB has
   dropped rather than leaving them behind
 - **Provider canonicalisation** — TMDB reports "Crave" and "Crave Amazon Channel"
   as different services, and five separate Paramount+ entries. Left alone they
   would inflate the coverage figure the subscription optimiser runs on. See
   [ADR 0007](docs/adr/0007-canonical-providers.md)
+- **Availability with provenance** — dated windows opened and closed rather than
+  overwritten, every offer carrying its source and last-verified time
+- **Nightly snapshot collection**, budgeted and off by default
+- **Catalogue search** over PostgreSQL full-text *and* trigram similarity, so a
+  typo still finds the title and OpenSearch stays unjustified
 - **`make premise-check`** — Appendix A's day-one question, answered by probing
   real Canadian availability for a sample of deliberately awkward titles
+
+#### API
+
+```
+GET  /api/v1/titles/search?query=           the ingested catalogue
+GET  /api/v1/titles/discover?query=         TMDB, for titles not ingested yet
+GET  /api/v1/titles/{titleId}
+POST /api/v1/titles                         ingest from TMDB
+GET  /api/v1/titles/{titleId}/availability  where to watch it, with provenance
+```
+
+#### Start collecting snapshots early
+
+Off unless you turn it on, because it spends TMDB quota:
+
+```bash
+PLOTTED_SNAPSHOT_ENABLED=true make api
+```
+
+Plot Armour's removal-risk model needs months of history before it can exist at
+all, and a night not collected cannot be recovered later.
 
 #### Answer the premise question before building further
 

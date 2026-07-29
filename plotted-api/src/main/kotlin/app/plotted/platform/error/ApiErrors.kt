@@ -22,6 +22,13 @@ enum class ErrorCode(
     UNSUPPORTED_REGION(HttpStatus.UNPROCESSABLE_ENTITY, "Unsupported region"),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error"),
+
+    /**
+     * A third party Plotted depends on could not be reached. 503 rather than
+     * 500, because the request is worth retrying and the client can tell the
+     * difference.
+     */
+    UPSTREAM_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Upstream service unavailable"),
     ;
 
     /** RFC 9457 `type` URI. Resolves to the published error reference. */

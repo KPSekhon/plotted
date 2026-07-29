@@ -110,6 +110,27 @@ data class ProviderResolution(
     val hasGaps: Boolean get() = unmapped.isNotEmpty()
 }
 
+/**
+ * A way of watching a title, ready to be shown.
+ *
+ * Carries its own provenance -- source, when it was last verified, and how much
+ * it is trusted -- because section 5 makes that a product requirement rather
+ * than a debugging aid. Being able to say "verified 3 hours ago, from JustWatch"
+ * is what lets Plotted be wrong gracefully instead of confidently.
+ */
+data class AvailabilityOffer(
+    val id: UUID,
+    val provider: Provider,
+    val providerLogoUrl: String?,
+    val accessType: AccessType,
+    val price: BigDecimal?,
+    val currency: String?,
+    val deepLink: String?,
+    val source: String,
+    val sourceCheckedAt: Instant,
+    val confidence: BigDecimal,
+)
+
 /** An availability row as currently stored and still believed to be true. */
 data class StoredAvailability(
     val id: UUID,

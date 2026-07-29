@@ -99,6 +99,17 @@ plotted:
     max-attempts: 3
     retry-base-delay: 250ms
     retry-max-delay: 20s
+  availability:
+    snapshot:
+      # Off by default so running the application locally does not quietly start
+      # spending the TMDB quota. Turn it on wherever the history is collected:
+      # Plot Armour needs months of it before it can exist at all, so every night
+      # this does not run is a night that cannot be recovered.
+      enabled: ${PLOTTED_SNAPSHOT_ENABLED:false}
+      cron: "0 30 3 * * *"
+      # Titles per run. At 20 requests per second this is a few minutes of work,
+      # and it is the knob to turn when the catalogue outgrows one nightly pass.
+      batch-size: 500
 
 logging:
   level:
