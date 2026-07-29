@@ -1,16 +1,42 @@
 @use '@angular/material' as mat;
 
-// Material 3. One theme, defined once; screens pull tokens from it rather than
-// each inventing its own colours.
+/*
+ * Plotted's look, in one place.
+ *
+ * Dark by default, and not as a fashion choice: this is a product used in the
+ * evening, on a sofa, deciding what to watch. A bright interface is the wrong
+ * object in that room. The accent is a warm amber rather than Material's default
+ * violet -- it reads as cinema marquee against cool neutrals, and it means the
+ * product does not look like every other Material demo.
+ *
+ * The rule underneath everything here: Plotted exists to reduce the work of
+ * choosing, so the interface stays quiet. Few borders, almost no elevation,
+ * generous space, and one accent used sparingly on the thing you are meant to do
+ * next. Anything competing for attention is working against the product.
+ */
+
 $plotted-theme: mat.define-theme(
   (
     color: (
-      theme-type: light,
-      primary: mat.$violet-palette,
-      tertiary: mat.$cyan-palette,
+      theme-type: dark,
+      primary: mat.$orange-palette,
+      tertiary: mat.$blue-palette,
     ),
+    // Slightly tighter than default: less chrome per control.
     density: (
-      scale: 0,
+      scale: -1,
+    ),
+    typography: (
+      plain-family: (
+        Inter,
+        system-ui,
+        sans-serif,
+      ),
+      brand-family: (
+        Inter,
+        system-ui,
+        sans-serif,
+      ),
     ),
   )
 );
@@ -19,28 +45,194 @@ html {
   @include mat.core();
   @include mat.all-component-themes($plotted-theme);
 
-  color-scheme: light;
-  font-family: Roboto, 'Helvetica Neue', system-ui, sans-serif;
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root {
+  /* Neutrals. Deliberately not pure black -- a flat #000 makes every surface
+     above it look like a floating rectangle. */
+  --plotted-bg: #0e0f13;
+  --plotted-surface: #16181f;
+  --plotted-surface-raised: #1c1f28;
+  --plotted-border: #262a35;
+  --plotted-border-strong: #333846;
+
+  --plotted-text: #e9ebf0;
+  --plotted-text-muted: #9aa1b1;
+  --plotted-text-faint: #6b7385;
+
+  --plotted-accent: #f5b544;
+  --plotted-accent-soft: rgb(245 181 68 / 12%);
+
+  --plotted-danger: #ff6b6b;
+
+  --plotted-radius: 0.75rem;
+  --plotted-radius-sm: 0.5rem;
+
+  /* One shadow, used rarely. Depth is expensive attention. */
+  --plotted-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 24px rgb(0 0 0 / 24%);
+
+  /* Material tokens pointed at the palette above, so Material components and
+     hand-written styles cannot drift apart.
+
+     This block is longer than it looks like it needs to be for a reason:
+     Material 3 derives its *neutral* surfaces from the primary palette, so an
+     amber primary tints every panel, table and menu a warm sepia. That reads as
+     a bug next to the cool neutrals above — surfaces from two different colour
+     families on the same screen. Pinning them keeps one palette. */
+  --mat-sys-surface: var(--plotted-bg);
+  --mat-sys-surface-container-lowest: var(--plotted-bg);
+  --mat-sys-surface-container-low: var(--plotted-surface);
+  --mat-sys-surface-container: var(--plotted-surface);
+  --mat-sys-surface-container-high: var(--plotted-surface-raised);
+  --mat-sys-surface-container-highest: var(--plotted-surface-raised);
+  --mat-sys-surface-variant: var(--plotted-surface-raised);
+  --mat-sys-on-surface: var(--plotted-text);
+  --mat-sys-on-surface-variant: var(--plotted-text-muted);
+  --mat-sys-outline: var(--plotted-border-strong);
+  --mat-sys-outline-variant: var(--plotted-border);
+  --mat-sys-error: var(--plotted-danger);
+
+  /* The table keeps its own copies of these rather than reading the sys tokens,
+     so they have to be set again or the rows stay sepia. */
+  --mat-table-background-color: transparent;
+  --mat-table-header-headline-color: var(--plotted-text-faint);
+  --mat-table-row-item-label-text-color: var(--plotted-text);
+  --mat-table-row-item-outline-color: var(--plotted-border);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background: var(--mat-sys-surface, #fdfcff);
-  color: var(--mat-sys-on-surface, #1b1b1f);
+  background: var(--plotted-bg);
+  color: var(--plotted-text);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  /* A little warmth behind the top of the page so the background is not a flat
+     slab. Fixed, so it does not travel with the scroll. */
+  background-image: radial-gradient(
+    120rem 40rem at 50% -22rem,
+    rgb(245 181 68 / 6%),
+    transparent 70%
+  );
+  background-attachment: fixed;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
 }
 
 h1 {
-  font-size: 1.6rem;
-  font-weight: 600;
+  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+}
+
+h2 {
+  font-size: 1.2rem;
+}
+
+p {
   margin: 0 0 1rem;
 }
 
 a {
   color: inherit;
+  text-decoration-color: var(--plotted-border-strong);
+  text-underline-offset: 0.2em;
 }
 
-// Respect a reduced-motion preference rather than assuming everyone wants the
-// Material transitions.
+a:hover {
+  text-decoration-color: var(--plotted-accent);
+}
+
+::selection {
+  background: var(--plotted-accent-soft);
+}
+
+/* Focus is never removed, only made to look deliberate. */
+:focus-visible {
+  outline: 2px solid var(--plotted-accent);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* --- shared building blocks -------------------------------------------- */
+
+.panel {
+  background: var(--plotted-surface);
+  border: 1px solid var(--plotted-border);
+  border-radius: var(--plotted-radius);
+  padding: 1.25rem 1.5rem;
+}
+
+.muted {
+  color: var(--plotted-text-muted);
+}
+
+.faint {
+  color: var(--plotted-text-faint);
+}
+
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--plotted-text-faint);
+}
+
+.form-error {
+  color: var(--plotted-danger);
+  font-size: 0.875rem;
+  margin: 0 0 0.75rem;
+}
+
+/* --- Material adjustments ----------------------------------------------- */
+
+/* Material derives a card's outline from the primary palette, which tints it
+   brown against an amber accent. The border is structural here, not accent, so
+   it is pinned to the neutral. */
+.mat-mdc-card {
+  background: var(--plotted-surface) !important;
+  border: 1px solid var(--plotted-border) !important;
+  border-radius: var(--plotted-radius) !important;
+  box-shadow: none !important;
+}
+
+.mat-mdc-unelevated-button,
+.mat-mdc-raised-button,
+.mat-mdc-outlined-button,
+.mat-mdc-button {
+  border-radius: 999px !important;
+  letter-spacing: 0 !important;
+}
+
+.mat-mdc-unelevated-button,
+.mat-mdc-raised-button {
+  font-weight: 600 !important;
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+.mat-mdc-progress-bar {
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+/* Respect a reduced-motion preference rather than assuming everyone wants the
+   Material transitions. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -48,5 +240,6 @@ a {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -16,6 +16,20 @@ export const routes: Routes = [
     title: 'Plotted',
   },
   {
+    path: 'search',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/catalogue/catalogue-search.page').then((m) => m.CatalogueSearchPage),
+    title: 'Search · Plotted',
+  },
+  {
+    path: 'titles/:titleId',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/catalogue/title-detail.page').then((m) => m.TitleDetailPage),
+    title: 'Title · Plotted',
+  },
+  {
     path: 'settings',
     canActivate: [authGuard],
     loadComponent: () => import('./features/settings/settings.page').then((m) => m.SettingsPage),
