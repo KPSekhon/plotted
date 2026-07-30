@@ -2,6 +2,7 @@ package app.plotted.catalogue.domain
 
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.util.UUID
 
 enum class MediaType(
     val dbValue: String,
@@ -103,7 +104,7 @@ data class SeriesDetails(
     val totalRuntimeMinutes: Int?,
 )
 
-/** One result from a catalogue search, before the details are fetched. */
+/** One result from a TMDB search, before the details are fetched. */
 data class TitleSearchResult(
     val externalId: String,
     val mediaType: MediaType,
@@ -113,3 +114,38 @@ data class TitleSearchResult(
     val posterUrl: String?,
     val popularityScore: BigDecimal?,
 )
+
+/**
+ * A title as Plotted has it stored.
+ *
+ * Distinct from [IngestedTitle], which is what arrives from upstream. This is
+ * what comes back out: it carries a Plotted identifier and flattens the
+ * film-versus-series split into the few fields every caller actually reads.
+ */
+data class CatalogueTitle(
+    val id: UUID,
+    val mediaType: MediaType,
+    val name: String,
+    val originalName: String?,
+    val overview: String?,
+    val releaseDate: LocalDate?,
+    val posterUrl: String?,
+    val popularityScore: BigDecimal?,
+    val communityRating: BigDecimal?,
+    val metadataStatus: MetadataStatus,
+    val runtimeMinutes: Int?,
+    val totalRuntimeMinutes: Int?,
+    val episodeCount: Int?,
+) {
+    /**
+     * How long this takes to get through, whichever kind of thing it is.
+     * Tonight Mode's hard time filter reads this and nothing else.
+     */
+    val watchMinutes: Int? get() = if (mediaType == MediaType.MOVIE) runtimeMinutes else totalRuntimeMinutes
+
+    /**
+     * Ranking may still use a title without a runtime; a time-constrained
+     * request must not, because "it fits" would be a guess.
+     */
+    val hasUsableRuntime: Boolean get() = watchMinutes != null
+}

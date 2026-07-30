@@ -1,13 +1,41 @@
+/*
+ * Sign in and sign up. A narrow column, centred, with nothing else on screen --
+ * there is exactly one thing to do here.
+ */
+
 .auth-card {
-  max-width: 28rem;
-  margin: 2rem auto;
+  max-width: 25rem;
+  margin: 3rem auto;
+  /* Overriding the Material card here rather than nesting one: the card's own
+     padding and header slots fight a form this simple. */
+  padding: 2rem !important;
+}
+
+.auth-card mat-card-header {
+  padding: 0;
+  display: block;
+  margin-bottom: 1.5rem;
+}
+
+.auth-card mat-card-content {
+  padding: 0;
+}
+
+.auth-card mat-card-title {
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.3rem;
+}
+
+.auth-card mat-card-subtitle {
+  color: var(--plotted-text-muted);
+  font-size: 0.9rem;
 }
 
 form {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  margin-top: 1rem;
+  gap: 0.35rem;
 }
 
 mat-form-field {
@@ -15,24 +43,30 @@ mat-form-field {
 }
 
 button[type='submit'] {
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
+  height: 2.75rem;
 }
 
 .form-error {
   margin: 0 0 0.75rem;
-  color: var(--mat-sys-error, #b3261e);
+  color: var(--plotted-danger);
   font-size: 0.875rem;
 }
 
 .field-hint {
-  margin: -0.5rem 0 1rem;
+  margin: -0.35rem 0 0.9rem;
   font-size: 0.75rem;
-  opacity: 0.8;
+  color: var(--plotted-text-faint);
+  line-height: 1.5;
 }
 
 mat-card-actions {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0 1rem 1rem;
+  gap: 0.35rem;
+  padding: 1.25rem 0 0;
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--plotted-border);
+  font-size: 0.875rem;
+  color: var(--plotted-text-muted);
 }

@@ -5,6 +5,8 @@
     <title>Plotted — Stop browsing. Your night's plotted.</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0e0f13" />
     <meta
       name="description"
       content="Plotted is a platform-neutral streaming decision and subscription optimisation platform."
@@ -13,10 +15,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined"
+      rel="stylesheet"
+    />
+    <style>
+      /* Painted before Angular boots, so a slow first load shows a dark page
+         rather than a white flash into a dark application. */
+      html,
+      body {
+        background: #0e0f13;
+        margin: 0;
+      }
+
+      .mat-icon,
+      .material-icons {
+        font-family: 'Material Icons Outlined', sans-serif;
+      }
+    </style>
   </head>
   <body>
     <plotted-root></plotted-root>

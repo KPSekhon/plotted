@@ -1,7 +1,4 @@
 import { Component, inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatToolbarModule } from '@angular/material/toolbar';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { AuthService } from './core/auth/auth.service';
@@ -9,14 +6,9 @@ import { AuthService } from './core/auth/auth.service';
 @Component({
   selector: 'plotted-root',
   standalone: true,
-  imports: [
-    RouterOutlet,
-    RouterLink,
-    RouterLinkActive,
-    MatToolbarModule,
-    MatButtonModule,
-    MatIconModule,
-  ],
+  // No Material here: the shell is plain markup, so the header is a hairline
+  // rather than a toolbar that announces itself on every screen.
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })

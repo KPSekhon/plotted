@@ -1,89 +1,99 @@
-import { DatePipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatListModule } from '@angular/material/list';
 import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../core/auth/auth.service';
 
+/**
+ * The signed-in landing page.
+ *
+ * Deliberately close to empty, and that is the product argument rather than an
+ * unfinished screen: Plotted exists because too many options is the problem. So
+ * home offers one action. Build status and what the product is for live on the
+ * about page, where someone evaluating the project can find them and someone who
+ * just wants to watch something is not made to read them.
+ */
 @Component({
   selector: 'plotted-home',
   standalone: true,
-  imports: [DatePipe, RouterLink, MatCardModule, MatButtonModule, MatListModule],
+  imports: [RouterLink],
   template: `
     @if (auth.user(); as user) {
-      <section class="greeting">
-        <h1>Evening, {{ user.displayName }}.</h1>
-        <p>
-          Your account is set up for {{ user.regionCode }} and priced in
-          {{ user.preferredCurrency }}. Joined {{ user.createdAt | date: 'longDate' }}.
+      <section class="hero">
+        <p class="eyebrow">{{ greeting() }}, {{ user.displayName }}</p>
+        <h1>What are you watching tonight?</h1>
+        <p class="lede muted">
+          Search the catalogue and see where anything streams in {{ user.regionCode }}.
+        </p>
+
+        <a class="primary-action" routerLink="/search">
+          Search the catalogue
+          <span aria-hidden="true">&rarr;</span>
+        </a>
+
+        <p class="secondary muted">
+          Tonight Mode is not built yet.
+          <a routerLink="/about">See what is coming</a>.
         </p>
       </section>
-
-      <div class="cards">
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title>Account</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <mat-list>
-              <mat-list-item>
-                <span matListItemTitle>Email</span>
-                <span matListItemLine>{{ user.email }}</span>
-              </mat-list-item>
-              <mat-list-item>
-                <span matListItemTitle>Time zone</span>
-                <span matListItemLine>{{ user.timezone }}</span>
-              </mat-list-item>
-              <mat-list-item>
-                <span matListItemTitle>Onboarding</span>
-                <span matListItemLine>{{ user.onboardingStatus }}</span>
-              </mat-list-item>
-            </mat-list>
-          </mat-card-content>
-          <mat-card-actions>
-            <a mat-button routerLink="/settings">Edit your defaults</a>
-          </mat-card-actions>
-        </mat-card>
-
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title>What is built so far</mat-card-title>
-            <mat-card-subtitle>Phase 1 of 12 &mdash; the skeleton</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <p>
-              Accounts, sessions, the Canadian schema and the recommendation defaults below are
-              live. The catalogue lands in phase 2, watchlists and coverage in phase 3, then
-              Tonight Mode and the subscription optimiser.
-            </p>
-            <p class="muted">
-              There is nothing to recommend yet, so nothing here pretends to recommend anything.
-            </p>
-          </mat-card-content>
-        </mat-card>
-      </div>
     }
   `,
   styles: `
-    .greeting h1 {
-      margin-bottom: 0.25rem;
+    .hero {
+      max-width: 38rem;
+      /* Sits a little off the top edge: the page has one thing on it, and
+         pinning that to the header would look like a mistake. */
+      margin-top: clamp(1rem, 6vh, 4rem);
     }
 
-    .cards {
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-      margin-top: 1.5rem;
+    .hero h1 {
+      margin: 0.35rem 0 0.75rem;
     }
 
-    .muted {
-      opacity: 0.7;
+    .lede {
+      font-size: 1.05rem;
+      margin-bottom: 2rem;
+    }
+
+    .primary-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 999px;
+      background: var(--plotted-accent);
+      color: #1a1408;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+
+    .primary-action:hover {
+      background: #ffc65c;
+      transform: translateX(2px);
+    }
+
+    .secondary {
+      margin: 1.75rem 0 0;
       font-size: 0.875rem;
+    }
+
+    .secondary a {
+      color: var(--plotted-text-muted);
+    }
+
+    .secondary a:hover {
+      color: var(--plotted-accent);
     }
   `,
 })
 export class HomePage {
   protected readonly auth = inject(AuthService);
+
+  /** A small touch, but this is an evening product and it should know that. */
+  protected greeting(): string {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Morning';
+    if (hour < 17) return 'Afternoon';
+    return 'Evening';
+  }
 }

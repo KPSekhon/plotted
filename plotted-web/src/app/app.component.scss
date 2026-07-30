@@ -10,66 +10,155 @@
   top: 0;
   z-index: 100;
   padding: 0.75rem 1rem;
-  background: #fff;
-  color: #000;
+  background: var(--plotted-accent);
+  color: #1a1408;
+  font-weight: 600;
+  border-radius: 0 0 var(--plotted-radius-sm) 0;
 
   &:focus {
     left: 0;
   }
 }
 
+/*
+ * A hairline header rather than a Material toolbar. The toolbar's fill and
+ * elevation announce themselves on every screen, and the header is never the
+ * thing a viewer came here to look at.
+ */
 .app-bar {
-  gap: 0.5rem;
   position: sticky;
   top: 0;
   z-index: 10;
+  border-bottom: 1px solid var(--plotted-border);
+  background: rgb(14 15 19 / 78%);
+  backdrop-filter: blur(12px);
+}
+
+.app-bar__inner {
+  width: min(72rem, 100%);
+  margin: 0 auto;
+  padding: 0.7rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
 }
 
 .brand {
   display: flex;
-  flex-direction: column;
-  line-height: 1.1;
+  align-items: center;
+  gap: 0.6rem;
   text-decoration: none;
-  color: inherit;
+  margin-right: auto;
+
+  &__mark {
+    width: 0.55rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    /* The one piece of pure brand colour in the chrome. */
+    background: linear-gradient(180deg, var(--plotted-accent), #d98f18);
+    flex-shrink: 0;
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+  }
 
   &__name {
-    font-weight: 600;
-    font-size: 1.15rem;
-    letter-spacing: 0.01em;
+    font-weight: 650;
+    font-size: 1.05rem;
+    letter-spacing: -0.02em;
   }
 
   &__tagline {
-    font-size: 0.7rem;
-    opacity: 0.8;
+    font-size: 0.68rem;
+    color: var(--plotted-text-faint);
   }
 }
 
-.spacer {
-  flex: 1 1 auto;
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+
+  a {
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    color: var(--plotted-text-muted);
+    text-decoration: none;
+    transition: color 0.12s ease, background-color 0.12s ease;
+
+    &:hover {
+      color: var(--plotted-text);
+      background: var(--plotted-surface);
+    }
+  }
+
+  a.is-active {
+    color: var(--plotted-text);
+    background: var(--plotted-surface-raised);
+  }
+
+  a.cta {
+    background: var(--plotted-accent);
+    color: #1a1408;
+    font-weight: 600;
+
+    &:hover {
+      background: #ffc65c;
+      color: #1a1408;
+    }
+  }
 }
 
-.is-active {
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 0.35rem;
+.ghost-button {
+  background: none;
+  border: 1px solid var(--plotted-border-strong);
+  color: var(--plotted-text-muted);
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease;
+
+  &:hover {
+    color: var(--plotted-text);
+    border-color: var(--plotted-text-faint);
+  }
 }
 
 .app-main {
   flex: 1 1 auto;
   width: min(72rem, 100%);
   margin: 0 auto;
-  padding: 2rem 1rem 3rem;
+  padding: 2.5rem 1.25rem 4rem;
 }
 
 .app-footer {
-  padding: 1rem;
-  font-size: 0.75rem;
-  text-align: center;
-  opacity: 0.75;
+  border-top: 1px solid var(--plotted-border);
+  padding: 1.5rem 1.25rem;
+
+  p {
+    width: min(72rem, 100%);
+    margin: 0 auto;
+    font-size: 0.75rem;
+    color: var(--plotted-text-faint);
+  }
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 46rem) {
   .brand__tagline {
     display: none;
+  }
+
+  .app-bar__inner {
+    gap: 0.5rem;
+  }
+
+  .nav a {
+    padding: 0.4rem 0.55rem;
   }
 }

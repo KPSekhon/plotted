@@ -1,0 +1,156 @@
+# Plotted :: Canadian catalogue seed
+#
+# One title per line. Blank lines and lines starting with # are ignored.
+# Each entry is resolved through TMDB search and ingested with its Canadian
+# availability, exactly as a user adding it by hand would be.
+#
+#     make seed          (needs TMDB_READ_ACCESS_TOKEN and a running database)
+#
+# WHAT THIS IS, HONESTLY
+#
+# Section 7.3 of the specification asks for roughly 500 titles, hand-verified,
+# with correct prices and deep links. This file is not that yet. It is a
+# starting set chosen to span the Canadian services and the awkward cases --
+# Canadian originals, public broadcasters, prestige cable, anime, subtitled
+# film, older titles that have drifted between services -- so that the coverage
+# numbers it produces are informative rather than flattering.
+#
+# Growing it to 500 is manual work and deliberately so: the point of a curated
+# seed is that a person checked it. Add titles you would actually watch, run
+# the seed, and check the availability that comes back against the provider's
+# own app. Where they disagree, that disagreement is the interesting data --
+# record it through the availability-correction endpoint rather than editing
+# the row.
+
+# --- Canadian originals and co-productions ---------------------------------
+Schitt's Creek
+Letterkenny
+Anne with an E
+Orphan Black
+Kim's Convenience
+Trailer Park Boys
+Corner Gas
+Murdoch Mysteries
+Degrassi: The Next Generation
+Slings and Arrows
+Sort Of
+Son of a Critch
+Workin' Moms
+Heartland
+Bon Cop Bad Cop
+Room
+Incendies
+Stories We Tell
+Away from Her
+Atanarjuat: The Fast Runner
+Sorry to Bother You
+Scott Pilgrim vs. the World
+
+# --- Prestige television ---------------------------------------------------
+Severance
+The Bear
+Succession
+Barry
+Better Call Saul
+Breaking Bad
+The Wire
+The Sopranos
+Mad Men
+Chernobyl
+The Last of Us
+Andor
+The Rehearsal
+Atlanta
+Fleabag
+The Handmaid's Tale
+Ted Lasso
+Slow Horses
+Shogun
+The White Lotus
+Yellowjackets
+Only Murders in the Building
+What We Do in the Shadows
+Reservation Dogs
+Poker Face
+Dark
+Money Heist
+
+# --- Comfort and long-runners ----------------------------------------------
+Psych
+Brooklyn Nine-Nine
+The Office
+Parks and Recreation
+30 Rock
+Community
+Bob's Burgers
+Arrested Development
+Frasier
+Seinfeld
+
+# --- Film: recent -----------------------------------------------------------
+Dune
+Dune: Part Two
+Everything Everywhere All at Once
+Past Lives
+Poor Things
+Oppenheimer
+Anatomy of a Fall
+The Zone of Interest
+Killers of the Flower Moon
+Aftersun
+The Banshees of Inisherin
+Nope
+Parasite
+Portrait of a Lady on Fire
+Drive My Car
+Minari
+The Farewell
+Moonlight
+Arrival
+Blade Runner 2049
+Sicario
+Prisoners
+
+# --- Film: older and canon --------------------------------------------------
+In the Mood for Love
+Spirited Away
+Princess Mononoke
+Perfect Blue
+Seven Samurai
+Tokyo Story
+Cléo from 5 to 7
+The Third Man
+Rear Window
+Vertigo
+Chinatown
+Heat
+Fargo
+The Big Lebowski
+No Country for Old Men
+Children of Men
+Eternal Sunshine of the Spotless Mind
+Lost in Translation
+There Will Be Blood
+Whiplash
+
+# --- Documentary and non-fiction --------------------------------------------
+Free Solo
+My Octopus Teacher
+Won't You Be My Neighbor?
+Apollo 11
+The Act of Killing
+Honeyland
+Planet Earth II
+Chef's Table
+
+# --- Animation and family ---------------------------------------------------
+Spider-Man: Into the Spider-Verse
+Spider-Man: Across the Spider-Verse
+The Mitchells vs. the Machines
+Wolfwalkers
+Klaus
+Ratatouille
+Inside Out
+Arcane
+Avatar: The Last Airbender
+Bluey

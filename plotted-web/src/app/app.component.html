@@ -1,28 +1,34 @@
 <a class="skip-link" href="#main">Skip to content</a>
 
-<mat-toolbar color="primary" class="app-bar">
-  <a routerLink="/" class="brand" aria-label="Plotted home">
-    <span class="brand__name">Plotted</span>
-    <span class="brand__tagline">Stop browsing. Your night&rsquo;s plotted.</span>
-  </a>
+<header class="app-bar">
+  <div class="app-bar__inner">
+    <a routerLink="/" class="brand" aria-label="Plotted home">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span class="brand__text">
+        <span class="brand__name">Plotted</span>
+        <span class="brand__tagline">Stop browsing. Your night&rsquo;s plotted.</span>
+      </span>
+    </a>
 
-  <span class="spacer"></span>
-
-  @if (auth.isAuthenticated()) {
-    <nav aria-label="Main">
-      <a mat-button routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">
-        Home
-      </a>
-      <a mat-button routerLink="/settings" routerLinkActive="is-active">Settings</a>
-    </nav>
-    <button mat-stroked-button type="button" (click)="signOut()">Sign out</button>
-  } @else {
-    <nav aria-label="Main">
-      <a mat-button routerLink="/sign-in" routerLinkActive="is-active">Sign in</a>
-      <a mat-flat-button routerLink="/sign-up" routerLinkActive="is-active">Create account</a>
-    </nav>
-  }
-</mat-toolbar>
+    @if (auth.isAuthenticated()) {
+      <nav aria-label="Main" class="nav">
+        <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">
+          Home
+        </a>
+        <a routerLink="/search" routerLinkActive="is-active">Search</a>
+        <a routerLink="/settings" routerLinkActive="is-active">Settings</a>
+        <a routerLink="/about" routerLinkActive="is-active">About</a>
+      </nav>
+      <button class="ghost-button" type="button" (click)="signOut()">Sign out</button>
+    } @else {
+      <nav aria-label="Main" class="nav">
+        <a routerLink="/about" routerLinkActive="is-active">About</a>
+        <a routerLink="/sign-in" routerLinkActive="is-active">Sign in</a>
+        <a class="cta" routerLink="/sign-up" routerLinkActive="is-active">Create account</a>
+      </nav>
+    }
+  </div>
+</header>
 
 <main id="main" class="app-main" tabindex="-1">
   <router-outlet />
@@ -30,7 +36,7 @@
 
 <footer class="app-footer">
   <p>
-    Title metadata and streaming availability are supplied by
+    Title metadata and streaming availability supplied by
     <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a>
     and JustWatch. Plotted is not endorsed or certified by either.
     <a routerLink="/legal/data-sources">Where the data comes from</a>.

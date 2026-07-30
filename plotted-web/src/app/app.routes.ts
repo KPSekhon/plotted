@@ -16,6 +16,20 @@ export const routes: Routes = [
     title: 'Plotted',
   },
   {
+    path: 'search',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/catalogue/catalogue-search.page').then((m) => m.CatalogueSearchPage),
+    title: 'Search · Plotted',
+  },
+  {
+    path: 'titles/:titleId',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/catalogue/title-detail.page').then((m) => m.TitleDetailPage),
+    title: 'Title · Plotted',
+  },
+  {
     path: 'settings',
     canActivate: [authGuard],
     loadComponent: () => import('./features/settings/settings.page').then((m) => m.SettingsPage),
@@ -32,6 +46,13 @@ export const routes: Routes = [
     canActivate: [anonymousOnlyGuard],
     loadComponent: () => import('./features/auth/sign-up.page').then((m) => m.SignUpPage),
     title: 'Create an account · Plotted',
+  },
+  {
+    // Public: someone evaluating the project should not have to sign up to read
+    // what it is.
+    path: 'about',
+    loadComponent: () => import('./features/about/about.page').then((m) => m.AboutPage),
+    title: 'About · Plotted',
   },
   {
     // Public: the attribution obligations apply whether or not anyone is signed in.
