@@ -18,6 +18,8 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.math.BigDecimal
+import java.time.Clock
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -51,6 +53,13 @@ class AvailabilityRepositoryIntegrationTest {
 
     private val region = "CA"
 
+    /**
+     * UTC, matching the injected [java.time.Clock] the repository writes with.
+     * A default-zone date would disagree with the stored range for anyone west
+     * of Greenwich after early evening — a flake that only appears at night.
+     */
+    private val today: LocalDate get() = LocalDate.now(Clock.systemUTC())
+
     @Test
     fun `opening a window stores an active row that reads back`() {
         val titleId = givenTitle()
@@ -64,7 +73,7 @@ class AvailabilityRepositoryIntegrationTest {
         active.single().providerId shouldBe crave.id
         active.single().accessType shouldBe AccessType.SUBSCRIPTION
         // Half-open range starting today, still unbounded above.
-        validityOf(id) shouldBe "[${java.time.LocalDate.now()},)"
+        validityOf(id) shouldBe "[$today,)"
     }
 
     @Test
@@ -108,7 +117,7 @@ class AvailabilityRepositoryIntegrationTest {
         repository.findActive(titleId, region).shouldBe(emptyList())
         // The row survives with a bounded range: when it was available is the
         // entire signal the removal-risk model learns from.
-        validityOf(first) shouldBe "[${java.time.LocalDate.now()},${java.time.LocalDate.now()})"
+        validityOf(first) shouldBe "[$today,$today)"
 
         // ...and the title can come back without tripping the constraint.
         val second = runCatching {
