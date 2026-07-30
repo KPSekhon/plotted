@@ -55,6 +55,10 @@ re-checking nightly — backend and screens both.
 - **Mapping** from TMDB's shape to Plotted's, in one pure, exhaustively tested place
 - **Idempotent title ingestion**, including replacing genre links that TMDB has
   dropped rather than leaving them behind
+- **Seasons and episodes**, so a series' length is summed from real episode
+  runtimes instead of episode-count times an average — specials excluded,
+  because nobody counting whether they can finish a show before a renewal is
+  counting the Christmas special
 - **Provider canonicalisation** — TMDB reports "Crave" and "Crave Amazon Channel"
   as different services, and five separate Paramount+ entries. Left alone they
   would inflate the coverage figure the subscription optimiser runs on. See

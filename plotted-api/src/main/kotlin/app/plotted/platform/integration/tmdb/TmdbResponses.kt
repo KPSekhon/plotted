@@ -83,6 +83,35 @@ data class TmdbSeasonSummary(
     val airDate: String? = null,
 )
 
+/**
+ * One season, with its episodes.
+ *
+ * Only this endpoint carries per-episode runtimes. The series detail has an
+ * `episode_run_time` average at best, and for many shows not even that.
+ */
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class TmdbSeasonDetail(
+    val id: Int,
+    val seasonNumber: Int,
+    val name: String? = null,
+    val overview: String? = null,
+    val airDate: String? = null,
+    val episodes: List<TmdbEpisode> = emptyList(),
+)
+
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class TmdbEpisode(
+    val id: Int,
+    val episodeNumber: Int,
+    val name: String? = null,
+    val overview: String? = null,
+    /** Null more often than you would expect, especially for older shows. */
+    val runtime: Int? = null,
+    val airDate: String? = null,
+)
+
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class TmdbSearchPage(
