@@ -157,10 +157,25 @@ class AvailabilityRepository(
      * The row is kept with a bounded validity rather than deleted. When it was
      * available is the entire signal Plot Armour's removal-risk model learns
      * from, and it cannot be recovered once thrown away.
+     *
+     * The upper bound is never allowed to equal the lower bound. A title opened
+     * and closed on the same day would otherwise produce `daterange(x, x)`,
+     * which Postgres normalises to `empty` -- a row asserting the title was
+     * available for no time at all, which is both false and useless as training
+     * data. Worse, an empty range overlaps nothing, so the exclusion constraint
+     * stops protecting that slot and duplicates become possible again. Clamping
+     * to at least one day keeps the record true and the constraint meaningful.
      */
     fun close(id: UUID) {
         dsl.update(TITLE_AVAILABILITY)
-            .set(validityField, DSL.field("daterange(lower(validity), {0})", String::class.java, DSL.`val`(LocalDate.now(clock))))
+            .set(
+                validityField,
+                DSL.field(
+                    "daterange(lower(validity), GREATEST({0}, lower(validity) + 1))",
+                    String::class.java,
+                    DSL.`val`(LocalDate.now(clock)),
+                ),
+            )
             .set(TITLE_AVAILABILITY.ACTIVE, false)
             .set(TITLE_AVAILABILITY.SOURCE_CHECKED_AT, OffsetDateTime.now(clock))
             .where(TITLE_AVAILABILITY.ID.eq(id))

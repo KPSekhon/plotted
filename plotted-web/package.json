@@ -18,6 +18,15 @@
     "generate:api": "openapi-generator-cli generate -i ../openapi/openapi.json -g typescript-angular -o src/app/core/api --additional-properties=ngVersion=18.2.0,providedInRoot=true,withInterfaces=true,fileNaming=kebab-case",
     "verify:api": "node scripts/verify-api-client.mjs"
   },
+  "//rollup": "npm prunes non-matching platform binaries out of the lockfile's package list, so a lock generated on Windows leaves Linux with no entry to install and rollup fails at runtime (npm/cli#4828). These are declared explicitly so every platform the project builds on is in the lock: gnu for CI, musl for the Alpine image, msvc for local development. rollup requires its binary to match its own version exactly, hence the override pinning rollup itself.",
+  "overrides": {
+    "rollup": "4.22.4"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.22.4",
+    "@rollup/rollup-linux-x64-musl": "4.22.4",
+    "@rollup/rollup-win32-x64-msvc": "4.22.4"
+  },
   "dependencies": {
     "@angular/animations": "^18.2.0",
     "@angular/cdk": "^18.2.0",

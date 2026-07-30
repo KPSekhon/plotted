@@ -167,7 +167,11 @@ jobs:
       - name: Apply every migration in order
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
-          for file in plotted-api/src/main/resources/db/migration/V*.sql; do
+          # sort -V, not the shell glob. A glob sorts lexicographically, which
+          # puts V10 immediately after V1 and applies it before V4 has created
+          # the table it references. Flyway orders by version; this loop has to
+          # do the same or it tests an order that never happens in production.
+          for file in $(ls plotted-api/src/main/resources/db/migration/V*.sql | sort -V); do
             echo "--> $file"
             PGPASSWORD=plotted psql -h localhost -U plotted -d plotted -v ON_ERROR_STOP=1 -f "$file"
           done
