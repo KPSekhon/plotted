@@ -1,0 +1,747 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "title" : "Plotted API",
+    "description" : "Platform-neutral streaming decision and subscription optimisation platform. Title metadata and regional availability originate from TMDB and JustWatch; see /legal/data-sources for attribution and refresh cadence.",
+    "license" : {
+      "name" : "AGPL-3.0-or-later"
+    },
+    "version" : "v1"
+  },
+  "servers" : [ {
+    "url" : "http://localhost:35403",
+    "description" : "Generated server url"
+  } ],
+  "security" : [ {
+    "bearerAuth" : [ ]
+  } ],
+  "paths" : {
+    "/api/v1/titles" : {
+      "post" : {
+        "tags" : [ "catalogue-controller" ],
+        "summary" : "Ingest a title from TMDB",
+        "description" : "Idempotent: ingesting the same title again refreshes it in place and returns 200 rather than creating a duplicate. Availability is fetched separately, after this returns, so a provider outage cannot fail the ingest.",
+        "operationId" : "ingest",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/IngestTitleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TitleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "summary" : "Create an account and start a session",
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/auth/refresh" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "summary" : "Rotate the refresh token and issue a new access token",
+        "description" : "Reads the HttpOnly refresh cookie. Presenting an already-spent token revokes the entire token family, so a leaked token cannot be used quietly alongside the legitimate session.",
+        "operationId" : "refresh",
+        "parameters" : [ {
+          "name" : "plotted_refresh",
+          "in" : "cookie",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/auth/logout" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "summary" : "End the session and revoke its refresh-token family",
+        "operationId" : "logout",
+        "parameters" : [ {
+          "name" : "plotted_refresh",
+          "in" : "cookie",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "summary" : "Exchange credentials for a session",
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/users/me/settings" : {
+      "get" : {
+        "tags" : [ "user-controller" ],
+        "summary" : "Recommendation and budget defaults for the signed-in account",
+        "operationId" : "settings",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [ "user-controller" ],
+        "summary" : "Update recommendation and budget defaults",
+        "description" : "Partial update; omitted fields are unchanged. weeklyViewingMinutesOverride replaces the trailing eight-week estimate that drives completion feasibility and cancellation advice.",
+        "operationId" : "updateSettings",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateUserSettingsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me" : {
+      "get" : {
+        "tags" : [ "user-controller" ],
+        "summary" : "The signed-in account",
+        "operationId" : "me",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/titles/{titleId}" : {
+      "get" : {
+        "tags" : [ "catalogue-controller" ],
+        "summary" : "A single ingested title",
+        "operationId" : "byId",
+        "parameters" : [ {
+          "name" : "titleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TitleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/titles/{titleId}/availability" : {
+      "get" : {
+        "tags" : [ "availability-controller" ],
+        "summary" : "Where a title can be watched",
+        "description" : "Always answers, even when the data is old. Staleness is reported rather than hidden: the degraded behaviour Plotted promises is cached availability with a visible timestamp, not a pretence of knowing nothing.",
+        "operationId" : "byTitle",
+        "parameters" : [ {
+          "name" : "titleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AvailabilityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/titles/search" : {
+      "get" : {
+        "tags" : [ "catalogue-controller" ],
+        "summary" : "Search the ingested catalogue",
+        "description" : "Full-text and trigram matching, so a typo still finds the title.",
+        "operationId" : "search",
+        "parameters" : [ {
+          "name" : "query",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 200,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        }, {
+          "name" : "mediaType",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "MOVIE", "SERIES" ]
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/TitleResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/titles/discover" : {
+      "get" : {
+        "tags" : [ "catalogue-controller" ],
+        "summary" : "Search TMDB for titles Plotted may not have yet",
+        "description" : "Degrades to an empty list when TMDB is unreachable rather than failing the request: an empty search box is a better outcome than an error page.",
+        "operationId" : "discover",
+        "parameters" : [ {
+          "name" : "query",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 200,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/DiscoverResultResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "IngestTitleRequest" : {
+        "required" : [ "mediaType", "tmdbId" ],
+        "type" : "object",
+        "properties" : {
+          "mediaType" : {
+            "type" : "string",
+            "enum" : [ "MOVIE", "SERIES" ]
+          },
+          "tmdbId" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "description" : "Ingest a title from TMDB into the Plotted catalogue."
+      },
+      "TitleResponse" : {
+        "required" : [ "id", "mediaType", "metadataStatus", "name" ],
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "mediaType" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "originalName" : {
+            "type" : "string"
+          },
+          "overview" : {
+            "type" : "string"
+          },
+          "releaseDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "posterUrl" : {
+            "type" : "string"
+          },
+          "communityRating" : {
+            "type" : "number"
+          },
+          "watchMinutes" : {
+            "type" : "integer",
+            "description" : "How long this takes to watch: a film's runtime, or a series' estimated total. Null means Plotted does not know, and a time-constrained recommendation must exclude it.",
+            "format" : "int32"
+          },
+          "episodeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "metadataStatus" : {
+            "type" : "string",
+            "description" : "stub, partial, complete or failed. Anything but complete is missing something."
+          }
+        },
+        "description" : "A title Plotted has already ingested."
+      },
+      "RegisterRequest" : {
+        "required" : [ "displayName", "email", "password" ],
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "maxLength" : 320,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "password" : {
+            "maxLength" : 200,
+            "minLength" : 12,
+            "type" : "string"
+          },
+          "displayName" : {
+            "maxLength" : 120,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "regionCode" : {
+            "pattern" : "^[A-Za-z]{2}$",
+            "type" : "string"
+          },
+          "timezone" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "description" : "Create an account. The response also establishes a session."
+      },
+      "SessionResponse" : {
+        "required" : [ "accessToken", "expiresAt", "expiresIn", "tokenType", "user" ],
+        "type" : "object",
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "tokenType" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserResponse"
+          }
+        },
+        "description" : "The access token is short-lived and belongs in memory. The refresh token is returned as an HttpOnly cookie and never appears in this body."
+      },
+      "UserResponse" : {
+        "required" : [ "createdAt", "displayName", "email", "id", "onboardingStatus", "preferredCurrency", "regionCode", "timezone" ],
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "regionCode" : {
+            "type" : "string"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "preferredCurrency" : {
+            "type" : "string"
+          },
+          "onboardingStatus" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "LoginRequest" : {
+        "required" : [ "email", "password" ],
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          },
+          "password" : {
+            "type" : "string"
+          }
+        }
+      },
+      "UpdateUserSettingsRequest" : {
+        "type" : "object",
+        "properties" : {
+          "maximumMonthlyBudget" : {
+            "maximum" : 10000.0,
+            "exclusiveMaximum" : false,
+            "minimum" : 0.0,
+            "exclusiveMinimum" : false,
+            "type" : "number"
+          },
+          "maximumActiveServices" : {
+            "maximum" : 20,
+            "minimum" : 0,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "maximumMonthlySwitches" : {
+            "maximum" : 20,
+            "minimum" : 0,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "defaultAvailableMinutes" : {
+            "maximum" : 1440,
+            "minimum" : 5,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "defaultAccessPolicy" : {
+            "type" : "string",
+            "enum" : [ "active_subscriptions_only", "include_free", "all_access" ]
+          },
+          "defaultNoveltyPreference" : {
+            "maximum" : 1.0,
+            "exclusiveMaximum" : false,
+            "minimum" : 0.0,
+            "exclusiveMinimum" : false,
+            "type" : "number"
+          },
+          "defaultCommitmentPreference" : {
+            "type" : "string",
+            "enum" : [ "low", "medium", "high" ]
+          },
+          "allowPaidRentals" : {
+            "type" : "boolean"
+          },
+          "maximumRentalPrice" : {
+            "maximum" : 1000.0,
+            "exclusiveMaximum" : false,
+            "minimum" : 0.0,
+            "exclusiveMinimum" : false,
+            "type" : "number"
+          },
+          "allowPhysicalMedia" : {
+            "type" : "boolean"
+          },
+          "weeklyViewingMinutesOverride" : {
+            "maximum" : 10080,
+            "minimum" : 0,
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "description" : "Partial update. Omitted fields are left unchanged."
+      },
+      "UserSettingsResponse" : {
+        "required" : [ "allowPaidRentals", "allowPhysicalMedia", "defaultAccessPolicy", "defaultCommitmentPreference", "defaultNoveltyPreference", "updatedAt" ],
+        "type" : "object",
+        "properties" : {
+          "maximumMonthlyBudget" : {
+            "type" : "number"
+          },
+          "maximumActiveServices" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "maximumMonthlySwitches" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "defaultAvailableMinutes" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "defaultAccessPolicy" : {
+            "type" : "string"
+          },
+          "defaultNoveltyPreference" : {
+            "type" : "number"
+          },
+          "defaultCommitmentPreference" : {
+            "type" : "string"
+          },
+          "allowPaidRentals" : {
+            "type" : "boolean"
+          },
+          "maximumRentalPrice" : {
+            "type" : "number"
+          },
+          "allowPhysicalMedia" : {
+            "type" : "boolean"
+          },
+          "weeklyViewingMinutesOverride" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "AvailabilityOfferResponse" : {
+        "required" : [ "accessType", "confidence", "providerName", "providerSlug", "providerType", "source", "verifiedAt" ],
+        "type" : "object",
+        "properties" : {
+          "providerName" : {
+            "type" : "string"
+          },
+          "providerSlug" : {
+            "type" : "string"
+          },
+          "providerType" : {
+            "type" : "string",
+            "description" : "subscription, free, transactional, library or linear."
+          },
+          "providerLogoUrl" : {
+            "type" : "string"
+          },
+          "accessType" : {
+            "type" : "string",
+            "description" : "subscription, free, ads, rent, buy or library."
+          },
+          "price" : {
+            "type" : "number"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "deepLink" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "verifiedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "confidence" : {
+            "type" : "number",
+            "description" : "0 to 1. Below 1 means part of the upstream response could not be mapped."
+          }
+        }
+      },
+      "AvailabilityResponse" : {
+        "required" : [ "attribution", "offers", "regionCode", "stale" ],
+        "type" : "object",
+        "properties" : {
+          "regionCode" : {
+            "type" : "string"
+          },
+          "offers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AvailabilityOfferResponse"
+            }
+          },
+          "lastVerifiedAt" : {
+            "type" : "string",
+            "description" : "When the freshest entry was last checked. Null when nothing is known.",
+            "format" : "date-time"
+          },
+          "stale" : {
+            "type" : "boolean",
+            "description" : "True when nothing here has been checked recently enough to rely on. Clients should label the data as stale rather than hide it -- suppressing prices is the documented degraded behaviour, not suppressing the title."
+          },
+          "attribution" : {
+            "type" : "string"
+          }
+        },
+        "description" : "Where a title can be watched. Every entry carries its source and when it was last verified: availability data is imperfect, particularly for smaller Canadian services, and a decision tool that hides that is worse than one that admits it."
+      },
+      "DiscoverResultResponse" : {
+        "required" : [ "externalId", "mediaType", "name" ],
+        "type" : "object",
+        "properties" : {
+          "externalId" : {
+            "type" : "string"
+          },
+          "mediaType" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "releaseDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "overview" : {
+            "type" : "string"
+          },
+          "posterUrl" : {
+            "type" : "string"
+          }
+        },
+        "description" : "A result from TMDB, which Plotted may not have ingested yet. Add it with POST /api/v1/titles to get a Plotted identifier."
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "type" : "http",
+        "description" : "Short-lived access token issued by /api/v1/auth/login.",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT"
+      }
+    }
+  }
+}
