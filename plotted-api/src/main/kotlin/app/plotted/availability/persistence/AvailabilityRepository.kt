@@ -118,7 +118,20 @@ class AvailabilityRepository(
             )
         }
 
-    /** Opens a new availability window, running from today with no known end. */
+    /**
+     * Opens a new availability window, running with no known end.
+     *
+     * It starts today unless this title, provider, region and access type
+     * already has a window covering today -- which happens when an offer is
+     * closed and comes back the same day, either because upstream flapped or
+     * because a refresh ran twice. [close] clamps a same-day window to
+     * `[today, today + 1)` so it is not stored as `empty`, and that row still
+     * claims today, so a new `[today, )` would overlap it and the exclusion
+     * constraint would reject the insert. Starting on the first uncovered day
+     * instead leaves the two windows abutting rather than overlapping, and
+     * `[today, today + 1)` followed by `[today + 1, )` reads back as exactly
+     * what happened: available from today onwards, without interruption.
+     */
     fun open(
         titleId: UUID,
         providerId: UUID,
@@ -145,8 +158,42 @@ class AvailabilityRepository(
             .set(TITLE_AVAILABILITY.SOURCE_CHECKED_AT, OffsetDateTime.now(clock))
             .set(TITLE_AVAILABILITY.CONFIDENCE, confidence)
             .set(TITLE_AVAILABILITY.ACTIVE, true)
-            // Half-open: [today, ). An unbounded upper bound means "current".
-            .set(validityField, DSL.field("daterange({0}, NULL)", String::class.java, DSL.`val`(today)))
+            // Half-open, unbounded above: an absent upper bound means "current".
+            // The lower bound is today, or the day the last window for this slot
+            // ended if that is later.
+            //
+            // Two NULLs are load-bearing here, and they work out. `max` over no
+            // rows is NULL, and `GREATEST` ignores NULL arguments -- returning
+            // NULL only when every argument is one -- so a slot with no history
+            // falls through to today without needing a COALESCE. And `upper` of
+            // a window that is still open is NULL too, which `max` skips, so a
+            // genuine duplicate still computes today, still overlaps, and is
+            // still refused by the exclusion constraint.
+            .set(
+                validityField,
+                DSL.field(
+                    """
+                    daterange(
+                        GREATEST(
+                            {0}::date,
+                            (SELECT max(upper(existing.validity))
+                               FROM title_availability existing
+                              WHERE existing.title_id = {1}
+                                AND existing.provider_id = {2}
+                                AND existing.region_code = {3}
+                                AND existing.access_type = {4})
+                        ),
+                        NULL
+                    )
+                    """.trimIndent(),
+                    String::class.java,
+                    DSL.`val`(today),
+                    DSL.`val`(titleId),
+                    DSL.`val`(providerId),
+                    DSL.`val`(regionCode),
+                    DSL.`val`(accessType.dbValue),
+                ),
+            )
             .execute()
         return id
     }

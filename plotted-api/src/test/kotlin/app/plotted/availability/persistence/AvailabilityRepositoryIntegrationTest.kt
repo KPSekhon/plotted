@@ -129,6 +129,12 @@ class AvailabilityRepositoryIntegrationTest {
             repository.open(titleId, crave.id, region, AccessType.SUBSCRIPTION, SOURCE, FULL)
         }
         second.isSuccess shouldBe true
+
+        // The returning window abuts the closed one rather than overlapping it.
+        // Read together the two rows say "available from today, uninterrupted",
+        // which is what actually happened -- and no day is claimed twice, so the
+        // exclusion constraint still means something for this slot.
+        validityOf(second.getOrThrow()) shouldBe "[${today.plusDays(1)},)"
     }
 
     @Test
