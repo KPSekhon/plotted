@@ -4,7 +4,7 @@ Where Plotted actually is, what each remaining phase involves, and what is still
 open. Written to be read by someone picking the project up cold — including a
 future me.
 
-Last updated: 2026-07-30.
+Last updated: 2026-08-05.
 
 ---
 
@@ -13,8 +13,8 @@ Last updated: 2026-07-30.
 | | Phase | Tier | State |
 |---|---|---|---|
 | 1 | Skeleton — schema, auth, boundaries, Compose, CI | 1 | **Done** |
-| 2 | Catalogue — TMDB ingestion, availability, search, screens | 1 | **Code-complete, unverified** |
-| 3 | Watchlists, subscriptions, coverage dashboard | 1 | Next |
+| 2 | Catalogue — TMDB ingestion, availability, search, screens | 1 | **Verified in CI; seeding still owed** |
+| 3 | Watchlists, subscriptions, coverage dashboard | 1 | In progress |
 | 4 | **Queue Theory** — tonight's recommendation | 1 | |
 | 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | |
 | 6 | Polish, demo mode, deployment | 1 | ← *résumé-ready line* |
@@ -38,21 +38,39 @@ ArchUnit rules) · 16 frontend tests · 7 ADRs · 107 provider aliases.
 
 ## Read this before doing anything else
 
-Three things are true right now and all three are traps.
+**Install Docker Desktop.** This is now the clearest finding in the project, and
+it has been paid for four times.
 
-**`main` carries two known bugs.** PR #1 merged an older state. The
-migration-ordering fix and the empty-`daterange` fix live only on
-`phase-2-ingestion`. Open a second PR.
+33 database tests are gated on `DockerSupport.isDockerAvailable()` and skip on
+the dev machine, so anything touching Postgres is unverified until CI runs it.
+PR #2 (merged 2026-08-05) was the first time CI ever executed the newest
+commits, and it took four round trips because the API job's steps are sequential
+— each failure hid the next one:
 
-**CI has never run on the newest commits.** `.github/workflows/ci.yml` triggers
-on pushes to `main` and PRs targeting it. With PR #1 merged, pushes to a feature
-branch trigger nothing — so the CI fixes and season ingestion are untested.
-Opening the PR is what runs them.
+1. Reopening a closed availability window tripped the GiST exclusion constraint.
+   `close` clamps a same-day window to `[today, today + 1)` so Postgres will not
+   normalise it to `empty`, but that row still claims today, so the replacement
+   overlapped it. Windows now abut: `[today, today+1)` then `[today+1, )`.
+2. **Refresh-token reuse detection was inert.** It revoked the family and then
+   threw, and the rejection is a `RuntimeException`, so the transaction rolled
+   back and took the revocation with it. The caller still got its 401, so
+   nothing looked wrong — while the stolen successor token kept working. The
+   unit test passed throughout, because a mock records the call the database
+   then discards. Fixed by committing the revocation in its own transaction.
+3. Committing `openapi/openapi.json` made the drift check live, and it could
+   never have passed: springdoc filled `servers.url` in from the request, which
+   under `RANDOM_PORT` is a different ephemeral port every run. Pinned to `/`.
+4. `bootJar` then ran for the first time ever and failed — `TmdbPremiseCheck` is
+   a second class with a `main` and the Boot plugin will not guess between two.
 
-**33 database tests always skip locally.** No Docker on the dev machine, so
-anything touching Postgres is unverified until CI runs it. Both real bugs found
-so far surfaced only when CI finally executed. Installing Docker Desktop is the
-single highest-leverage change to how this project is developed.
+Items 3 and 4 had never once been executed. Nothing here was catchable locally:
+three needed Docker, and the fourth needed the build step, which only runs after
+the Docker-backed tests pass.
+
+**The lesson generalises.** A step that "passed" may simply never have run, and
+a test that passes against a mock proves only that a call was made. Read the
+whole job log, and be suspicious of any check that has never had the chance to
+fail.
 
 ---
 
@@ -78,8 +96,9 @@ Angular shell.
   clone builds with no Postgres and no Docker. Postgres-only DDL is fenced with
   `[jooq ignore]` markers and exercised by a dedicated CI job.
 
-**Verified:** unit and architecture tests, both builds, both linters.
-**Verified by CI later:** migrations against real PostgreSQL 16.
+**Verified:** unit and architecture tests, both builds, both linters, and — as
+of PR #2 — the migrations and every Testcontainers test against real
+PostgreSQL 16.
 
 ---
 
@@ -110,18 +129,32 @@ is safe to build on.
 
 ### Remaining in phase 2
 
-1. **Open the PR and get CI green.** The only way to test the newest commits.
-2. **Commit `openapi/openapi.json`** from the CI artifact. The drift check is
-   inert until that file exists.
+Items 1 and 2 are done — PR #2 is merged, all four CI jobs are green, 133 tests
+pass, and `openapi/openapi.json` is committed so the drift check now has teeth.
+
+What is left needs a person, not another commit. All three are blocked on
+something no amount of code can supply, and each is blocked for a different
+reason worth keeping straight:
+
 3. **Run `make seed`** with a real token and a database. Nobody has yet run the
-   ingestion pipeline end to end against live TMDB.
+   ingestion pipeline end to end against live TMDB. *Blocked on Postgres* — see
+   the Docker note above. This is the one that unblocks the other two.
 4. **Turn on `PLOTTED_SNAPSHOT_ENABLED`.** Plot Armour needs months of history
-   and a night not collected cannot be recovered. This clock should already be
-   running.
-5. **Grow the seed toward 500 hand-verified titles.** The current list is a
-   starting set. The value of a curated seed is that a person checked it —
-   compare what comes back against the provider's own app, and record
-   disagreements through the correction endpoint rather than editing rows.
+   and a night not collected cannot be recovered, so this clock should already
+   be running. *Blocked on an environment that runs continuously*, which does
+   not exist until deployment in phase 6. The `false` default is deliberate — a
+   developer machine should not quietly spend the TMDB quota — so the fix is not
+   to change it but to set the variable in the first long-lived environment.
+   Both this flag and `PLOTTED_SEED_ENABLED` are now listed in `.env.example`,
+   which is where someone setting that environment up will actually look.
+5. **Grow the seed toward 500 hand-verified titles** (119 today), and enter
+   provider plan prices per `docs/seed/provider-plans.md`. *Deliberately manual,
+   and must stay that way.* The value of a curated seed is precisely that a
+   person checked it, and invented prices would put fabricated money into the
+   optimiser's objective function — which does not produce a visibly broken
+   feature, it produces confident, wrong financial advice. Compare what comes
+   back against the provider's own app and record disagreements through the
+   correction endpoint rather than editing rows.
 
 ---
 
