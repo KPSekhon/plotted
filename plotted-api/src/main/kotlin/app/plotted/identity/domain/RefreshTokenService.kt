@@ -51,7 +51,10 @@ class RefreshTokenService(
 
         if (stored.usedAt != null) {
             // Reuse. Everything descended from this family is now suspect.
-            val revoked = repository.revokeFamily(stored.familyId, "reuse_detected")
+            //
+            // Revoked in its own transaction: the rejection below is a
+            // RuntimeException, so anything written in this one is rolled back.
+            val revoked = repository.revokeFamilyIndependently(stored.familyId, "reuse_detected")
             log.warn(
                 "Refresh token reuse detected for user {}; revoked {} tokens in family {}",
                 stored.userId,
@@ -67,7 +70,7 @@ class RefreshTokenService(
 
         if (!repository.markUsed(stored.id)) {
             // Lost a race with a concurrent refresh: treat exactly as reuse.
-            repository.revokeFamily(stored.familyId, "reuse_detected")
+            repository.revokeFamilyIndependently(stored.familyId, "reuse_detected")
             throw ApiException(ErrorCode.TOKEN_INVALID, "Refresh token is not valid")
         }
 
