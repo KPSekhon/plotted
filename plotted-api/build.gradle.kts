@@ -149,6 +149,15 @@ tasks.withType<Test>().configureEach {
     }
 }
 
+// Stated rather than discovered. The premise check below is a second class with
+// a main method, and the Boot plugin refuses to guess between two candidates --
+// so packaging fails, and it fails at `bootJar`, well after the tests that would
+// normally be blamed. Naming the entry point here means adding another
+// standalone tool cannot break the build.
+springBoot {
+    mainClass = "app.plotted.PlottedApplicationKt"
+}
+
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName = "plotted-api.jar"
 }

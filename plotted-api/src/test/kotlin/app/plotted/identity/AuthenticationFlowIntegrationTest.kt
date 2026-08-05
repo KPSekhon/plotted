@@ -4,6 +4,7 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIf
 import org.springframework.beans.factory.annotation.Autowired
@@ -15,6 +16,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.test.context.ActiveProfiles
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
@@ -34,6 +36,21 @@ import java.util.UUID
 class AuthenticationFlowIntegrationTest {
     @Autowired
     private lateinit var rest: TestRestTemplate
+
+    /**
+     * Swap the default `HttpURLConnection` transport for the JDK HTTP client.
+     *
+     * Two of its limitations break this suite rather than the application:
+     * `HttpURLConnection` cannot send PATCH at all, and on a 401 it tries to
+     * follow an authentication challenge, which fails as `HttpRetryException`
+     * once the request body has been streamed. Both surface as transport
+     * exceptions in place of the response the test wants to assert on, which
+     * looks like an API fault and is not one.
+     */
+    @BeforeEach
+    fun useJdkHttpClient() {
+        rest.restTemplate.requestFactory = JdkClientHttpRequestFactory()
+    }
 
     @Test
     fun `migrations apply and a new account can be created and read back`() {

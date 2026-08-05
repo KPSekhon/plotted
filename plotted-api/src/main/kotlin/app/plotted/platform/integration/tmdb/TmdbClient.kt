@@ -66,6 +66,20 @@ class TmdbClient(
 
     fun series(tmdbId: Int): TmdbSeriesDetail = fetch("/tv/$tmdbId", TmdbSeriesDetail::class.java, mapOf("language" to properties.language))
 
+    /**
+     * One season with its episodes.
+     *
+     * A separate call per season, because that is the only place TMDB exposes
+     * episode runtimes. It is also why season ingestion is a deliberate second
+     * step rather than part of fetching a series: an eight-season show costs
+     * eight extra requests, and quota is the scarcest thing this client spends.
+     */
+    fun season(seriesTmdbId: Int, seasonNumber: Int): TmdbSeasonDetail = fetch(
+        "/tv/$seriesTmdbId/season/$seasonNumber",
+        TmdbSeasonDetail::class.java,
+        mapOf("language" to properties.language),
+    )
+
     /** Films and series in one call; people are filtered out during mapping. */
     fun searchMulti(query: String, page: Int = 1): TmdbSearchPage = fetch(
         "/search/multi",

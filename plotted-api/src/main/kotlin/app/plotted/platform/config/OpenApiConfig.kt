@@ -6,6 +6,7 @@ import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.info.License
 import io.swagger.v3.oas.models.security.SecurityRequirement
 import io.swagger.v3.oas.models.security.SecurityScheme
+import io.swagger.v3.oas.models.servers.Server
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -29,6 +30,18 @@ class OpenApiConfig {
                 )
                 .license(License().name("AGPL-3.0-or-later")),
         )
+        // Pinned, because left alone springdoc fills this in from the request it
+        // happened to be serving. Under @SpringBootTest(RANDOM_PORT) that is a
+        // different ephemeral port on every run, so the committed document could
+        // never match the regenerated one and the drift check could never pass
+        // -- it only looked green while the file was absent and the test took
+        // its write-and-return branch. It would also bake a dead localhost port
+        // into the generated Angular client.
+        //
+        // A relative URL is the honest answer anyway: the web app is served from
+        // the same origin in production and proxies /api in development, so the
+        // API is always exactly here.
+        .servers(listOf(Server().url("/").description("This deployment")))
         .components(
             Components().addSecuritySchemes(
                 BEARER_SCHEME,

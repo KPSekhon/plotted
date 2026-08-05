@@ -27,12 +27,14 @@ import java.util.UUID
 class TitleIngestionServiceTest {
     private val client = mockk<TmdbClient>()
     private val titles = mockk<TitleRepository>()
+    private val seasons = mockk<app.plotted.catalogue.persistence.SeasonRepository>(relaxed = true)
     private val events = mockk<ApplicationEventPublisher>(relaxed = true)
 
     private val service = TitleIngestionService(
         client = client,
         mapper = TmdbTitleMapper(TmdbProperties()),
         titles = titles,
+        seasons = seasons,
         events = events,
     )
 

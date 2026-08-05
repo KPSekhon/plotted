@@ -1,6 +1,7 @@
 package app.plotted.catalogue.domain
 
 import app.plotted.catalogue.integration.tmdb.TmdbTitleMapper
+import app.plotted.catalogue.persistence.SeasonRepository
 import app.plotted.catalogue.persistence.TitleRepository
 import app.plotted.platform.events.TitleIngested
 import app.plotted.platform.integration.tmdb.TmdbClient
@@ -24,6 +25,7 @@ class TitleIngestionService(
     private val client: TmdbClient,
     private val mapper: TmdbTitleMapper,
     private val titles: TitleRepository,
+    private val seasons: SeasonRepository,
     private val events: ApplicationEventPublisher,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -42,6 +44,50 @@ class TitleIngestionService(
                 log.warn("TMDB search for '{}' failed: {}", query, failure.message)
                 emptyList()
             }
+    }
+
+    /**
+     * Ingests a series and then its seasons, replacing the estimated total
+     * runtime with one summed from real episodes.
+     *
+     * Separate from [ingest] because it is expensive: one request per season on
+     * top of the series itself. Tonight Mode's time filter is a hard filter, so
+     * "it fits" needs to rest on measured runtimes rather than an average — but
+     * that is worth paying for deliberately, not by accident on every ingest.
+     */
+    fun ingestWithSeasons(tmdbId: Int): IngestionOutcome {
+        val outcome = ingest(MediaType.SERIES, tmdbId)
+        if (outcome !is IngestionOutcome.Ingested) return outcome
+
+        val seasonNumbers = runCatching { client.series(tmdbId) }
+            .getOrNull()
+            ?.seasons
+            ?.map { it.seasonNumber }
+            ?: return outcome
+
+        var stored = 0
+        seasonNumbers.forEach { number ->
+            // One bad season must not cost the whole series. A show with a
+            // partially ingested episode list is still more useful than one
+            // stuck on an average.
+            runCatching { mapper.toIngestedSeason(client.season(tmdbId, number)) }
+                .onSuccess {
+                    seasons.upsert(outcome.titleId, it)
+                    stored++
+                }
+                .onFailure { log.warn("Season {} of TMDB series {} failed: {}", number, tmdbId, it.message) }
+        }
+
+        if (stored > 0) {
+            val total = seasons.recalculateTotalRuntime(outcome.titleId)
+            log.info(
+                "Ingested {} seasons of '{}'; total runtime now {}",
+                stored,
+                outcome.name,
+                total?.let { "$it min (measured)" } ?: "unchanged (no episode runtimes upstream)",
+            )
+        }
+        return outcome
     }
 
     fun ingest(mediaType: MediaType, tmdbId: Int): IngestionOutcome = try {

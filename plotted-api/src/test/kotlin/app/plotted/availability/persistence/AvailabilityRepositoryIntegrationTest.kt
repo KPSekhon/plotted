@@ -117,13 +117,24 @@ class AvailabilityRepositoryIntegrationTest {
         repository.findActive(titleId, region).shouldBe(emptyList())
         // The row survives with a bounded range: when it was available is the
         // entire signal the removal-risk model learns from.
-        validityOf(first) shouldBe "[$today,$today)"
+        //
+        // Opened and closed the same day, so the window is clamped to one day
+        // rather than collapsing to `daterange(today, today)` -- which Postgres
+        // normalises to `empty`, asserting the title was never available and
+        // quietly exempting the row from the exclusion constraint.
+        validityOf(first) shouldBe "[$today,${today.plusDays(1)})"
 
         // ...and the title can come back without tripping the constraint.
         val second = runCatching {
             repository.open(titleId, crave.id, region, AccessType.SUBSCRIPTION, SOURCE, FULL)
         }
         second.isSuccess shouldBe true
+
+        // The returning window abuts the closed one rather than overlapping it.
+        // Read together the two rows say "available from today, uninterrupted",
+        // which is what actually happened -- and no day is claimed twice, so the
+        // exclusion constraint still means something for this slot.
+        validityOf(second.getOrThrow()) shouldBe "[${today.plusDays(1)},)"
     }
 
     @Test

@@ -43,7 +43,12 @@ class TmdbClientTest {
         server.stop()
     }
 
-    private fun client(token: String = "test-token", maxAttempts: Int = 3, readTimeout: Duration = Duration.ofMillis(500)) = TmdbClient(
+    // The default read timeout is generous deliberately. A tight default makes
+    // every test race the clock: on a loaded machine WireMock answers late, the
+    // client correctly classifies that as an outage and retries, and assertions
+    // about request counts then fail for a reason unrelated to the case under
+    // test. The timeout test passes its own short value explicitly.
+    private fun client(token: String = "test-token", maxAttempts: Int = 3, readTimeout: Duration = Duration.ofSeconds(10)) = TmdbClient(
         properties = TmdbProperties(
             baseUrl = "http://localhost:${server.port()}",
             readAccessToken = token,

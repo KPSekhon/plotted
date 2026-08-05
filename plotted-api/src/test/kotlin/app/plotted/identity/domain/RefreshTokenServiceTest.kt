@@ -73,7 +73,13 @@ class RefreshTokenServiceTest {
         val error = shouldFailWith(ErrorCode.TOKEN_INVALID) { service.rotate(presented, context) }
 
         error.code shouldBe ErrorCode.TOKEN_INVALID
-        verify { repository.revokeFamily(familyId, "reuse_detected") }
+        // Only that the revocation is requested, and on its own transaction so
+        // the rejection below it cannot roll it back. That it actually survives
+        // is a property of the database, and is asserted by
+        // AuthenticationFlowIntegrationTest against a real one -- a mock records
+        // the call either way, which is precisely how the rollback bug lived
+        // here undetected.
+        verify { repository.revokeFamilyIndependently(familyId, "reuse_detected") }
     }
 
     @Test
@@ -84,7 +90,7 @@ class RefreshTokenServiceTest {
 
         shouldFailWith(ErrorCode.TOKEN_INVALID) { service.rotate(presented, context) }
 
-        verify { repository.revokeFamily(familyId, "reuse_detected") }
+        verify { repository.revokeFamilyIndependently(familyId, "reuse_detected") }
     }
 
     @Test
@@ -99,7 +105,9 @@ class RefreshTokenServiceTest {
 
         shouldFailWith(ErrorCode.TOKEN_INVALID) { service.rotate(presented, context) }
 
+        // Expiry is not evidence of theft, so neither revocation route may fire.
         verify(exactly = 0) { repository.revokeFamily(any(), any()) }
+        verify(exactly = 0) { repository.revokeFamilyIndependently(any(), any()) }
     }
 
     @Test

@@ -64,7 +64,19 @@ class CatalogueSeedRunner(
                 return@forEach
             }
 
-            when (val outcome = ingestion.ingest(match.mediaType, tmdbId)) {
+            // Series go through the season path so the seeded catalogue carries
+            // measured runtimes rather than episode-count times an average.
+            // Tonight Mode's time filter is a hard filter, and a seed built on
+            // estimates would make its promise only as good as a guess. It costs
+            // one extra request per season, which is what the seed is for.
+            val outcome =
+                if (match.mediaType == MediaType.SERIES) {
+                    ingestion.ingestWithSeasons(tmdbId)
+                } else {
+                    ingestion.ingest(match.mediaType, tmdbId)
+                }
+
+            when (outcome) {
                 is TitleIngestionService.IngestionOutcome.Ingested -> {
                     if (outcome.created) report.created++ else report.refreshed++
                     if (outcome.metadataStatus != MetadataStatus.COMPLETE) {

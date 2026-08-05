@@ -1,5 +1,7 @@
 package app.plotted.catalogue.integration.tmdb
 
+import app.plotted.catalogue.domain.IngestedEpisode
+import app.plotted.catalogue.domain.IngestedSeason
 import app.plotted.catalogue.domain.IngestedTitle
 import app.plotted.catalogue.domain.MediaType
 import app.plotted.catalogue.domain.MetadataStatus
@@ -9,6 +11,7 @@ import app.plotted.catalogue.domain.TitleSearchResult
 import app.plotted.platform.integration.tmdb.TmdbMovieDetail
 import app.plotted.platform.integration.tmdb.TmdbProperties
 import app.plotted.platform.integration.tmdb.TmdbSearchPage
+import app.plotted.platform.integration.tmdb.TmdbSeasonDetail
 import app.plotted.platform.integration.tmdb.TmdbSeriesDetail
 import app.plotted.platform.integration.tmdb.parseTmdbDate
 import org.springframework.stereotype.Component
@@ -84,6 +87,24 @@ class TmdbTitleMapper(
             },
         )
     }
+
+    fun toIngestedSeason(season: TmdbSeasonDetail): IngestedSeason = IngestedSeason(
+        externalId = season.id.toString(),
+        seasonNumber = season.seasonNumber,
+        name = season.name?.takeIf { it.isNotBlank() },
+        airDate = parseTmdbDate(season.airDate),
+        episodes = season.episodes.map { episode ->
+            IngestedEpisode(
+                externalId = episode.id.toString(),
+                episodeNumber = episode.episodeNumber,
+                name = episode.name?.takeIf { it.isNotBlank() },
+                overview = episode.overview?.takeIf { it.isNotBlank() },
+                // Zero is a placeholder upstream, same as it is on films.
+                runtimeMinutes = episode.runtime?.takeIf { it > 0 },
+                airDate = parseTmdbDate(episode.airDate),
+            )
+        },
+    )
 
     /**
      * `search/multi` returns people alongside titles. They are dropped rather
