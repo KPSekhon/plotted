@@ -9,8 +9,8 @@
     "version" : "v1"
   },
   "servers" : [ {
-    "url" : "http://localhost:35403",
-    "description" : "Generated server url"
+    "url" : "/",
+    "description" : "This deployment"
   } ],
   "security" : [ {
     "bearerAuth" : [ ]
