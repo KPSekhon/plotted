@@ -122,12 +122,74 @@ class TitleSearchRepository(
     }.firstOrNull()
 
     /**
-     * Titles whose availability is most overdue, oldest first.
+     * Several titles at once, for a caller drawing a list it owns.
+     *
+     * One query rather than one per id: this is what a watchlist screen and the
+     * coverage breakdown both read, and the per-row alternative is the classic
+     * way a list of fifty becomes fifty round trips.
+     *
+     * Ids that do not exist are simply absent from the result. The caller knows
+     * what it asked for and can see what came back, which is the only way it can
+     * notice that a title it references has been deleted.
+     */
+    fun findSummaries(titleIds: Collection<UUID>): List<CatalogueTitle> {
+        val wanted = titleIds.distinct().take(MAX_SUMMARY_BATCH)
+        if (wanted.isEmpty()) return emptyList()
+
+        // Placeholders are generated from the list size and the values are all
+        // bound, so nothing here is string-concatenated user input.
+        val placeholders = wanted.joinToString(", ") { "?" }
+        return dsl.fetch(
+            """
+                SELECT t.id, t.media_type, t.name, t.original_name, t.overview, t.release_date,
+                       t.poster_url, t.popularity_score, t.community_rating, t.metadata_status,
+                       m.runtime_minutes, s.total_runtime_minutes, s.episode_count
+                  FROM titles t
+                  LEFT JOIN movies m ON m.title_id = t.id
+                  LEFT JOIN series s ON s.title_id = t.id
+                 WHERE t.id IN ($placeholders)
+            """.trimIndent(),
+            *wanted.toTypedArray(),
+        ).map { record ->
+            CatalogueTitle(
+                id = record.get("id", UUID::class.java),
+                mediaType = MediaType.fromDb(record.get("media_type", String::class.java)),
+                name = record.get("name", String::class.java),
+                originalName = record.get("original_name", String::class.java),
+                overview = record.get("overview", String::class.java),
+                releaseDate = record.get("release_date", LocalDate::class.java),
+                posterUrl = record.get("poster_url", String::class.java),
+                popularityScore = record.get("popularity_score", BigDecimal::class.java),
+                communityRating = record.get("community_rating", BigDecimal::class.java),
+                metadataStatus = MetadataStatus.fromDb(record.get("metadata_status", String::class.java)),
+                runtimeMinutes = record.get("runtime_minutes", Int::class.javaObjectType),
+                totalRuntimeMinutes = record.get("total_runtime_minutes", Int::class.javaObjectType),
+                episodeCount = record.get("episode_count", Int::class.javaObjectType),
+            )
+        }
+    }
+
+    /**
+     * Titles whose availability is most overdue, most deserving first.
      *
      * Section 17 wants watchlist titles refreshed daily and the long tail
-     * opportunistically. Watchlists arrive in phase 3, so for now this is a
-     * plain staleness ordering -- and a title nobody has ever checked sorts
-     * first, because it has no availability at all.
+     * opportunistically, so anything on someone's active watchlist sorts ahead
+     * of everything else regardless of staleness. Within each group it is plain
+     * staleness ordering, and a title nobody has ever checked sorts first
+     * because it has no availability row at all.
+     *
+     * Only `pending` and `in_progress` items count. Someone who has finished or
+     * abandoned a title is not waiting on it, and letting completed rows hold
+     * priority would slowly fill the nightly budget with titles nobody intends
+     * to watch -- the batch is finite, so a title promoted here is a title
+     * demoted somewhere else.
+     *
+     * This reaches across a module boundary in SQL, which is deliberate and
+     * consistent with the `title_availability` join immediately above it: the
+     * rule that ArchUnit enforces is that no *class* crosses a feature boundary,
+     * because that is the coupling that spreads. Both tables live in one
+     * database and one deployment, and doing this in application code would mean
+     * paging every title into memory to sort it.
      */
     fun findDueForAvailabilityRefresh(regionCode: String, limit: Int): List<DueTitle> = dsl.fetch(
         """
@@ -140,7 +202,14 @@ class TitleSearchRepository(
                      GROUP BY title_id
                    ) a ON a.title_id = t.id
              WHERE t.external_source = 'tmdb'
-             ORDER BY a.last_checked ASC NULLS FIRST, t.popularity_score DESC NULLS LAST
+             ORDER BY EXISTS (
+                          SELECT 1
+                            FROM watchlist_items wi
+                           WHERE wi.title_id = t.id
+                             AND wi.status IN ('pending', 'in_progress')
+                      ) DESC,
+                      a.last_checked ASC NULLS FIRST,
+                      t.popularity_score DESC NULLS LAST
              LIMIT ?
         """.trimIndent(),
         regionCode,
@@ -164,5 +233,12 @@ class TitleSearchRepository(
         const val MAX_LIMIT = 50
         const val MAX_QUERY_LENGTH = 200
         const val MAX_REFRESH_BATCH = 2_000
+
+        /**
+         * A watchlist is meant to be a shortlist. Bounding this keeps one
+         * pathological list from generating an unbounded `IN` clause, and the
+         * screens that read it page anyway.
+         */
+        const val MAX_SUMMARY_BATCH = 500
     }
 }

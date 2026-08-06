@@ -16,6 +16,36 @@
     "bearerAuth" : [ ]
   } ],
   "paths" : {
+    "/api/v1/watchlist/items" : {
+      "post" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "Add a title to the watchlist",
+        "description" : "Idempotent: adding a title that is already on the list returns the existing entry rather than failing, because adding something twice is a slip rather than an error.",
+        "operationId" : "add",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddWatchlistItemRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WatchlistItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/titles" : {
       "post" : {
         "tags" : [ "catalogue-controller" ],
@@ -39,6 +69,53 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/TitleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions" : {
+      "get" : {
+        "tags" : [ "subscription-controller" ],
+        "summary" : "What the signed-in user pays for",
+        "description" : "monthlyTotal counts active and trial subscriptions only. Cancelled and lapsed rows are kept and returned, because what someone used to pay for is part of the record, but they cost nothing now and including them would overstate the bill.",
+        "operationId" : "list_1",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SubscriptionListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "subscription-controller" ],
+        "summary" : "Record a subscription",
+        "operationId" : "add_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateSubscriptionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SubscriptionResponse"
                 }
               }
             }
@@ -155,6 +232,64 @@
         "security" : [ ]
       }
     },
+    "/api/v1/watchlist/items/{itemId}" : {
+      "delete" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "Remove a title from the watchlist",
+        "operationId" : "remove",
+        "parameters" : [ {
+          "name" : "itemId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "Update priority, status or intent for a watchlist entry",
+        "description" : "Partial update; omitted fields are unchanged.",
+        "operationId" : "update",
+        "parameters" : [ {
+          "name" : "itemId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateWatchlistItemRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WatchlistItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/me/settings" : {
       "get" : {
         "tags" : [ "user-controller" ],
@@ -195,6 +330,105 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/UserSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions/{subscriptionId}" : {
+      "delete" : {
+        "tags" : [ "subscription-controller" ],
+        "summary" : "Forget a subscription entirely",
+        "description" : "Deletes the record. To mark something as no longer paid for while keeping its history, PATCH the status to cancelled instead.",
+        "operationId" : "remove_1",
+        "parameters" : [ {
+          "name" : "subscriptionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [ "subscription-controller" ],
+        "summary" : "Update a subscription",
+        "description" : "Partial update; omitted fields are unchanged.",
+        "operationId" : "update_1",
+        "parameters" : [ {
+          "name" : "subscriptionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateSubscriptionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/watchlist" : {
+      "get" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "The signed-in user's watchlist",
+        "description" : "Ordered by priority, highest first, then by when each title was added.",
+        "operationId" : "list",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WatchlistResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/watchlist/coverage" : {
+      "get" : {
+        "tags" : [ "coverage-controller" ],
+        "summary" : "Which service covers the most of the watchlist",
+        "description" : "Shares are weighted by priority rather than counted, so one title someone urgently wants outranks several they are lukewarm about. Only outstanding items count: something already watched says nothing about which service to pay for next month. Titles whose availability has never been checked are excluded and reported in unknownTitles, because scoring them as uncovered would penalise every service in proportion to how stale Plotted's own data is.",
+        "operationId" : "coverage",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CoverageResponse"
                 }
               }
             }
@@ -360,10 +594,118 @@
           }
         }
       }
+    },
+    "/api/v1/providers" : {
+      "get" : {
+        "tags" : [ "provider-controller" ],
+        "summary" : "Services a user could be subscribed to",
+        "description" : "Filtered to providers that bill on a recurring basis, so a rental storefront does not appear on a screen asking what someone subscribes to. Carries no pricing: Plotted ships none, because a price it invented would reach the optimiser.",
+        "operationId" : "list_2",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProviderListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
     "schemas" : {
+      "AddWatchlistItemRequest" : {
+        "required" : [ "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "priority" : {
+            "maximum" : 5,
+            "minimum" : 1,
+            "type" : "integer",
+            "description" : "1 is the highest priority and 5 the lowest. Defaults to 3.",
+            "format" : "int32"
+          },
+          "desiredByDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "notes" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "WatchlistItemResponse" : {
+        "required" : [ "addedAt", "id", "priority", "status", "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "priority" : {
+            "type" : "integer",
+            "description" : "1 is the highest priority and 5 the lowest.",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "addedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "desiredByDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "notes" : {
+            "type" : "string"
+          },
+          "title" : {
+            "$ref" : "#/components/schemas/WatchlistTitleResponse"
+          }
+        },
+        "description" : "A title on the signed-in user's watchlist."
+      },
+      "WatchlistTitleResponse" : {
+        "required" : [ "mediaType", "name" ],
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "mediaType" : {
+            "type" : "string"
+          },
+          "releaseYear" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "posterUrl" : {
+            "type" : "string"
+          },
+          "watchMinutes" : {
+            "type" : "integer",
+            "description" : "Runtime for a film, total episode runtime for a series. Null when unknown.",
+            "format" : "int32"
+          }
+        },
+        "description" : "Null when the title has been removed from the catalogue since it was added."
+      },
       "IngestTitleRequest" : {
         "required" : [ "mediaType", "tmdbId" ],
         "type" : "object",
@@ -425,6 +767,131 @@
           }
         },
         "description" : "A title Plotted has already ingested."
+      },
+      "CreateSubscriptionRequest" : {
+        "required" : [ "autoRenews", "cannotCancel", "price", "providerId" ],
+        "type" : "object",
+        "properties" : {
+          "providerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "planName" : {
+            "maxLength" : 120,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "The plan as the user knows it, for example 'Standard with ads'. Defaults to 'Standard'."
+          },
+          "billingPeriod" : {
+            "type" : "string",
+            "description" : "One of monthly, quarterly, annual.",
+            "enum" : [ "monthly", "quarterly", "annual" ]
+          },
+          "price" : {
+            "minimum" : 0.0,
+            "exclusiveMinimum" : false,
+            "type" : "number"
+          },
+          "currency" : {
+            "maxLength" : 3,
+            "minLength" : 3,
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "One of active, paused, cancelled, trial, lapsed. Defaults to active.",
+            "enum" : [ "active", "paused", "cancelled", "trial", "lapsed" ]
+          },
+          "startedOn" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "renewsOn" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "commitmentEndsOn" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "autoRenews" : {
+            "type" : "boolean"
+          },
+          "cannotCancel" : {
+            "type" : "boolean"
+          },
+          "notes" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "description" : "Records a subscription the user pays for. Price is supplied by the user rather than looked up: Plotted deliberately ships no pricing data, because a figure it invented would flow straight into the cancellation optimiser's objective."
+      },
+      "SubscriptionResponse" : {
+        "required" : [ "autoRenews", "billingPeriod", "cannotCancel", "currency", "id", "monthlyCost", "planName", "price", "providerId", "providerName", "providerSlug", "startedOn", "status" ],
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "providerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "providerName" : {
+            "type" : "string"
+          },
+          "providerSlug" : {
+            "type" : "string"
+          },
+          "providerLogoUrl" : {
+            "type" : "string"
+          },
+          "planName" : {
+            "type" : "string"
+          },
+          "billingPeriod" : {
+            "type" : "string"
+          },
+          "price" : {
+            "type" : "number",
+            "description" : "What the user told us they pay, per billing period."
+          },
+          "monthlyCost" : {
+            "type" : "number",
+            "description" : "The same figure expressed per month, so plans on different cycles compare."
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "startedOn" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "renewsOn" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "autoRenews" : {
+            "type" : "boolean"
+          },
+          "cannotCancel" : {
+            "type" : "boolean",
+            "description" : "Inside a commitment. Phase 5 treats this as a hard constraint, never a cost."
+          },
+          "commitmentEndsOn" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "notes" : {
+            "type" : "string"
+          }
+        }
       },
       "RegisterRequest" : {
         "required" : [ "displayName", "email", "password" ],
@@ -522,6 +989,40 @@
           },
           "password" : {
             "type" : "string"
+          }
+        }
+      },
+      "UpdateWatchlistItemRequest" : {
+        "required" : [ "clearDesiredByDate", "clearNotes" ],
+        "type" : "object",
+        "properties" : {
+          "priority" : {
+            "maximum" : 5,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "One of pending, in_progress, completed, abandoned, unavailable.",
+            "enum" : [ "pending", "in_progress", "completed", "abandoned", "unavailable" ]
+          },
+          "desiredByDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "clearDesiredByDate" : {
+            "type" : "boolean",
+            "description" : "Set true to remove an existing desiredByDate; JSON null alone cannot express this."
+          },
+          "notes" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "clearNotes" : {
+            "type" : "boolean",
+            "description" : "Set true to remove existing notes."
           }
         }
       },
@@ -637,6 +1138,138 @@
           }
         }
       },
+      "UpdateSubscriptionRequest" : {
+        "required" : [ "clearNotes", "clearRenewsOn" ],
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "type" : "string",
+            "enum" : [ "active", "paused", "cancelled", "trial", "lapsed" ]
+          },
+          "renewsOn" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "clearRenewsOn" : {
+            "type" : "boolean",
+            "description" : "Set true to remove an existing renewal date."
+          },
+          "autoRenews" : {
+            "type" : "boolean"
+          },
+          "cannotCancel" : {
+            "type" : "boolean"
+          },
+          "notes" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "clearNotes" : {
+            "type" : "boolean",
+            "description" : "Set true to remove existing notes."
+          }
+        }
+      },
+      "WatchlistResponse" : {
+        "required" : [ "id", "items", "name" ],
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/WatchlistItemResponse"
+            }
+          }
+        }
+      },
+      "CoverageResponse" : {
+        "required" : [ "attribution", "consideredTitles", "providers", "regionCode", "unknownTitles" ],
+        "type" : "object",
+        "properties" : {
+          "regionCode" : {
+            "type" : "string"
+          },
+          "consideredTitles" : {
+            "type" : "integer",
+            "description" : "Outstanding items with availability data. The denominator of every share below.",
+            "format" : "int32"
+          },
+          "unknownTitles" : {
+            "type" : "integer",
+            "description" : "Outstanding items nobody has checked yet. Reported, never scored.",
+            "format" : "int32"
+          },
+          "providers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ProviderCoverageResponse"
+            }
+          },
+          "attribution" : {
+            "type" : "string"
+          }
+        },
+        "description" : "Which service covers the largest priority-weighted share of the outstanding watchlist. Titles whose availability has never been checked are excluded from the calculation and reported in unknownTitles, so a stale catalogue does not silently depress every score."
+      },
+      "CoveredTitleResponse" : {
+        "required" : [ "priority", "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "priority" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ProviderCoverageResponse" : {
+        "required" : [ "name", "providerId", "slug", "titleCount", "titles", "weightedShare" ],
+        "type" : "object",
+        "properties" : {
+          "providerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "slug" : {
+            "type" : "string"
+          },
+          "logoUrl" : {
+            "type" : "string"
+          },
+          "titleCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "weightedShare" : {
+            "type" : "number",
+            "description" : "Share of the total priority weight this service covers, 0 to 1.",
+            "format" : "double"
+          },
+          "titles" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CoveredTitleResponse"
+            }
+          }
+        }
+      },
       "AvailabilityOfferResponse" : {
         "required" : [ "accessType", "confidence", "providerName", "providerSlug", "providerType", "source", "verifiedAt" ],
         "type" : "object",
@@ -733,6 +1366,64 @@
           }
         },
         "description" : "A result from TMDB, which Plotted may not have ingested yet. Add it with POST /api/v1/titles to get a Plotted identifier."
+      },
+      "SubscriptionListResponse" : {
+        "required" : [ "countedSubscriptions", "currency", "monthlyTotal", "subscriptions" ],
+        "type" : "object",
+        "properties" : {
+          "subscriptions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SubscriptionResponse"
+            }
+          },
+          "monthlyTotal" : {
+            "type" : "number",
+            "description" : "Total monthly cost of active and trial subscriptions only."
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "countedSubscriptions" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ProviderListResponse" : {
+        "required" : [ "providers" ],
+        "type" : "object",
+        "properties" : {
+          "providers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ProviderResponse"
+            }
+          }
+        }
+      },
+      "ProviderResponse" : {
+        "required" : [ "id", "name", "slug", "type" ],
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "slug" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "logoUrl" : {
+            "type" : "string"
+          }
+        },
+        "description" : "A streaming service. No price: the user supplies what they pay."
       }
     },
     "securitySchemes" : {
