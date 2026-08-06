@@ -178,8 +178,12 @@ class CancelCultureService(
         val unpriced = mutableListOf<ExcludedTitle>()
 
         wanted.forEach { entry ->
-            // A title whose catalogue row has gone is a real state, not a blank
-            // row: TitleDirectory omits unknown ids rather than inventing them.
+            // A watchlist row whose catalogue title has gone. Dropped rather
+            // than reported, unlike the three exclusions below, because there is
+            // nothing to report it *as* — the name lived in the row that
+            // vanished. `TonightService` treats it the same way. It is a
+            // catalogue integrity problem, and dressing it up as a subscription
+            // finding would put it in front of the wrong person.
             val summary = summaries[entry.titleId] ?: return@forEach
             val offers = coverage.byTitle[entry.titleId].orEmpty()
 
