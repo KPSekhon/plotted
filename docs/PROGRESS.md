@@ -31,8 +31,9 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-33 tables · 10 migrations · 50 Kotlin source files · 130 API tests (8 of them
-ArchUnit rules) · 16 frontend tests · 7 ADRs · 107 provider aliases.
+33 tables · 10 migrations · 68 Kotlin source files · 145 API tests (8 of them
+ArchUnit rules) · 19 frontend tests · 18 API paths · 7 ADRs · 107 provider
+aliases.
 
 ---
 
@@ -205,14 +206,28 @@ allowed and used, following the precedent already set by the catalogue's join
 onto `title_availability`; the line ArchUnit enforces is that no class crosses a
 feature boundary, because that is the coupling that spreads.
 
-**What is not yet verified.** Everything above passes ktlint, the unit tests, the
-ArchUnit rules and both builds, and none of it has met a database. The new
-repositories — `WatchlistRepository`, `SubscriptionRepository`, the batched
-`findSummaries` and `findActiveForTitles` — have no integration tests yet, which
-means the SQL in them is the least-tested code in the project. Given the phase 2
-record, assume at least one of these queries is wrong until CI says otherwise.
-Writing those Testcontainers tests is the first job of phase 4, or of whoever
-installs Docker.
+**What green CI does and does not prove here.** PR #3 passes all four jobs, 145
+tests. That is worth exactly as much as what the tests cover, and they do not
+cover the new SQL. `WatchlistRepository`, `SubscriptionRepository`, the batched
+`findSummaries` and `findActiveForTitles` have **no integration tests**, so
+nothing has executed those queries against Postgres — a green API job means
+nothing else broke, not that these work.
+
+That makes them the least-tested code in the project, and on the phase 2 record
+the right assumption is that at least one is wrong. Writing those Testcontainers
+tests is the first job of phase 4, or of whoever installs Docker. The specific
+things to exercise: the `findOrCreateDefault` race under the partial unique
+index, `findOrCreatePlan` against the GiST exclusion constraint on
+`provider_plans`, the `IN` batching in `findSummaries`, and the `EXISTS`
+subquery now driving refresh priority.
+
+**One more CI defect fixed in passing.** The workflow uploaded
+`openapi/openapi.json` — the *committed* file, which the contract test stops
+overwriting once it exists. So the artifact re-uploaded the stale copy and the
+workflow's own advice to "download it from this run's artifacts" quietly stopped
+working from the moment the file was committed, which is precisely when a drift
+failure means you need it. It now uploads `build/openapi-actual.json` too. This
+is the only way to regenerate the document without Docker.
 
 ---
 
