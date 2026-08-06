@@ -44,5 +44,12 @@ interface AvailabilityDirectory {
         val name: String,
         val slug: String,
         val logoUrl: String?,
+        /**
+         * Whether this title is watchable on this provider without paying for
+         * it -- free or ad-supported. What the `INCLUDE_FREE` access policy
+         * turns on, and the reason CBC Gem is not simply "a service you do not
+         * subscribe to".
+         */
+        val isFree: Boolean,
     )
 }

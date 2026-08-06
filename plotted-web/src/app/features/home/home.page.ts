@@ -26,18 +26,19 @@ import { AuthService } from '../../core/auth/auth.service';
           service carries most of it in {{ user.regionCode }}.
         </p>
 
-        <a class="primary-action" routerLink="/search">
-          Search the catalogue
+        <a class="primary-action" routerLink="/tonight">
+          Find something for tonight
           <span aria-hidden="true">&rarr;</span>
         </a>
 
         <p class="secondary muted">
-          Or go straight to <a routerLink="/watchlist">your list</a> and its
+          Or <a routerLink="/search">search the catalogue</a>, check
+          <a routerLink="/watchlist">your list</a>, or see its
           <a routerLink="/coverage">coverage</a>.
         </p>
 
         <p class="secondary muted">
-          Tonight Mode is not built yet.
+          Cancel Culture, the subscription optimiser, is not built yet.
           <a routerLink="/about">See what is coming</a>.
         </p>
       </section>

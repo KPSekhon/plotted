@@ -3,10 +3,10 @@ import { Routes } from '@angular/router';
 import { anonymousOnlyGuard, authGuard } from './core/auth/auth.guard';
 
 /**
- * Phase 1 ships the routes that are actually implemented. Tonight Mode (Queue
- * Theory) and the subscription optimiser (Cancel Culture) arrive in phases 4 and
- * 5; there are no placeholder screens for them, because a demo that navigates to
- * an empty page is worse than one with fewer links.
+ * Only routes that are actually implemented. Tonight Mode (Queue Theory) landed
+ * in phase 4; the subscription optimiser (Cancel Culture) arrives in phase 5 and
+ * has no route until it does, because a demo that navigates to an empty page is
+ * worse than one with fewer links.
  */
 export const routes: Routes = [
   {
@@ -28,6 +28,12 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/catalogue/title-detail.page').then((m) => m.TitleDetailPage),
     title: 'Title · Plotted',
+  },
+  {
+    path: 'tonight',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/tonight/tonight.page').then((m) => m.TonightPage),
+    title: 'Tonight · Plotted',
   },
   {
     path: 'watchlist',

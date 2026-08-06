@@ -169,7 +169,7 @@ class CoverageServiceTest {
     )
 
     private fun provider(name: String, slug: String) =
-        AvailabilityDirectory.ProviderRef(providerId = UUID.randomUUID(), name = name, slug = slug, logoUrl = null)
+        AvailabilityDirectory.ProviderRef(providerId = UUID.randomUUID(), name = name, slug = slug, logoUrl = null, isFree = false)
 
     private fun titleId() = UUID.randomUUID()
 

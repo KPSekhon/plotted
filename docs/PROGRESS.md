@@ -15,7 +15,7 @@ Last updated: 2026-08-05.
 | 1 | Skeleton — schema, auth, boundaries, Compose, CI | 1 | **Done** |
 | 2 | Catalogue — TMDB ingestion, availability, search, screens | 1 | **Verified in CI; seeding still owed** |
 | 3 | Watchlists, subscriptions, coverage dashboard | 1 | **Done** |
-| 4 | **Queue Theory** — tonight's recommendation | 1 | |
+| 4 | **Queue Theory** — tonight's recommendation | 1 | **API built** |
 | 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | |
 | 6 | Polish, demo mode, deployment | 1 | ← *résumé-ready line* |
 | 7 | Evaluation harness, MovieLens, baselines | 2 | |
@@ -256,10 +256,54 @@ is the only way to regenerate the document without Docker.
 
 ---
 
-## Phase 4 — Queue Theory (~3 weeks)
+## Phase 4 — Queue Theory (API built, no screen yet)
 
 The first headline feature. Tonight's context in, one pick plus two backups out,
-each with a reason.
+each with a reason. `GET /api/v1/tonight?availableMinutes=&accessPolicy=`.
+
+**Built.** Hard filters → weighted linear score → MMR → exploration → decision
+log. Each stage is a separate function with its own tests, because the failures
+that matter here are not exceptions, they are rankings that look plausible and
+are wrong.
+
+The six things the plan below warned about, and where each one lives:
+
+- **Renormalisation over available features** — `FeatureVector.score()`. A
+  missing feature is absent, never zero: without this a candidate lacking a
+  0.10-weight feature caps at 0.90 and loses to one with complete metadata, so
+  the ranking silently becomes a ranking of data quality. `FeaturesTest` asserts
+  two candidates identical but for a missing rating score the same.
+- **Asymmetric runtime fit** — `runtimeFit()`, overshoot penalised 3× undershoot,
+  and overshoot past 10% is a *hard filter* in `screen()` rather than a penalty.
+- **MMR and a propensity-logged exploration slot** — `Ranker.diversify` and
+  `Ranker.explore`. Slot 1 is never diversified; it is the answer.
+- **Explanations from real contributions** — `FeatureVector.contributions()`,
+  rendered straight into the response. Nothing generates prose.
+- **The "nothing fits" path** — `Recommendation.NothingFits` carries counts per
+  rejection reason and the API returns 200 with a diagnosis. Silently relaxing a
+  constraint to produce *something* would be answering a different question.
+- **Propensity logging from day one** — `V12__recommendations.sql`. It is one
+  numeric column and phase 7 cannot be built without it.
+
+**One bug found while writing this**, worth keeping in mind for the rest of the
+phase: with a single pick and a nonzero exploration rate, the last slot was
+discounted by the chance it was replaced even though exploration can only fire
+when there are at least two slots — at rate 1.0 that recorded a propensity of
+*zero* for a decision that was never in doubt. Nothing would have failed; phase 7
+would simply have divided by zero over months of logs. `RankerTest` now pins it.
+
+**The Tonight screen** is built and is the app's primary action from the home
+page. The empty answer is rendered as a diagnosis rather than an apology, and
+each pick shows its real feature contributions as bars — the same numbers the
+ranker used, not a description of them. An explored slot is labelled a wildcard
+rather than passed off as a considered choice.
+
+**The decision log has integration tests**, written before merging rather than
+after, on the phase 3 evidence that untested SQL is where this project's bugs
+live. They cover the propensity guard, the unique-position constraint, empty
+answers being logged with their reasons and no items, and `availableMinutes`
+storing null rather than a sentinel — "no particular limit" and "no time at all"
+have to stay distinguishable in the logs forever.
 
 - Hard filters (region, runtime, access policy, content rating, **and blocked
   titles**), then the weighted linear score from §9.5. `blocked_titles` has
