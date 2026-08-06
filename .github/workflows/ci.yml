@@ -62,12 +62,21 @@ jobs:
             exit 1
           fi
 
+      # Both documents, and the second one is the point. Once
+      # openapi/openapi.json exists the contract test stops overwriting it, so
+      # uploading only that path re-uploads the committed copy and the advice to
+      # "download it from this run's artifacts" silently stops working -- exactly
+      # when a drift failure means you need the regenerated one. The test writes
+      # that to build/openapi-actual.json whenever the two differ, which is the
+      # only way to recover it on a machine without Docker.
       - name: Upload the generated OpenAPI document
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: openapi
-          path: openapi/openapi.json
+          path: |
+            openapi/openapi.json
+            plotted-api/build/openapi-actual.json
           if-no-files-found: ignore
 
       - name: Build
