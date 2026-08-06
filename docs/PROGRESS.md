@@ -180,12 +180,23 @@ headline features need.
   restricted to outstanding items: the nightly batch is finite, so a title
   promoted is a title demoted.
 
-**Where the prices come from.** `provider_plans` still ships unseeded. The
-subscription form asks the *user* what they pay, and that figure is what gets
-stored. This is not a workaround for the no-fabricated-data rule, it is the rule
-applied correctly: what a person reports about their own bill is the most
-reliable pricing available, and it carries a source. Plotted still invents
-nothing.
+**Where the prices come from.** Two sources, and neither is invented.
+
+The subscription form asks the *user* what they pay, and
+`user_subscriptions.actual_price` overrides everything else on read — a
+grandfathered rate or a bundle discount is what someone is really billed.
+
+Underneath that, `V11__provider_plan_prices.sql` seeds a researched list price
+per plan so coverage and phase 5 have something to run against before anyone has
+entered a subscription. Every figure was read from a published source on
+2026-08-06 and the migration records which, flags the least confident, and gives
+the procedure for closing a stale row rather than editing it. They are
+**researched, not verified**; `docs/seed/provider-plans.md` still governs.
+
+One result worth carrying forward: the two figures read from a provider's own
+page were the two that secondary sources had wrong. Apple TV+ is widely reported
+at $12.99, which is the US price; Apple's Canadian page says $14.99. Prefer the
+provider.
 
 **Two decisions in coverage worth not undoing.**
 
@@ -204,7 +215,9 @@ nothing.
 `AvailabilityDirectory`), never by importing them. Cross-module *SQL* joins are
 allowed and used, following the precedent already set by the catalogue's join
 onto `title_availability`; the line ArchUnit enforces is that no class crosses a
-feature boundary, because that is the coupling that spreads.
+feature boundary, because that is the coupling that spreads. Written up as
+[ADR 0008](adr/0008-cross-module-reads-through-the-shared-kernel.md), including
+the cost that was accepted: a cross-module join is invisible to the compiler.
 
 **The new SQL is covered.** The first CI run on phase 3 passed with 145 tests
 and proved almost nothing about the repositories, because none of the new
@@ -248,8 +261,12 @@ is the only way to regenerate the document without Docker.
 The first headline feature. Tonight's context in, one pick plus two backups out,
 each with a reason.
 
-- Hard filters (region, runtime, access policy, content rating), then the
-  weighted linear score from §9.5.
+- Hard filters (region, runtime, access policy, content rating, **and blocked
+  titles**), then the weighted linear score from §9.5. `blocked_titles` has
+  existed since V6 and nothing reads it yet. It belongs here rather than in
+  catalogue search: someone searching for a title they have blocked should still
+  find it, because hiding it there looks like a missing catalogue entry rather
+  than a preference being honoured. `CatalogueQueryService` is the seam.
 - **Renormalise weights over available features.** A missing feature must not be
   treated as zero, or scores stop being comparable across candidates. Two lines,
   and most implementations ship without it.
