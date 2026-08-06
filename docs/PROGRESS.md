@@ -4,7 +4,7 @@ Where Plotted actually is, what each remaining phase involves, and what is still
 open. Written to be read by someone picking the project up cold — including a
 future me.
 
-Last updated: 2026-08-05.
+Last updated: 2026-08-06.
 
 ---
 
@@ -15,7 +15,7 @@ Last updated: 2026-08-05.
 | 1 | Skeleton — schema, auth, boundaries, Compose, CI | 1 | **Done** |
 | 2 | Catalogue — TMDB ingestion, availability, search, screens | 1 | **Verified in CI; seeding still owed** |
 | 3 | Watchlists, subscriptions, coverage dashboard | 1 | **Done** |
-| 4 | **Queue Theory** — tonight's recommendation | 1 | **API built** |
+| 4 | **Queue Theory** — tonight's recommendation | 1 | **Done** |
 | 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | |
 | 6 | Polish, demo mode, deployment | 1 | ← *résumé-ready line* |
 | 7 | Evaluation harness, MovieLens, baselines | 2 | |
@@ -31,9 +31,9 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-33 tables · 10 migrations · 68 Kotlin source files · 176 API tests (8 of them
-ArchUnit rules, 64 needing Docker) · 19 frontend tests · 18 API paths · 7 ADRs ·
-107 provider aliases.
+35 tables · 12 migrations · 78 Kotlin source files · 205 API tests (8 of them
+ArchUnit rules, 70 needing Docker) · 22 frontend tests · 19 API paths · 8 ADRs ·
+107 provider aliases · 17 seeded plan prices.
 
 ---
 
@@ -42,8 +42,8 @@ ArchUnit rules, 64 needing Docker) · 19 frontend tests · 18 API paths · 7 ADR
 **Install Docker Desktop.** This is now the clearest finding in the project, and
 it has been paid for four times.
 
-33 database tests are gated on `DockerSupport.isDockerAvailable()` and skip on
-the dev machine, so anything touching Postgres is unverified until CI runs it.
+70 database tests are now gated on `DockerSupport.isDockerAvailable()` and skip
+on the dev machine, so anything touching Postgres is unverified until CI runs it.
 PR #2 (merged 2026-08-05) was the first time CI ever executed the newest
 commits, and it took four round trips because the API job's steps are sequential
 — each failure hid the next one:
@@ -103,7 +103,7 @@ PostgreSQL 16.
 
 ---
 
-## Phase 2 — Catalogue (code-complete, unverified)
+## Phase 2 — Catalogue (done; seeding still owed)
 
 **Shipped.**
 
@@ -256,7 +256,7 @@ is the only way to regenerate the document without Docker.
 
 ---
 
-## Phase 4 — Queue Theory (API built, no screen yet)
+## Phase 4 — Queue Theory (done)
 
 The first headline feature. Tonight's context in, one pick plus two backups out,
 each with a reason. `GET /api/v1/tonight?availableMinutes=&accessPolicy=`.
