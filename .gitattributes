@@ -14,6 +14,12 @@ Makefile text eol=lf
 *.jpg binary
 *.woff2 binary
 
+# Declared rather than left to `text=auto`, which decides by looking for NUL
+# bytes. A serialised model that happened not to contain one would be LF-mangled
+# on checkout and stop parsing -- and because the mangling is per-platform, it
+# would pass on the machine that committed it and fail only in CI.
+*.onnx binary
+
 # Generated and committed: readable in review, but not worth reviewing by hand.
 openapi/openapi.json linguist-generated=true
 plotted-web/package-lock.json linguist-generated=true
