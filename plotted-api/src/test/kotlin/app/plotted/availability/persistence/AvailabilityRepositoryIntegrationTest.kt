@@ -269,6 +269,56 @@ class AvailabilityRepositoryIntegrationTest {
         stored.deepLink shouldNotBe null
     }
 
+    @Test
+    fun `findActiveForTitles answers for several titles in one query`() {
+        val one = givenTitle()
+        val other = givenTitle()
+        val crave = providers.findBySlug("crave")!!
+        val apple = providers.findBySlug("apple-tv-store")!!
+        repository.open(one, crave.id, region, AccessType.SUBSCRIPTION, SOURCE, FULL)
+        repository.open(other, apple.id, region, AccessType.RENT, SOURCE, FULL)
+
+        val rows = repository.findActiveForTitles(listOf(one, other), region)
+
+        rows.size shouldBe 2
+        rows.single { it.titleId == one }.provider.slug shouldBe "crave"
+        // The access type travels with the row: coverage has to be able to tell
+        // a subscription from a rental, and a rental covers nothing.
+        rows.single { it.titleId == other }.accessType shouldBe AccessType.RENT
+    }
+
+    @Test
+    fun `findActiveForTitles omits a title with no offers rather than returning a blank`() {
+        val covered = givenTitle()
+        val nothingKnown = givenTitle()
+        val crave = providers.findBySlug("crave")!!
+        repository.open(covered, crave.id, region, AccessType.SUBSCRIPTION, SOURCE, FULL)
+
+        val rows = repository.findActiveForTitles(listOf(covered, nothingKnown), region)
+
+        // Absence is what lets the caller separate "checked, nothing carries it"
+        // from "never checked" -- the distinction the coverage dashboard reports
+        // rather than scoring.
+        rows.map { it.titleId } shouldBe listOf(covered)
+    }
+
+    @Test
+    fun `findActiveForTitles ignores closed windows and other regions`() {
+        val titleId = givenTitle()
+        val crave = providers.findBySlug("crave")!!
+        val closed = repository.open(titleId, crave.id, region, AccessType.SUBSCRIPTION, SOURCE, FULL)
+        repository.close(closed)
+        repository.open(titleId, crave.id, "US", AccessType.SUBSCRIPTION, SOURCE, FULL)
+
+        repository.findActiveForTitles(listOf(titleId), region) shouldBe emptyList()
+        repository.findActiveForTitles(listOf(titleId), "US").size shouldBe 1
+    }
+
+    @Test
+    fun `findActiveForTitles with nothing to look up issues no statement`() {
+        repository.findActiveForTitles(emptyList(), region) shouldBe emptyList()
+    }
+
     // --- helpers -----------------------------------------------------------
 
     /** A minimal title, inserted directly so this test does not reach into the catalogue module. */

@@ -206,20 +206,22 @@ allowed and used, following the precedent already set by the catalogue's join
 onto `title_availability`; the line ArchUnit enforces is that no class crosses a
 feature boundary, because that is the coupling that spreads.
 
-**What green CI does and does not prove here.** PR #3 passes all four jobs, 145
-tests. That is worth exactly as much as what the tests cover, and they do not
-cover the new SQL. `WatchlistRepository`, `SubscriptionRepository`, the batched
-`findSummaries` and `findActiveForTitles` have **no integration tests**, so
-nothing has executed those queries against Postgres — a green API job means
-nothing else broke, not that these work.
+**The new SQL is covered.** The first CI run on phase 3 passed with 145 tests
+and proved almost nothing about the repositories, because none of the new
+queries had a test at all — a green API job meant only that nothing *else*
+broke. Integration tests now exist for all of it:
+`WatchlistRepositoryIntegrationTest`, `SubscriptionRepositoryIntegrationTest`,
+`TitleSearchRepositoryIntegrationTest`, and additions to
+`AvailabilityRepositoryIntegrationTest`.
 
-That makes them the least-tested code in the project, and on the phase 2 record
-the right assumption is that at least one is wrong. Writing those Testcontainers
-tests is the first job of phase 4, or of whoever installs Docker. The specific
-things to exercise: the `findOrCreateDefault` race under the partial unique
-index, `findOrCreatePlan` against the GiST exclusion constraint on
-`provider_plans`, the `IN` batching in `findSummaries`, and the `EXISTS`
-subquery now driving refresh priority.
+They target the parts nothing else type-checks: the partial unique index behind
+`findOrCreateDefault`, the composite unique constraint that makes a second
+`addItem` idempotent, the GiST exclusion constraint on `provider_plans` that
+`findOrCreatePlan` has to avoid tripping, the `IN` batching in `findSummaries`,
+the `EXISTS` subquery driving refresh priority, and — in every repository —
+that one user cannot read or change another's rows. Also that a `PATCH {}` does
+not become an `UPDATE` with an empty `SET`, which is invalid SQL rather than a
+no-op.
 
 **One more CI defect fixed in passing.** The workflow uploaded
 `openapi/openapi.json` — the *committed* file, which the contract test stops
