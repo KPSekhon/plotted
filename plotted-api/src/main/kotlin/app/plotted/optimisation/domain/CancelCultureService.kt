@@ -133,18 +133,27 @@ class CancelCultureService(
         val held = subscriptions.currentSubscriptions(userId, today).associateBy { it.providerId }
         val plans = subscriptions.availablePlans(region).associateBy { it.providerId }
 
-        val options = (held.keys + plans.keys).map { providerId ->
-            val holding = held[providerId]
-            val plan = plans[providerId]
-            ServiceOption(
-                providerId = providerId,
-                name = holding?.providerName ?: plan?.providerName ?: UNNAMED_SERVICE,
-                monthlyCents = holding?.monthlyCents ?: plan!!.monthlyCents,
-                committedMonths = holding?.committedMonths ?: 0,
-                currentlySubscribed = holding != null,
-            )
-        }
-        return options.sortedBy { it.name }
+        return (held.keys + plans.keys)
+            .mapNotNull { providerId ->
+                val holding = held[providerId]
+                val plan = plans[providerId]
+                // One of the two is always present — the id came from their
+                // keys. Written so the compiler knows it rather than asserted,
+                // because a service with no price at all must be left out
+                // regardless of how it got here: there is nothing to optimise
+                // against and nothing honest to invent.
+                val priced = holding?.let { it.providerName to it.monthlyCents }
+                    ?: plan?.let { it.providerName to it.monthlyCents }
+                    ?: return@mapNotNull null
+                ServiceOption(
+                    providerId = providerId,
+                    name = priced.first,
+                    monthlyCents = priced.second,
+                    committedMonths = holding?.committedMonths ?: 0,
+                    currentlySubscribed = holding != null,
+                )
+            }
+            .sortedBy { it.name }
     }
 
     /**
@@ -264,12 +273,5 @@ class CancelCultureService(
     private companion object {
         /** Mirrors `Priority.LOWEST`, which lives in another module and cannot be imported. */
         const val LOWEST_PRIORITY = 5
-
-        /**
-         * A held subscription whose provider row has gone. Rare and recoverable,
-         * and better than dropping a service the user is paying for out of a
-         * plan that is supposed to account for their whole bill.
-         */
-        const val UNNAMED_SERVICE = "Unnamed service"
     }
 }

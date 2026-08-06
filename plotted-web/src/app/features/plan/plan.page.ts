@@ -106,7 +106,10 @@ import { PlanService } from '../../core/plan/plan.service';
         <div class="centre"><mat-spinner diameter="36" /></div>
       } @else if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
-      } @else if (result(); as plan) {
+      } @else {
+        <!-- The alias needs its own block rather than riding on the chain
+             above: "as" binds only on a primary if, never on an else-if. -->
+        @if (result(); as plan) {
         @if (plan.violations.length > 0) {
           <!-- The independent checker disagreed with the model. This is a defect
                in Plotted, not in the plan the user asked for, and hiding it
@@ -152,7 +155,8 @@ import { PlanService } from '../../core/plan/plan.service';
               </p>
             }
           </section>
-        } @else if (plan.objective; as objective) {
+        } @else {
+        @if (plan.objective; as objective) {
           <section class="summary">
             <div class="stat">
               <span class="value">{{ percent(objective.coverage) }}</span>
@@ -242,6 +246,7 @@ import { PlanService } from '../../core/plan/plan.service';
             </section>
           }
         }
+        }
 
         @if (excludedCount() > 0) {
           <section class="excluded">
@@ -253,10 +258,10 @@ import { PlanService } from '../../core/plan/plan.service';
               from one no plan could afford.
             </p>
 
-            @if (result()!.excluded.freeToWatch.length > 0) {
+            @if (plan.excluded.freeToWatch.length > 0) {
               <h3>Already free to watch</h3>
               <ul class="titles">
-                @for (title of result()!.excluded.freeToWatch; track title.titleId) {
+                @for (title of plan.excluded.freeToWatch; track title.titleId) {
                   <li>
                     <a [routerLink]="['/titles', title.titleId]">{{ title.name }}</a>
                     <span class="why">on {{ title.providerNames.join(', ') }}</span>
@@ -265,7 +270,7 @@ import { PlanService } from '../../core/plan/plan.service';
               </ul>
             }
 
-            @if (result()!.excluded.neverChecked.length > 0) {
+            @if (plan.excluded.neverChecked.length > 0) {
               <h3>Never checked</h3>
               <p class="why-excluded">
                 Plotted does not know where these are streaming yet, so counting
@@ -273,7 +278,7 @@ import { PlanService } from '../../core/plan/plan.service';
                 data.
               </p>
               <ul class="titles">
-                @for (title of result()!.excluded.neverChecked; track title.titleId) {
+                @for (title of plan.excluded.neverChecked; track title.titleId) {
                   <li>
                     <a [routerLink]="['/titles', title.titleId]">{{ title.name }}</a>
                   </li>
@@ -281,14 +286,14 @@ import { PlanService } from '../../core/plan/plan.service';
               </ul>
             }
 
-            @if (result()!.excluded.unpricedService.length > 0) {
+            @if (plan.excluded.unpricedService.length > 0) {
               <h3>On a service with no established price</h3>
               <p class="why-excluded">
                 Plotted has no verified price for these services, and guessing
                 one would put invented money into a calculation about your bill.
               </p>
               <ul class="titles">
-                @for (title of result()!.excluded.unpricedService; track title.titleId) {
+                @for (title of plan.excluded.unpricedService; track title.titleId) {
                   <li>
                     <a [routerLink]="['/titles', title.titleId]">{{ title.name }}</a>
                     <span class="why">on {{ title.providerNames.join(', ') }}</span>
@@ -299,12 +304,13 @@ import { PlanService } from '../../core/plan/plan.service';
           </section>
         }
 
-        @if (result()!.solveMillis !== null) {
+        @if (plan.solveMillis !== null) {
           <p class="provenance">
-            Solved in {{ result()!.solveMillis }} ms. Every figure above is
+            Solved in {{ plan.solveMillis }} ms. Every figure above is
             recomputed from the chosen plan by an independent checker, not read
             back out of the solver.
           </p>
+        }
         }
       }
     </section>

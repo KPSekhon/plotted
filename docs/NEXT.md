@@ -168,27 +168,32 @@ Nothing missing. `blocked_titles` still has no reader — it belongs with phase
 4's hard filters conceptually but was deliberately left for a later pass; see
 the note in `CatalogueQueryService`.
 
-### Phase 5 — Cancel Culture (in progress)
+### Phase 5 — Cancel Culture (done)
 
-Built: `PlanChecker` (the independent verifier, complete and tested),
-`PlanSolver` (the CP-SAT model, **never executed**), the SPI extensions it needs.
+Built and green in CI: `PlanChecker`, `PlanSolver`, `CancelCultureService`,
+`GET /api/v1/plan`, the screen, and `PlanSolverAgreementTest` — which enumerates
+every possible plan for small instances, scores them with the checker alone, and
+asserts CP-SAT found the best of them. See `PROGRESS.md` for what the first
+execution turned up.
 
-Missing:
+Still open, and neither blocks anything:
 
-1. **The service** that gathers inputs from the four SPIs and calls the solver.
-2. **The API and screen.**
-3. **The test that matters most:** solver and checker agreeing on a plan neither
-   produced alone. Right now the checker is proven and the model is not.
-4. **The CP-SAT crash on Windows**, still unexplained. `msvcp140.dll` and
+1. **The CP-SAT crash on Windows**, still unexplained. `msvcp140.dll` and
    `vcruntime140_1.dll` are current (14.44.35211.0), so the obvious cause is
    ruled out. Start from the module list in `hs_err_pid*.log`. CI is Linux and
-   unaffected, so **phase 5 can be finished and verified through CI regardless**
-   — do not let this block the work.
+   runs all ten solver tests, so this is a developer-machine inconvenience
+   rather than a product problem.
+2. **The optimiser has a thin catalogue to work with.** Everything it says is
+   real, but it chooses among 119 seeded titles and 17 researched prices. The
+   seed procedure in Part 1 is what makes the answers *interesting* as well as
+   correct, and it is the highest-value thing left before phase 6.
 
-**Plan.** Open the PR early; CI is the first real execution of `PlanSolver` and
-it will find things. Expect the model to be wrong somewhere on first run — that
-is what the independent checker is for, and `violations` being non-empty on a
-returned plan is a defect in the model, reported rather than thrown.
+**One result worth carrying into phase 6.** A limit on services held *at once*
+is much weaker than it looks once the model has a time dimension: given two
+months and a one-service limit, the solver rotates rather than giving up half
+the list. That rotation is the single best thing to put in the demo — it is a
+plan no coverage dashboard could produce, and it is obviously right the moment
+you see it.
 
 ---
 
@@ -241,10 +246,21 @@ that carry the product's thesis.
 
 ## The standing lesson
 
-Four of the bugs found so far were mechanisms that reported success while doing
+Five of the bugs found so far were mechanisms that reported success while doing
 nothing: reuse detection whose revocation was rolled back, a drift check that
 could never fail, a build step that had never run, an exploration slot logging a
-propensity of zero. None of them threw. All of them passed their tests.
+propensity of zero, and two DTOs whose shared simple name silently collapsed to
+one schema in the published contract. None of them threw. All of them passed
+their tests.
+
+The last one is the sharpest example yet, because a check *was* watching and
+still could not see it: the OpenAPI drift check compares the document to the
+committed copy, and the wrong document was internally consistent and matched
+itself perfectly. A check only catches what it compares against.
 
 **Be suspicious of any check that has never had the chance to fail**, and prefer
-a second implementation that disagrees over a test that agrees.
+a second implementation that disagrees over a test that agrees. When you add a
+guard, make it fail once on the real defect before you trust it —
+`apiClassNamesAreUnique` was run against the live collision, and the first
+version of it also flagged 24 Kotlin companion objects, which is exactly the
+kind of thing you only find by looking.
