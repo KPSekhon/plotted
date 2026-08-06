@@ -75,6 +75,19 @@ data class Provider(
     val type: ProviderType,
 )
 
+/**
+ * A provider offered for selection, with its logo.
+ *
+ * Separate from [Provider] because the logo is presentation, and the callers
+ * that matter most -- ingestion and alias resolution -- have no use for it. It
+ * lives in the domain rather than in the repository so that a controller can
+ * hold one without depending on a persistence class.
+ */
+data class ProviderListing(
+    val provider: Provider,
+    val logoUrl: String?,
+)
+
 /** A provider as TMDB reported it, before canonicalisation. */
 data class RawProviderOffer(
     val tmdbProviderId: Int,

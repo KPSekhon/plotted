@@ -30,6 +30,25 @@ export const routes: Routes = [
     title: 'Title · Plotted',
   },
   {
+    path: 'watchlist',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/watchlist/watchlist.page').then((m) => m.WatchlistPage),
+    title: 'Your list · Plotted',
+  },
+  {
+    path: 'coverage',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/coverage/coverage.page').then((m) => m.CoveragePage),
+    title: 'Coverage · Plotted',
+  },
+  {
+    path: 'subscriptions',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/subscriptions/subscriptions.page').then((m) => m.SubscriptionsPage),
+    title: 'Subscriptions · Plotted',
+  },
+  {
     path: 'settings',
     canActivate: [authGuard],
     loadComponent: () => import('./features/settings/settings.page').then((m) => m.SettingsPage),

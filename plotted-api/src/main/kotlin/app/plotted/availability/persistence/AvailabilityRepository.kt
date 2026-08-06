@@ -119,6 +119,61 @@ class AvailabilityRepository(
         }
 
     /**
+     * Active offers for several titles at once, with the provider joined in.
+     *
+     * The batched sibling of [findOffers]. The coverage dashboard asks about a
+     * whole watchlist, and asking per title would turn one screen into one query
+     * per row -- the shape that looks fine against a seed of five and falls over
+     * against a real list.
+     *
+     * Returns rows, not a map. Which titles came back with nothing is
+     * information the caller needs, and a map keyed by title silently loses it.
+     */
+    fun findActiveForTitles(titleIds: Collection<UUID>, regionCode: String): List<TitleOffer> {
+        val wanted = titleIds.distinct().take(MAX_COVERAGE_BATCH)
+        if (wanted.isEmpty()) return emptyList()
+
+        return dsl.select(
+            TITLE_AVAILABILITY.TITLE_ID,
+            TITLE_AVAILABILITY.ID,
+            TITLE_AVAILABILITY.ACCESS_TYPE,
+            TITLE_AVAILABILITY.PRICE,
+            TITLE_AVAILABILITY.CURRENCY,
+            TITLE_AVAILABILITY.DEEP_LINK,
+            TITLE_AVAILABILITY.SOURCE,
+            TITLE_AVAILABILITY.SOURCE_CHECKED_AT,
+            TITLE_AVAILABILITY.CONFIDENCE,
+            PROVIDERS.ID,
+            PROVIDERS.NAME,
+            PROVIDERS.SLUG,
+            PROVIDERS.PROVIDER_TYPE,
+            PROVIDERS.LOGO_URL,
+        )
+            .from(TITLE_AVAILABILITY)
+            .join(PROVIDERS).on(PROVIDERS.ID.eq(TITLE_AVAILABILITY.PROVIDER_ID))
+            .where(TITLE_AVAILABILITY.TITLE_ID.`in`(wanted))
+            .and(TITLE_AVAILABILITY.REGION_CODE.eq(regionCode))
+            .and(TITLE_AVAILABILITY.ACTIVE.isTrue)
+            .orderBy(TITLE_AVAILABILITY.TITLE_ID, TITLE_AVAILABILITY.ACCESS_TYPE, PROVIDERS.NAME)
+            .fetch()
+            .map { record ->
+                TitleOffer(
+                    titleId = record[TITLE_AVAILABILITY.TITLE_ID]!!,
+                    accessType = AccessType.fromDb(record[TITLE_AVAILABILITY.ACCESS_TYPE]!!),
+                    provider = Provider(
+                        id = record[PROVIDERS.ID]!!,
+                        name = record[PROVIDERS.NAME]!!,
+                        slug = record[PROVIDERS.SLUG]!!,
+                        type = ProviderType.fromDb(record[PROVIDERS.PROVIDER_TYPE]!!),
+                    ),
+                    providerLogoUrl = record[PROVIDERS.LOGO_URL],
+                    sourceCheckedAt = record[TITLE_AVAILABILITY.SOURCE_CHECKED_AT]!!.toInstant(),
+                    confidence = record[TITLE_AVAILABILITY.CONFIDENCE]!!,
+                )
+            }
+    }
+
+    /**
      * Opens a new availability window, running with no known end.
      *
      * It starts today unless this title, provider, region and access type
@@ -275,7 +330,28 @@ class AvailabilityRepository(
 
     fun countSnapshots(titleId: UUID): Int = dsl.fetchCount(AVAILABILITY_SNAPSHOTS, AVAILABILITY_SNAPSHOTS.TITLE_ID.eq(titleId))
 
+    /**
+     * One active offer, carrying the title it belongs to.
+     *
+     * Provenance travels with it -- `sourceCheckedAt` and `confidence` -- even
+     * though coverage does not currently show them, because section 5's rule is
+     * that an availability claim moves around the system with its evidence
+     * attached. The moment a caller has to fetch that separately is the moment
+     * one of them stops bothering.
+     */
+    data class TitleOffer(
+        val titleId: UUID,
+        val accessType: AccessType,
+        val provider: Provider,
+        val providerLogoUrl: String?,
+        val sourceCheckedAt: java.time.Instant,
+        val confidence: BigDecimal,
+    )
+
     private companion object {
+        /** Matches the catalogue's summary batch: the same screens read both. */
+        const val MAX_COVERAGE_BATCH = 500
+
         /**
          * Referenced by name because the jOOQ generator never sees this column;
          * it is added by a fenced ALTER in V5. The type is deliberately opaque:

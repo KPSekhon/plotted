@@ -8,6 +8,7 @@ import { RouterLink } from '@angular/router';
 import { Availability, Title } from '../../core/catalogue/catalogue.models';
 import { CatalogueService } from '../../core/catalogue/catalogue.service';
 import { messageFrom } from '../../core/error/problem-detail';
+import { WatchlistService } from '../../core/watchlist/watchlist.service';
 import { AvailabilityPanelComponent } from './availability-panel.component';
 
 /**
@@ -87,6 +88,26 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
           @if (loaded.overview; as overview) {
             <p class="overview">{{ overview }}</p>
           }
+
+          <div class="list-actions">
+            @if (onList()) {
+              <!-- Confirmed rather than assumed: the button reflects what the
+                   server came back with, so a failed add cannot leave the
+                   interface claiming something is saved when it is not. -->
+              <a mat-stroked-button routerLink="/watchlist">
+                <mat-icon>check</mat-icon>
+                On your list
+              </a>
+            } @else {
+              <button mat-flat-button (click)="addToList(loaded.id)" [disabled]="adding()">
+                <mat-icon>add</mat-icon>
+                Add to your list
+              </button>
+            }
+            @if (listError(); as message) {
+              <span class="list-error" role="alert">{{ message }}</span>
+            }
+          </div>
 
           @if (availability(); as loadedAvailability) {
             <plotted-availability-panel [availability]="loadedAvailability" />
@@ -187,6 +208,19 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
     .form-error {
       color: var(--mat-sys-error, #b3261e);
     }
+
+    .list-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .list-error {
+      font-size: 0.85rem;
+      color: var(--mat-sys-error, #b3261e);
+    }
   `,
 })
 export class TitleDetailPage implements OnInit {
@@ -194,11 +228,37 @@ export class TitleDetailPage implements OnInit {
   readonly titleId = input.required<string>();
 
   private readonly catalogue = inject(CatalogueService);
+  private readonly watchlists = inject(WatchlistService);
 
   protected readonly title = signal<Title | null>(null);
   protected readonly availability = signal<Availability | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+
+  protected readonly onList = signal(false);
+  protected readonly adding = signal(false);
+  protected readonly listError = signal<string | null>(null);
+
+  /**
+   * Adds this title to the default watchlist.
+   *
+   * The API is idempotent, so a double click is harmless rather than a second
+   * row -- adding something twice is a slip, not an error worth reporting.
+   */
+  protected addToList(titleId: string): void {
+    this.adding.set(true);
+    this.listError.set(null);
+    this.watchlists.add({ titleId }).subscribe({
+      next: () => {
+        this.onList.set(true);
+        this.adding.set(false);
+      },
+      error: (failure: unknown) => {
+        this.listError.set(messageFrom(failure));
+        this.adding.set(false);
+      },
+    });
+  }
   protected readonly availabilityError = signal(false);
 
   ngOnInit(): void {

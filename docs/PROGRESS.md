@@ -14,7 +14,7 @@ Last updated: 2026-08-05.
 |---|---|---|---|
 | 1 | Skeleton — schema, auth, boundaries, Compose, CI | 1 | **Done** |
 | 2 | Catalogue — TMDB ingestion, availability, search, screens | 1 | **Verified in CI; seeding still owed** |
-| 3 | Watchlists, subscriptions, coverage dashboard | 1 | In progress |
+| 3 | Watchlists, subscriptions, coverage dashboard | 1 | **Built; unverified against a database** |
 | 4 | **Queue Theory** — tonight's recommendation | 1 | |
 | 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | |
 | 6 | Polish, demo mode, deployment | 1 | ← *résumé-ready line* |
@@ -158,21 +158,61 @@ reason worth keeping straight:
 
 ---
 
-## Phase 3 — Watchlists, subscriptions, coverage (~1.5 weeks)
+## Phase 3 — Watchlists, subscriptions, coverage (built)
 
-The first screen that is genuinely useful, and the last piece of groundwork the
-two headline features need.
+The first screens that are genuinely useful, and the last groundwork the two
+headline features need.
 
-- Watchlists with 1–5 priority (1 = highest; the direction is documented in the
-  column comment because ambiguity here produces optimiser bugs that are very
-  hard to see).
-- Subscription tracking: plans, prices, renewal dates, `cannot_cancel` flags.
-  **Provider plan prices are deliberately unseeded** — fill them from public
-  pricing pages per `docs/seed/provider-plans.md`.
-- **Coverage dashboard**: which service covers the largest weighted share of the
-  watchlist. Appendix A calls this out as already demoable on its own.
-- Wire watchlist titles into the refresh priority — `TitleSearchRepository`
-  currently orders purely by staleness, with a comment marking the spot.
+**Shipped.**
+
+- **Watchlists** with 1–5 priority (1 = highest, restated in the schema, the
+  column comment and `Priority` itself, because ambiguity here produces
+  optimiser bugs that look like bad taste rather than defects). Priority and
+  status are editable in place — a weighting nobody adjusts stays at its default
+  and makes the weighting meaningless.
+- **Subscription tracking**: plans, prices, renewal dates, `cannot_cancel`.
+  `cannotCancel` is *derived* from a commitment end date rather than trusted from
+  the request, so the flag cannot disagree with the date beside it.
+- **Coverage dashboard** — the first screen that answers a question rather than
+  displaying a record, and the direct ancestor of phase 5's objective.
+- Watchlist titles now sort ahead of everything else in the refresh priority,
+  restricted to outstanding items: the nightly batch is finite, so a title
+  promoted is a title demoted.
+
+**Where the prices come from.** `provider_plans` still ships unseeded. The
+subscription form asks the *user* what they pay, and that figure is what gets
+stored. This is not a workaround for the no-fabricated-data rule, it is the rule
+applied correctly: what a person reports about their own bill is the most
+reliable pricing available, and it carries a source. Plotted still invents
+nothing.
+
+**Two decisions in coverage worth not undoing.**
+
+- Shares are **priority-weighted, not counted**. A service carrying one film
+  someone is desperate to see outranks one carrying four they are lukewarm about.
+  `CoverageServiceTest` asserts exactly this inversion, so anyone who
+  "simplifies" it back to a count gets a failing test rather than a plausible
+  wrong answer.
+- Titles whose availability has **never been checked are excluded from the
+  denominator** and reported separately. Scoring them as uncovered would penalise
+  every service in proportion to how stale Plotted's own data is — invisibly,
+  because a low percentage looks the same either way.
+
+**Module boundaries.** `watchlist` and `subscriptions` reach `catalogue` and
+`availability` through `platform.spi` interfaces (`TitleDirectory`,
+`AvailabilityDirectory`), never by importing them. Cross-module *SQL* joins are
+allowed and used, following the precedent already set by the catalogue's join
+onto `title_availability`; the line ArchUnit enforces is that no class crosses a
+feature boundary, because that is the coupling that spreads.
+
+**What is not yet verified.** Everything above passes ktlint, the unit tests, the
+ArchUnit rules and both builds, and none of it has met a database. The new
+repositories — `WatchlistRepository`, `SubscriptionRepository`, the batched
+`findSummaries` and `findActiveForTitles` — have no integration tests yet, which
+means the SQL in them is the least-tested code in the project. Given the phase 2
+record, assume at least one of these queries is wrong until CI says otherwise.
+Writing those Testcontainers tests is the first job of phase 4, or of whoever
+installs Docker.
 
 ---
 
