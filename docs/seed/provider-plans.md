@@ -1,6 +1,19 @@
 # Seeding provider plan pricing
 
-`V8__reference_data.sql` seeds the Canadian providers but deliberately seeds **no
+> **Update, 2026-08-06.** `V11__provider_plan_prices.sql` seeds a researched
+> starting set for Netflix, Crave, Disney+, Amazon Prime, Apple TV+, Paramount+
+> and CBC Gem, so coverage and the phase 5 optimiser have something real to run
+> against. Every figure was read from a published source on that date, and the
+> migration records which source and flags the least confident of them. That
+> makes them **researched, not verified** — everything below still applies, and
+> the procedure in this document is how they get corrected.
+>
+> One result worth keeping: the two figures read from a provider's own page are
+> the two that a secondary source had wrong. Apple TV+ was widely reported at
+> $12.99, which is the US price; Apple's Canadian page says $14.99. Prefer the
+> provider.
+
+`V8__reference_data.sql` seeds the Canadian providers and deliberately seeded **no
 prices**.
 
 Plan pricing is manually curated from public pricing pages. A migration has no
