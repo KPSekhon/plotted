@@ -14,7 +14,7 @@ Last updated: 2026-08-05.
 |---|---|---|---|
 | 1 | Skeleton — schema, auth, boundaries, Compose, CI | 1 | **Done** |
 | 2 | Catalogue — TMDB ingestion, availability, search, screens | 1 | **Verified in CI; seeding still owed** |
-| 3 | Watchlists, subscriptions, coverage dashboard | 1 | **Built; unverified against a database** |
+| 3 | Watchlists, subscriptions, coverage dashboard | 1 | **Done** |
 | 4 | **Queue Theory** — tonight's recommendation | 1 | |
 | 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | |
 | 6 | Polish, demo mode, deployment | 1 | ← *résumé-ready line* |
@@ -222,6 +222,16 @@ the `EXISTS` subquery driving refresh priority, and — in every repository —
 that one user cannot read or change another's rows. Also that a `PATCH {}` does
 not become an `UPDATE` with an empty `SET`, which is invalid SQL rather than a
 no-op.
+
+**All 176 tests pass.** Every one of the new queries was correct on its first
+execution against Postgres, which after phase 2 was not the way to bet. The two
+failures that did appear were in a *test fixture*: it inserted an availability
+row as one plain-SQL string, and in plain SQL jOOQ has no target type for a
+bind, so an `OffsetDateTime` reached a `timestamptz` column as
+`character varying`. The production repositories never hit this because they use
+the typed API and keep raw SQL for `validity` alone. **Write fixtures the same
+way the repository writes** — a fixture that takes a shortcut the real code
+avoids reintroduces exactly the bug the real code was designed around.
 
 **One more CI defect fixed in passing.** The workflow uploaded
 `openapi/openapi.json` — the *committed* file, which the contract test stops
