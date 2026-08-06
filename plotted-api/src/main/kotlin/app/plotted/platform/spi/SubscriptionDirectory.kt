@@ -43,6 +43,13 @@ interface SubscriptionDirectory {
 
     data class Held(
         val providerId: UUID,
+        /**
+         * Carried here because a held service may have no plan row at all — the
+         * user told us what they pay for something `provider_plans` has never
+         * priced. The optimiser can still reason about it, and a plan that says
+         * "cancel this" has to be able to name it.
+         */
+        val providerName: String,
         val monthlyCents: Long,
         /** Months from today during which this cannot be cancelled. Zero when free to cancel. */
         val committedMonths: Int,

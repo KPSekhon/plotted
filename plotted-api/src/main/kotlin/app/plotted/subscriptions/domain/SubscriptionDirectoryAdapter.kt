@@ -30,6 +30,7 @@ class SubscriptionDirectoryAdapter(
         .map { subscription ->
             SubscriptionDirectory.Held(
                 providerId = subscription.providerId,
+                providerName = subscription.providerName,
                 monthlyCents = subscription.monthlyCost.movePointRight(2).toLong(),
                 committedMonths = committedMonths(subscription, today),
             )

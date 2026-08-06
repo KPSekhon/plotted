@@ -359,7 +359,7 @@ class PlanSolver {
         val committedCost = committed.sumOf { it.monthlyCents }
 
         request.constraints.maximumMonthlyCents?.let { budget ->
-            if (committedCost > budget) {
+            if (committed.isNotEmpty() && committedCost > budget) {
                 return PlanOutcome.Infeasible(
                     explanation = "Your commitments alone cost $${money(committedCost)} a month, " +
                         "which is more than the $${money(budget)} budget. " +

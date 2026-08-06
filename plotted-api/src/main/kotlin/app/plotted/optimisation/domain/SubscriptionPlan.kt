@@ -146,7 +146,68 @@ sealed interface PlanOutcome {
         val explanation: String,
         val bindingConstraint: String?,
     ) : PlanOutcome
+
+    /**
+     * There is nothing to optimise against, so no advice is given.
+     *
+     * Distinct from [Infeasible], and the distinction is the whole point. With an
+     * empty demand set the mathematically optimal plan is "cancel everything you
+     * are not locked into" — which the solver would return, confidently, with a
+     * cost saving attached. That is not a recommendation, it is an artefact of
+     * having asked a question with no data behind it, and it is exactly the shape
+     * of confident wrong financial advice this project keeps refusing to ship.
+     */
+    data class NothingToPlan(
+        val explanation: String,
+    ) : PlanOutcome
 }
+
+/**
+ * An outcome plus what the model was never shown.
+ *
+ * The two are separate because [PlanSolver] only ever sees a [PlanRequest] and
+ * should stay that way — deciding which titles are worth modelling is a product
+ * judgement, and a solver that knew about it would be a solver you could no
+ * longer test by handing it a request.
+ */
+data class PlanReport(
+    val outcome: PlanOutcome,
+    val excluded: ExcludedDemand,
+    val horizonMonths: Int,
+    /** Provider names for everything in the model, so the API never has to look them up again. */
+    val providerNames: Map<UUID, String>,
+)
+
+/**
+ * Watchlist items deliberately kept out of the model, grouped by reason.
+ *
+ * Reported rather than dropped. Each of these is a title the user put on a list
+ * and then did not see in the answer, and "it is not there because Plotted has
+ * never checked it" is a completely different fact from "no plan could afford
+ * it". Silently narrowing the input is how a coverage percentage starts
+ * describing Plotted's data quality instead of the user's options.
+ */
+data class ExcludedDemand(
+    /** Watchable free or ad-supported, so no subscription decision turns on them. */
+    val freeToWatch: List<ExcludedTitle>,
+    /** Availability has never been checked, so scoring them would penalise every plan equally. */
+    val neverChecked: List<ExcludedTitle>,
+    /** Only on services with no known price. Guessing the price would put invented money in the objective. */
+    val unpricedService: List<ExcludedTitle>,
+) {
+    val total: Int get() = freeToWatch.size + neverChecked.size + unpricedService.size
+
+    companion object {
+        val NONE = ExcludedDemand(emptyList(), emptyList(), emptyList())
+    }
+}
+
+data class ExcludedTitle(
+    val titleId: UUID,
+    val name: String,
+    /** Named so the interface can say which service, rather than "a service". */
+    val providerNames: List<String>,
+)
 
 /**
  * What relaxing one constraint by one unit would buy.
