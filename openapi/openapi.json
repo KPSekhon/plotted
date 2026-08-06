@@ -455,6 +455,44 @@
         }
       }
     },
+    "/api/v1/tonight" : {
+      "get" : {
+        "tags" : [ "tonight-controller" ],
+        "summary" : "What to watch tonight",
+        "description" : "One pick and two backups, each with the reasons that actually produced its score. Returns 200 with an empty picks list and a diagnosis when nothing fits: the constraints were the request, so relaxing them silently to produce something would be answering a different question.",
+        "operationId" : "tonight",
+        "parameters" : [ {
+          "name" : "availableMinutes",
+          "in" : "query",
+          "description" : "Minutes available. Omit for no time limit — which is not the same as zero.",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "accessPolicy",
+          "in" : "query",
+          "description" : "One of active_subscriptions_only, include_free, any_subscription.",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TonightResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/titles/{titleId}" : {
       "get" : {
         "tags" : [ "catalogue-controller" ],
@@ -1269,6 +1307,131 @@
             }
           }
         }
+      },
+      "DiagnosisResponse" : {
+        "required" : [ "headline", "reasons" ],
+        "type" : "object",
+        "properties" : {
+          "headline" : {
+            "type" : "string"
+          },
+          "reasons" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RejectionResponse"
+            }
+          }
+        },
+        "description" : "Present only when nothing fit."
+      },
+      "PickResponse" : {
+        "required" : [ "availableOn", "exploration", "mediaType", "name", "position", "reasons", "score", "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "position" : {
+            "type" : "integer",
+            "description" : "1 is the pick, 2 and 3 are backups.",
+            "format" : "int32"
+          },
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "mediaType" : {
+            "type" : "string"
+          },
+          "posterUrl" : {
+            "type" : "string"
+          },
+          "watchMinutes" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "availableOn" : {
+            "type" : "array",
+            "description" : "Where it can be watched, under the access policy that was applied.",
+            "items" : {
+              "type" : "string",
+              "description" : "Where it can be watched, under the access policy that was applied."
+            }
+          },
+          "score" : {
+            "type" : "number",
+            "description" : "0 to 1, after renormalising over the features this title actually has.",
+            "format" : "double"
+          },
+          "reasons" : {
+            "type" : "array",
+            "description" : "Why it was chosen, largest contribution first. Derived from the scored features themselves — never generated prose.",
+            "items" : {
+              "$ref" : "#/components/schemas/ReasonResponse"
+            }
+          },
+          "exploration" : {
+            "type" : "boolean",
+            "description" : "True when this slot was filled by exploration rather than by rank. Surfaced rather than hidden: a suggestion that is deliberately a wildcard should say so."
+          }
+        }
+      },
+      "ReasonResponse" : {
+        "required" : [ "reason", "share" ],
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "share" : {
+            "type" : "number",
+            "description" : "How much of the score this accounted for, 0 to 1.",
+            "format" : "double"
+          }
+        },
+        "description" : "Why it was chosen, largest contribution first. Derived from the scored features themselves — never generated prose."
+      },
+      "RejectionResponse" : {
+        "required" : [ "count", "explanation", "reason" ],
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "explanation" : {
+            "type" : "string"
+          },
+          "count" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "TonightResponse" : {
+        "required" : [ "candidateCount", "eligibleCount", "picks" ],
+        "type" : "object",
+        "properties" : {
+          "picks" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PickResponse"
+            }
+          },
+          "diagnosis" : {
+            "$ref" : "#/components/schemas/DiagnosisResponse"
+          },
+          "candidateCount" : {
+            "type" : "integer",
+            "description" : "How many watchlist items were considered before filtering.",
+            "format" : "int32"
+          },
+          "eligibleCount" : {
+            "type" : "integer",
+            "description" : "How many survived the hard filters.",
+            "format" : "int32"
+          }
+        },
+        "description" : "Tonight's answer. An empty picks list with a populated diagnosis is a valid, successful response: it means the constraints excluded everything, which is information rather than a failure."
       },
       "AvailabilityOfferResponse" : {
         "required" : [ "accessType", "confidence", "providerName", "providerSlug", "providerType", "source", "verifiedAt" ],

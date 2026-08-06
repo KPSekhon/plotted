@@ -298,9 +298,12 @@ each pick shows its real feature contributions as bars — the same numbers the
 ranker used, not a description of them. An explored slot is labelled a wildcard
 rather than passed off as a considered choice.
 
-**Not built yet.** Integration tests for `RecommendationLogRepository`. The
-decision log is written on every request including the empty ones, and none of
-that SQL has met Postgres — same gap phase 3 had, same fix.
+**The decision log has integration tests**, written before merging rather than
+after, on the phase 3 evidence that untested SQL is where this project's bugs
+live. They cover the propensity guard, the unique-position constraint, empty
+answers being logged with their reasons and no items, and `availableMinutes`
+storing null rather than a sentinel — "no particular limit" and "no time at all"
+have to stay distinguishable in the logs forever.
 
 - Hard filters (region, runtime, access policy, content rating, **and blocked
   titles**), then the weighted linear score from §9.5. `blocked_titles` has
