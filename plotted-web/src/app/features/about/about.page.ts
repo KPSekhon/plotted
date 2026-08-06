@@ -52,12 +52,15 @@ import { RouterLink } from '@angular/router';
         <ol class="phases">
           <li class="done"><span>Accounts, sessions and the Canadian schema</span></li>
           <li class="done"><span>Catalogue, availability and nightly snapshots</span></li>
-          <li><span>Watchlists and platform coverage</span></li>
-          <li><span>Queue Theory &mdash; tonight&rsquo;s pick</span></li>
-          <li><span>Cancel Culture &mdash; next month&rsquo;s subscriptions</span></li>
+          <li class="done"><span>Watchlists and platform coverage</span></li>
+          <li class="done"><span>Queue Theory &mdash; tonight&rsquo;s pick</span></li>
+          <li class="done"><span>Cancel Culture &mdash; next month&rsquo;s subscriptions</span></li>
+          <li><span>Demo mode, deployment and a written-up evaluation</span></li>
         </ol>
         <p class="faint note">
-          There is nothing to recommend yet, so nothing here pretends to recommend anything.
+          Both headline features are built. The catalogue is still a small
+          hand-checked seed rather than everything streaming in Canada, so the
+          answers are real but the range they choose from is narrow.
         </p>
       </section>
     </div>

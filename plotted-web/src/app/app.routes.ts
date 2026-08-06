@@ -4,9 +4,9 @@ import { anonymousOnlyGuard, authGuard } from './core/auth/auth.guard';
 
 /**
  * Only routes that are actually implemented. Tonight Mode (Queue Theory) landed
- * in phase 4; the subscription optimiser (Cancel Culture) arrives in phase 5 and
- * has no route until it does, because a demo that navigates to an empty page is
- * worse than one with fewer links.
+ * in phase 4 and Cancel Culture, the subscription optimiser, in phase 5 — a
+ * route appears here when its screen does, because a demo that navigates to an
+ * empty page is worse than one with fewer links.
  */
 export const routes: Routes = [
   {
@@ -34,6 +34,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/tonight/tonight.page').then((m) => m.TonightPage),
     title: 'Tonight · Plotted',
+  },
+  {
+    path: 'plan',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/plan/plan.page').then((m) => m.PlanPage),
+    title: 'Cancel Culture · Plotted',
   },
   {
     path: 'watchlist',

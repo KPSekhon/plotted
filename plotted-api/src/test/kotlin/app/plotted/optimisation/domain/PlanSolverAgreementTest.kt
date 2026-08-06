@@ -182,17 +182,46 @@ class PlanSolverAgreementTest {
     }
 
     @Test
+    fun `one service at a time over two months is answered by rotating, not by giving up half the list`() {
+        // This is the feature working, and it is worth pinning explicitly: the
+        // first version of the test below assumed a one-service limit had to
+        // cost half the coverage, and the model found the plan a person would
+        // want instead — hold the cheap one this month, switch to the other next
+        // month, and see everything. The limit is on services held *at once*,
+        // and only a model with a real time dimension can exploit that.
+        val request = PlanRequest(
+            services = listOf(
+                service(netflix, "Netflix", 1_899, currentlySubscribed = false),
+                service(crave, "Crave", 1_200, currentlySubscribed = false),
+            ),
+            titles = listOf(demand("On Netflix", 5, netflix), demand("On Crave", 5, crave)),
+            constraints = constraints(horizonMonths = 2, maximumActiveServices = 1),
+            weights = PlanWeights.DEFAULT,
+        )
+
+        val solved = solver.solve(request).shouldBeSolved()
+
+        solved.objective.coverage shouldBe 1.0
+        solved.months.forEach { (it.subscribedProviderIds.size <= 1) shouldBe true }
+        // Which month gets which service is a tie the solver may break either
+        // way, so the assertion is about the rotation rather than its order.
+        solved.months.flatMap { it.subscribedProviderIds }.toSet() shouldBe setOf(netflix, crave)
+        solved.violations.shouldBeEmpty()
+    }
+
+    @Test
     fun `sensitivity reports what one more service would buy`() {
         val request = PlanRequest(
             services = listOf(
                 service(netflix, "Netflix", 1_899, currentlySubscribed = false),
                 service(crave, "Crave", 1_200, currentlySubscribed = false),
             ),
-            // One title on each: with a limit of one service, half the list is
-            // unreachable, and lifting the limit is exactly what buys the rest.
+            // One title on each and a single month, so rotation is off the table
+            // and the limit genuinely costs coverage. Over a longer horizon the
+            // solver rotates instead — see the test above.
             titles = listOf(demand("On Netflix", 5, netflix), demand("On Crave", 5, crave)),
-            constraints = constraints(horizonMonths = 2, maximumActiveServices = 1),
-            weights = PlanWeights.DEFAULT,
+            constraints = constraints(horizonMonths = 1, maximumActiveServices = 1),
+            weights = PlanWeights(coverage = 0.8, cost = 0.15, switching = 0.05),
         )
 
         val solved = solver.solve(request).shouldBeSolved()

@@ -24,7 +24,7 @@ data class PlanResponse(
     val objective: ObjectiveResponse?,
     @Schema(description = "Total spend across the whole horizon, in cents.")
     val totalCents: Long?,
-    val covered: List<CoveredTitleResponse>,
+    val covered: List<PlanCoveredTitleResponse>,
     val uncovered: List<UncoveredTitleResponse>,
     @Schema(description = "What relaxing each binding limit by one unit would buy. Empty when nothing is binding.")
     val sensitivity: List<SensitivityResponse>,
@@ -59,7 +59,7 @@ data class PlanResponse(
                 ),
                 totalCents = outcome.totalCents,
                 covered = outcome.covered.map {
-                    CoveredTitleResponse(
+                    PlanCoveredTitleResponse(
                         titleId = it.titleId,
                         name = it.name,
                         month = it.month,
@@ -152,7 +152,15 @@ data class ObjectiveResponse(
     val weighted: Double,
 )
 
-data class CoveredTitleResponse(
+/**
+ * Prefixed rather than called `CoveredTitleResponse`, which the coverage
+ * dashboard already uses for a different shape. springdoc keys `components
+ * .schemas` by simple class name, so two classes sharing one silently overwrite
+ * each other in the document — no error, no warning, and the generated client is
+ * wrong for whichever endpoint lost. [app.plotted.architecture.ModuleBoundaryTest]
+ * now fails the build on the collision rather than leaving it to be noticed.
+ */
+data class PlanCoveredTitleResponse(
     val titleId: UUID,
     val name: String,
     @Schema(description = "The first month the plan makes it reachable.")
