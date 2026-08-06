@@ -30,7 +30,8 @@ features are complete, tested and — where it was possible without users — me
 | 5 | **Cancel Culture** — CP-SAT optimiser, plan types, sensitivity | **Done** |
 | 6 | Polish, demo mode, deployment | **Built, not deployed** |
 | 7 | Evaluation harness, baselines, ablations | **Harness built; one defensible result** |
-| 8–12 | Learned ranking, Pilot Season, Temporal, analytics | |
+| 8 | Learned ranking — LightGBM → ONNX → JVM | **Pipeline built and proven; not served** |
+| 9–12 | Pilot Season, Temporal, analytics | |
 
 ### The two things worth looking at
 
@@ -283,6 +284,8 @@ state of every phase including the bugs.
   rather than what documents it
 - [`docs/EVALUATION.md`](docs/EVALUATION.md) — metrics, baselines, the one
   defensible result, and an explicit list of what the numbers do not say
+- [`docs/MODEL.md`](docs/MODEL.md) — the learned ranker, and the four mechanisms
+  that stop training-serving skew shipping silently
 - [`docs/PROGRESS.md`](docs/PROGRESS.md) — where every phase actually stands,
   and the six bugs that reported success while doing nothing
 - [`docs/NEXT.md`](docs/NEXT.md) — the forward plan and how to spend the API
