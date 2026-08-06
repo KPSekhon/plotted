@@ -354,15 +354,15 @@ should start from the `hs_err` log's module list rather than from this note.
 `SolverSupport` gates the solver tests exactly as `DockerSupport` gates the
 database ones, and it has to guess from the OS rather than probe, because
 probing is the thing that crashes. Linux and macOS run them; Windows skips
-unless `PLOTTED_SOLVER_ENABLED=true`. CI is Linux and runs the solver
+unless `PLOTTED_SOLVER_ENABLED=true`. CI is Linux and runs all ten solver tests
 unconditionally, as does production — so this is a developer-machine problem
-rather than a product one, and phase 5 can be finished and verified through CI
-regardless.
+rather than a product one, and the whole phase was in fact finished and verified
+through CI regardless.
 
 Everything that is not the solver is plain Kotlin and runs everywhere, which is
 most of the interesting logic: `PlanChecker` and its tests touch no native code.
 
-### Built so far
+### The model and the checker
 
 - **`PlanChecker`** — the independent reimplementation, written *before* the
   solver so its logic could not be shaped by the model it audits. Plain loops,
@@ -381,7 +381,7 @@ most of the interesting logic: `PlanChecker` and its tests touch no native code.
   Nothing reported to the user comes from that scale — `PlanChecker` recomputes
   every displayed number exactly.
 
-### Built since
+### The service, the API and the screen
 
 - **`CancelCultureService`** — gathers from the four SPIs and decides what the
   model is shown, which decides what it says more completely than the model
@@ -433,6 +433,16 @@ and only one of them was in the model.
    now fails the build on any API name collision; it was verified to fail on the
    real one before being trusted, and is scoped to top-level classes because
    every Kotlin companion object compiles to a nested class called `Companion`.
+
+### Known, and deliberately not changed
+
+A request can in the worst case take four solves — the plan plus one per binding
+constraint — at a 5-second cap each. On instances this size CP-SAT proves
+optimality in milliseconds and nothing has come close, but the *bound* is 20
+seconds, and that is the number phase 11's load testing should be aimed at. The
+alternative, a shorter cap on the sensitivity re-solves, is worse: a re-solve
+that times out returns null and the constraint silently disappears from the
+panel, which turns a latency problem into a correctness one.
 
 ### The original plan
 
