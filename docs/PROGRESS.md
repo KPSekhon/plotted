@@ -6,6 +6,11 @@ future me.
 
 Last updated: 2026-08-06.
 
+**The forward plan lives in [NEXT.md](NEXT.md)** — how to spend the Watchmode
+and MDBList budgets, the verified Canadian source IDs, the 500-title seed
+procedure, and how to approach phases 6 onwards. This document is the state of
+the world; that one is what to do about it.
+
 ---
 
 ## Status at a glance
