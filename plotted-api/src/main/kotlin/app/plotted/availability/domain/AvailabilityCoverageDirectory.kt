@@ -38,19 +38,28 @@ class AvailabilityCoverageDirectory(
             .groupBy { it.titleId }
             .mapValues { (_, offers) ->
                 offers
-                    .map {
+                    // Grouped by provider, because one provider can carry a
+                    // title under more than one included access type -- with ads
+                    // and without. That is one covered title, not two, and
+                    // counting it twice would overstate whichever service
+                    // happens to list it the most ways.
+                    .groupBy { it.provider.id }
+                    .map { (_, forProvider) ->
+                        val first = forProvider.first()
                         AvailabilityDirectory.ProviderRef(
-                            providerId = it.provider.id,
-                            name = it.provider.name,
-                            slug = it.provider.slug,
-                            logoUrl = it.providerLogoUrl,
+                            providerId = first.provider.id,
+                            name = first.provider.name,
+                            slug = first.provider.slug,
+                            logoUrl = first.providerLogoUrl,
+                            // Free if *any* included offer on this provider is
+                            // free or ad-supported. Taking the first offer's
+                            // access type instead would make the answer depend
+                            // on row order.
+                            isFree = forProvider.any {
+                                it.accessType == AccessType.FREE || it.accessType == AccessType.ADS
+                            },
                         )
                     }
-                    // One provider can carry a title under more than one included
-                    // access type -- with ads and without. That is one covered
-                    // title, not two, and counting it twice would overstate the
-                    // service that happens to list it most ways.
-                    .distinctBy { it.providerId }
                     .sortedBy { it.name }
             }
 

@@ -51,5 +51,13 @@ interface TitleDirectory {
          * and getting it wrong is how a time filter starts lying.
          */
         val watchMinutes: Int?,
+        /**
+         * Community rating out of 10, or null when nobody has rated it.
+         *
+         * Null rather than zero, and the distinction is load-bearing: an unrated
+         * film is not a film everyone hated, and scoring it as one would push
+         * every obscure title down every list.
+         */
+        val communityRating: Double?,
     )
 }

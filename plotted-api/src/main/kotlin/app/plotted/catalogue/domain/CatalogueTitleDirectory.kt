@@ -38,6 +38,7 @@ class CatalogueTitleDirectory(
                 // rule belongs to the catalogue. Handing over both fields would
                 // invite the caller to pick, and eventually to pick wrong.
                 watchMinutes = title.watchMinutes,
+                communityRating = title.communityRating?.toDouble(),
             )
         }
 }

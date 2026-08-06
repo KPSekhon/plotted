@@ -1,5 +1,6 @@
 package app.plotted.watchlist.persistence
 
+import app.plotted.generated.jooq.tables.references.BLOCKED_TITLES
 import app.plotted.generated.jooq.tables.references.WATCHLISTS
 import app.plotted.generated.jooq.tables.references.WATCHLIST_ITEMS
 import app.plotted.watchlist.domain.Priority
@@ -204,6 +205,19 @@ class WatchlistRepository(
             .and(WATCHLIST_ITEMS.ID.eq(itemId))
             .execute() > 0
     }
+
+    /**
+     * Titles this user has asked never to be shown.
+     *
+     * Keyed by user rather than by watchlist: blocking is a statement about the
+     * person's taste, not about one list, and it must survive them starting a
+     * new list.
+     */
+    fun blockedTitleIds(userId: UUID): Set<UUID> = dsl.select(BLOCKED_TITLES.TITLE_ID)
+        .from(BLOCKED_TITLES)
+        .where(BLOCKED_TITLES.USER_ID.eq(userId))
+        .fetch()
+        .mapNotNullTo(mutableSetOf()) { it.value1() }
 
     fun removeItem(watchlistId: UUID, itemId: UUID): Boolean = dsl.deleteFrom(WATCHLIST_ITEMS)
         .where(WATCHLIST_ITEMS.WATCHLIST_ID.eq(watchlistId))
