@@ -22,13 +22,19 @@ import { AuthService } from '../../core/auth/auth.service';
         <p class="eyebrow">{{ greeting() }}, {{ user.displayName }}</p>
         <h1>What are you watching tonight?</h1>
         <p class="lede muted">
-          Search the catalogue and see where anything streams in {{ user.regionCode }}.
+          Search the catalogue, keep a list of what you actually mean to watch, and see which
+          service carries most of it in {{ user.regionCode }}.
         </p>
 
         <a class="primary-action" routerLink="/search">
           Search the catalogue
           <span aria-hidden="true">&rarr;</span>
         </a>
+
+        <p class="secondary muted">
+          Or go straight to <a routerLink="/watchlist">your list</a> and its
+          <a routerLink="/coverage">coverage</a>.
+        </p>
 
         <p class="secondary muted">
           Tonight Mode is not built yet.

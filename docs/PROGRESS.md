@@ -204,7 +204,9 @@ nothing.
 `AvailabilityDirectory`), never by importing them. Cross-module *SQL* joins are
 allowed and used, following the precedent already set by the catalogue's join
 onto `title_availability`; the line ArchUnit enforces is that no class crosses a
-feature boundary, because that is the coupling that spreads.
+feature boundary, because that is the coupling that spreads. Written up as
+[ADR 0008](adr/0008-cross-module-reads-through-the-shared-kernel.md), including
+the cost that was accepted: a cross-module join is invisible to the compiler.
 
 **The new SQL is covered.** The first CI run on phase 3 passed with 145 tests
 and proved almost nothing about the repositories, because none of the new
@@ -248,8 +250,12 @@ is the only way to regenerate the document without Docker.
 The first headline feature. Tonight's context in, one pick plus two backups out,
 each with a reason.
 
-- Hard filters (region, runtime, access policy, content rating), then the
-  weighted linear score from §9.5.
+- Hard filters (region, runtime, access policy, content rating, **and blocked
+  titles**), then the weighted linear score from §9.5. `blocked_titles` has
+  existed since V6 and nothing reads it yet. It belongs here rather than in
+  catalogue search: someone searching for a title they have blocked should still
+  find it, because hiding it there looks like a missing catalogue entry rather
+  than a preference being honoured. `CatalogueQueryService` is the seam.
 - **Renormalise weights over available features.** A missing feature must not be
   treated as zero, or scores stop being comparable across candidates. Two lines,
   and most implementations ship without it.
