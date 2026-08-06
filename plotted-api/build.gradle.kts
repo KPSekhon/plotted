@@ -35,6 +35,8 @@ dependencies {
     implementation(libs.jackson.module.kotlin)
     implementation(libs.kotlin.reflect)
 
+    implementation(libs.ortools.java)
+
     implementation(libs.flyway.core)
     implementation(libs.flyway.postgresql)
     runtimeOnly(libs.postgresql)

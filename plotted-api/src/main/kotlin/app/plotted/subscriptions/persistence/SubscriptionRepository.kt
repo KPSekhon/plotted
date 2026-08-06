@@ -213,6 +213,48 @@ class SubscriptionRepository(
             .execute() > 0
     }
 
+    /**
+     * The current list price of every provider that has one, for this region.
+     *
+     * Only plans whose `validity` is still open count -- a closed row is a
+     * historical price and quoting it would be worse than quoting nothing.
+     * Cheapest plan per provider, because the optimiser is deciding whether a
+     * *service* is worth holding and the user can pick their own tier.
+     */
+    fun findCurrentPlans(regionCode: String): List<CurrentPlan> = dsl.select(
+        PROVIDERS.ID,
+        PROVIDERS.NAME,
+        PROVIDER_PLANS.NAME,
+        PROVIDER_PLANS.BILLING_PERIOD,
+        PROVIDER_PLANS.PRICE,
+    )
+        .from(PROVIDER_PLANS)
+        .join(PROVIDERS).on(PROVIDERS.ID.eq(PROVIDER_PLANS.PROVIDER_ID))
+        .where(PROVIDER_PLANS.REGION_CODE.eq(regionCode))
+        .and(PROVIDERS.ACTIVE.isTrue)
+        .and(DSL.condition("upper_inf({0})", DSL.field(DSL.name("validity"))))
+        .fetch()
+        .map {
+            CurrentPlan(
+                providerId = it[PROVIDERS.ID]!!,
+                providerName = it[PROVIDERS.NAME]!!,
+                planName = it[PROVIDER_PLANS.NAME]!!,
+                billingPeriod = BillingPeriod.fromDb(it[PROVIDER_PLANS.BILLING_PERIOD]!!),
+                price = it[PROVIDER_PLANS.PRICE]!!,
+            )
+        }
+
+    data class CurrentPlan(
+        val providerId: UUID,
+        val providerName: String,
+        val planName: String,
+        val billingPeriod: BillingPeriod,
+        val price: BigDecimal,
+    ) {
+        /** Normalised so plans on different cycles are comparable. */
+        val monthlyCents: Long get() = billingPeriod.toMonthly(price).movePointRight(2).toLong()
+    }
+
     fun delete(userId: UUID, subscriptionId: UUID): Boolean = dsl.deleteFrom(USER_SUBSCRIPTIONS)
         .where(USER_SUBSCRIPTIONS.USER_ID.eq(userId))
         .and(USER_SUBSCRIPTIONS.ID.eq(subscriptionId))

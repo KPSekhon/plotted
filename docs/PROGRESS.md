@@ -326,7 +326,54 @@ have to stay distinguishable in the logs forever.
 
 ---
 
-## Phase 5 — Cancel Culture (~3 weeks)
+## Phase 5 — Cancel Culture (in progress)
+
+**Read this before running the tests on Windows.** CP-SAT is a JNI binding, and
+on a Windows machine whose Microsoft Visual C++ redistributable is older than
+the one OR-Tools was built against, `jniortools.dll` fails to resolve its
+dependencies (`error code 126`) and the solve then dies with an
+`EXCEPTION_ACCESS_VIOLATION` inside `msvcp140.dll`. That is a **process crash,
+not an exception** — nothing catches it, the test JVM disappears taking the
+Gradle worker with it, and what gets reported is an unrelated-looking
+`MessageIOException` about a socket. The real diagnosis is only in the
+`hs_err_pid*.log` the JVM leaves behind.
+
+`SolverSupport` therefore gates the solver tests exactly as `DockerSupport`
+gates the database ones, and it has to guess from the OS rather than probe,
+because probing is the thing that crashes. Linux and macOS run them; Windows
+skips unless `PLOTTED_SOLVER_ENABLED=true`. **The fix is to install the current
+x64 Visual C++ redistributable**, after which that flag can be set. CI is Linux
+and runs the solver unconditionally, as does production — this is a
+developer-machine problem, not a product one.
+
+Everything that is not the solver is plain Kotlin and runs everywhere, which is
+most of the interesting logic: `PlanChecker` and its tests touch no native code.
+
+### Built so far
+
+- **`PlanChecker`** — the independent reimplementation, written *before* the
+  solver so its logic could not be shaped by the model it audits. Plain loops,
+  no CP-SAT types. The spec calls this the highest-value test in the project and
+  it is: a solver will optimally solve a model you specified wrong, and the
+  result is indistinguishable from a correct answer.
+- **`PlanSolver`** — `x`/`u`/`d`/`y` with start and stop split, because starting
+  costs money you were not spending and stopping costs access you had; folding
+  them into one "changed" indicator prices a cancellation like a signup. The
+  `u + d ≤ 1` constraint is the one that fails silently — without it the solver
+  satisfies the transition equality by setting both and under-reports churn.
+- **A normalised objective**, every term a fraction of its own maximum before
+  weighting. Scaled by 1,000,000 rather than the spec's 1,000: at ×1000 the
+  rounding on one service's cost coefficient can exceed the real difference
+  between two plans, so the solver goes indifferent for arithmetic reasons.
+  Nothing reported to the user comes from that scale — `PlanChecker` recomputes
+  every displayed number exactly.
+
+### Still to build
+
+The service that gathers inputs, the API and screen, and tests that the solver
+and the checker agree on a plan neither one chose alone.
+
+### The original plan
 
 The second headline feature, and the most technically distinctive.
 

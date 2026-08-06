@@ -1,6 +1,11 @@
 # --- Build output ---
 build/
 .kotlin/
+
+# JVM crash reports. OR-Tools is a JNI binding and a bad native environment
+# leaves these behind; they are diagnostics, not source.
+hs_err_pid*.log
+replay_pid*.log
 out/
 dist/
 bin/
