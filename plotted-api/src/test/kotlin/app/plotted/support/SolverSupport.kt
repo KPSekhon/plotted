@@ -8,20 +8,23 @@ package app.plotted.support
  *
  * ### Why this cannot just try it and catch the failure
  *
- * OR-Tools is a JNI binding. On a Windows box whose Visual C++ redistributable
- * is older than the one the natives were built against, `jniortools.dll` fails
- * to load its dependencies (`error code 126`), and the subsequent solve dies
- * with an `EXCEPTION_ACCESS_VIOLATION` inside `msvcp140.dll`. That is a process
- * crash, not an exception — there is nothing to catch, and the test JVM
- * disappears mid-run taking the whole Gradle worker with it.
+ * OR-Tools is a JNI binding, and on the current Windows dev machine
+ * `jniortools.dll` fails to resolve a dependency (`error code 126`) and the
+ * solve then dies with an `EXCEPTION_ACCESS_VIOLATION` inside `msvcp140.dll`.
+ * That is a process crash, not an exception — there is nothing to catch, and
+ * the test JVM disappears mid-run taking the whole Gradle worker with it.
+ *
+ * The cause is not established. An outdated Visual C++ redistributable was the
+ * obvious suspect and was ruled out: the installed runtimes are current. See
+ * the phase 5 section of `docs/PROGRESS.md`.
  *
  * So the check has to be made *before* touching native code, which means it can
  * only be a guess about the environment rather than a probe of it. The guess is
  * deliberately conservative: assume Windows cannot until told otherwise.
  *
- * **Fixing it on Windows:** install the current Microsoft Visual C++
- * Redistributable (x64), then set `PLOTTED_SOLVER_ENABLED=true`. On Linux and
- * macOS, and therefore in CI and in production, the solver runs unconditionally.
+ * **On Windows,** set `PLOTTED_SOLVER_ENABLED=true` once the crash is
+ * understood and fixed. On Linux and macOS, and therefore in CI and in
+ * production, the solver runs unconditionally.
  */
 object SolverSupport {
     @JvmStatic

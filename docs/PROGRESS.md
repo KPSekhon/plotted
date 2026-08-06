@@ -328,23 +328,31 @@ have to stay distinguishable in the logs forever.
 
 ## Phase 5 — Cancel Culture (in progress)
 
-**Read this before running the tests on Windows.** CP-SAT is a JNI binding, and
-on a Windows machine whose Microsoft Visual C++ redistributable is older than
-the one OR-Tools was built against, `jniortools.dll` fails to resolve its
-dependencies (`error code 126`) and the solve then dies with an
-`EXCEPTION_ACCESS_VIOLATION` inside `msvcp140.dll`. That is a **process crash,
-not an exception** — nothing catches it, the test JVM disappears taking the
-Gradle worker with it, and what gets reported is an unrelated-looking
-`MessageIOException` about a socket. The real diagnosis is only in the
-`hs_err_pid*.log` the JVM leaves behind.
+**Read this before running the tests on Windows.** CP-SAT is a JNI binding and
+it crashes the JVM on the current dev machine. The solve dies with an
+`EXCEPTION_ACCESS_VIOLATION` inside `msvcp140.dll`, preceded by
+`Loading ... jniortools.dll failed, error code 126` (a dependent DLL could not
+be resolved). That is a **process crash, not an exception** — nothing catches
+it, the test JVM disappears taking the Gradle worker with it, and what Gradle
+reports is an unrelated-looking `MessageIOException` about a socket. The real
+diagnosis is only in the `hs_err_pid*.log` the JVM leaves behind.
 
-`SolverSupport` therefore gates the solver tests exactly as `DockerSupport`
-gates the database ones, and it has to guess from the OS rather than probe,
-because probing is the thing that crashes. Linux and macOS run them; Windows
-skips unless `PLOTTED_SOLVER_ENABLED=true`. **The fix is to install the current
-x64 Visual C++ redistributable**, after which that flag can be set. CI is Linux
-and runs the solver unconditionally, as does production — this is a
-developer-machine problem, not a product one.
+**The cause is not yet known.** The obvious explanation — an outdated Visual C++
+redistributable — was checked and does not hold: `msvcp140.dll` and
+`vcruntime140_1.dll` are both 14.44.35211.0, current VS 2022 runtimes. Remaining
+candidates, untested: OR-Tools extracts its natives to a random `%TEMP%`
+directory on each run and the first extraction failed to load, which is
+consistent with antivirus interference or a `%TEMP%` permissions problem; or a
+sibling DLL genuinely missing from the packaged set. Anyone picking this up
+should start from the `hs_err` log's module list rather than from this note.
+
+`SolverSupport` gates the solver tests exactly as `DockerSupport` gates the
+database ones, and it has to guess from the OS rather than probe, because
+probing is the thing that crashes. Linux and macOS run them; Windows skips
+unless `PLOTTED_SOLVER_ENABLED=true`. CI is Linux and runs the solver
+unconditionally, as does production — so this is a developer-machine problem
+rather than a product one, and phase 5 can be finished and verified through CI
+regardless.
 
 Everything that is not the solver is plain Kotlin and runs everywhere, which is
 most of the interesting logic: `PlanChecker` and its tests touch no native code.
