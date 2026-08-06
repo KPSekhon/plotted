@@ -1,5 +1,6 @@
 # --- Build output ---
 build/
+.kotlin/
 out/
 dist/
 bin/
