@@ -1,5 +1,8 @@
 package app.plotted.recommendation.domain
 
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+
 /**
  * The features the linear ranker scores on, and what each is worth.
  *
@@ -146,3 +149,28 @@ private const val OVERSHOOT_PENALTY = 3.0
  * candidate is filtered out rather than penalised.
  */
 const val OVERSHOOT_TOLERANCE = 0.10
+
+/**
+ * How urgent a self-imposed deadline is, 0 to 1.
+ *
+ * Overdue is maximally urgent rather than negative: a date that has passed is
+ * the strongest possible statement that this should have been watched already.
+ * Beyond the horizon it contributes nothing, because a deadline three months out
+ * is not a reason to watch something tonight.
+ *
+ * Top-level beside [runtimeFit] because the learned model's feature schema needs
+ * the identical transform. Two copies of this — one for each model — is a
+ * training-serving skew bug with a head start: they would begin identical and
+ * drift the first time either was tuned, and nothing would report it.
+ */
+fun deadlineUrgency(desiredBy: LocalDate, today: LocalDate): Double {
+    val days = ChronoUnit.DAYS.between(today, desiredBy)
+    return when {
+        days <= 0 -> 1.0
+        days >= DEADLINE_HORIZON_DAYS -> 0.0
+        else -> 1.0 - days.toDouble() / DEADLINE_HORIZON_DAYS
+    }
+}
+
+/** A deadline further out than this is not tonight's problem. */
+const val DEADLINE_HORIZON_DAYS = 30

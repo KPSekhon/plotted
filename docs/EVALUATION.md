@@ -54,11 +54,16 @@ renormalisation recover?*
 
 | Strategy | NDCG@3 | 95% CI | Precision@3 | MRR |
 |---|---|---|---|---|
+| learned-distill | 0.9604 | 0.9588 – 0.9620 | 0.9845 | 0.9956 |
 | **linear-v1** | 0.9604 | 0.9587 – 0.9620 | 0.9842 | 0.9956 |
 | watchlist-priority | 0.9479 | 0.9458 – 0.9499 | **0.9953** | 0.9995 |
 | linear-v1-no-renormalisation | 0.9434 | 0.9415 – 0.9454 | 0.9927 | **1.0000** |
 | popularity | 0.8197 | 0.8158 – 0.8237 | 0.8505 | 0.9266 |
 | random | 0.7956 | 0.7916 – 0.7997 | 0.8267 | 0.9036 |
+
+`learned-distill` is the phase 8 ONNX model. It sits level with `linear-v1`
+because it was **trained to imitate it**, which is the point of it rather than a
+disappointment — see below and [MODEL.md](MODEL.md).
 
 Paired bootstrap over identical queries, 2,000 resamples, seed 20260806:
 
@@ -115,6 +120,21 @@ is scored against a target it half defines. The honest residue is still that
 at least under this simulation. Whether they earn their place is a question only
 real outcome data can settle, and it is the first thing to look at when there is
 any.
+
+### The learned model matching the linear one is a passing test, not a null result
+
+> **learned-distill against linear-v1: no measurable difference (0.0000 NDCG@3,
+> 95% CI −0.0002 to 0.0003, n = 2000).**
+
+Read as a model comparison this says nothing — and it is not one. The ONNX model
+was distilled from the linear ranker, so a correct pipeline *must* produce this
+number, which makes it the strongest end-to-end check available with no real
+data. Features exported out of order, `NaN` read as zero, the wrong float width
+anywhere along export → train → convert → load → score, and this interval moves
+off zero. `DistillationFidelityTest` asserts it does not.
+
+Being precise about what that buys: the plumbing is honest, and nothing
+whatsoever is known about whether a learned ranker would be *better*.
 
 ### Popularity barely beats random, and that is a property of the simulation
 
