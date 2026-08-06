@@ -31,9 +31,9 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-33 tables · 10 migrations · 68 Kotlin source files · 145 API tests (8 of them
-ArchUnit rules) · 19 frontend tests · 18 API paths · 7 ADRs · 107 provider
-aliases.
+33 tables · 10 migrations · 68 Kotlin source files · 176 API tests (8 of them
+ArchUnit rules, 64 needing Docker) · 19 frontend tests · 18 API paths · 7 ADRs ·
+107 provider aliases.
 
 ---
 

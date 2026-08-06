@@ -1,13 +1,16 @@
 package app.plotted.catalogue.persistence
 
 import app.plotted.generated.jooq.tables.references.MOVIES
+import app.plotted.generated.jooq.tables.references.PROVIDERS
 import app.plotted.generated.jooq.tables.references.TITLES
+import app.plotted.generated.jooq.tables.references.TITLE_AVAILABILITY
 import app.plotted.generated.jooq.tables.references.USERS
 import app.plotted.generated.jooq.tables.references.WATCHLISTS
 import app.plotted.generated.jooq.tables.references.WATCHLIST_ITEMS
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIf
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -130,19 +134,38 @@ class TitleSearchRepositoryIntegrationTest {
         return id
     }
 
-    /** An availability row exists only to date the last check; its content is irrelevant here. */
+    /**
+     * An availability row exists only to date the last check; its content is
+     * irrelevant here.
+     *
+     * Written through the typed API rather than as one plain-SQL string. In
+     * plain SQL jOOQ has no target type for a bind, so an [OffsetDateTime] goes
+     * across as `character varying` and Postgres rejects it against a
+     * `timestamptz` column. Only `validity` needs the raw fragment, because it
+     * is the one column the generator never sees.
+     */
     private fun givenLastChecked(titleId: UUID, checkedAt: OffsetDateTime) {
-        dsl.execute(
-            """
-            INSERT INTO title_availability
-                (id, title_id, provider_id, region_code, access_type, source, source_checked_at, confidence, active, validity)
-            VALUES (?, ?, (SELECT id FROM providers WHERE slug = 'crave'), 'CA', 'subscription',
-                    'tmdb:justwatch', ?, 1.000, TRUE, daterange(CURRENT_DATE, NULL))
-            """.trimIndent(),
-            UUID.randomUUID(),
-            titleId,
-            checkedAt,
-        )
+        val providerId = dsl.select(PROVIDERS.ID)
+            .from(PROVIDERS)
+            .where(PROVIDERS.SLUG.eq("crave"))
+            .fetchOne()!!
+            .value1()!!
+
+        dsl.insertInto(TITLE_AVAILABILITY)
+            .set(TITLE_AVAILABILITY.ID, UUID.randomUUID())
+            .set(TITLE_AVAILABILITY.TITLE_ID, titleId)
+            .set(TITLE_AVAILABILITY.PROVIDER_ID, providerId)
+            .set(TITLE_AVAILABILITY.REGION_CODE, "CA")
+            .set(TITLE_AVAILABILITY.ACCESS_TYPE, "subscription")
+            .set(TITLE_AVAILABILITY.SOURCE, "tmdb:justwatch")
+            .set(TITLE_AVAILABILITY.SOURCE_CHECKED_AT, checkedAt)
+            .set(TITLE_AVAILABILITY.CONFIDENCE, BigDecimal("1.000"))
+            .set(TITLE_AVAILABILITY.ACTIVE, true)
+            .set(
+                DSL.field(DSL.name("validity"), String::class.java),
+                DSL.field("daterange(CURRENT_DATE, NULL)", String::class.java),
+            )
+            .execute()
     }
 
     private fun givenWatchlistItem(titleId: UUID, status: String) {
