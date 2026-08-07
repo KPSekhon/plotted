@@ -162,11 +162,18 @@ Nothing missing. The one thing to keep intact: coverage is **priority-weighted,
 not counted**, and unchecked titles are **excluded from the denominator**, not
 scored as uncovered. `CoverageServiceTest` pins both.
 
-### Phase 4 — Queue Theory (done)
+### Phase 4 — Queue Theory (done, with one half-wired feature)
 
-Nothing missing. `blocked_titles` still has no reader — it belongs with phase
-4's hard filters conceptually but was deliberately left for a later pass; see
-the note in `CatalogueQueryService`.
+**Correction to an earlier note here:** `blocked_titles` *does* have a reader.
+`WatchlistRepository.blockedTitleIds` is read through the SPI by both
+`TonightService` (as a hard filter) and `CancelCultureService`. What it does not
+have is a **writer** — no endpoint, no insert anywhere — so the filter is live
+and the table can never be populated. An hour of work, described in
+`PROGRESS.md`.
+
+The part worth getting right: blocking must not hide a title from catalogue
+search, because that reads as a missing catalogue entry rather than a preference
+being honoured. `CatalogueQueryService` carries the note.
 
 ### Phase 5 — Cancel Culture (done)
 
