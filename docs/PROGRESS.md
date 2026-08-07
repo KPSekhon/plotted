@@ -4,7 +4,11 @@ Where Plotted actually is, what each remaining phase involves, and what is still
 open. Written to be read by someone picking the project up cold — including a
 future me.
 
-Last updated: 2026-08-06.
+Last updated: 2026-08-07.
+
+**Picking this up cold? Start at [What is still open](#what-is-still-open-and-how-to-finish-it)** —
+every remaining item, why it is blocked, what finishing it looks like, and the
+order worth doing them in.
 
 **The forward plan lives in [NEXT.md](NEXT.md)** — how to spend the Watchmode
 and MDBList budgets, the verified Canadian source IDs, the 500-title seed
@@ -21,11 +25,11 @@ the world; that one is what to do about it.
 | 2 | Catalogue — TMDB ingestion, availability, search, screens | 1 | **Verified in CI; seeding still owed** |
 | 3 | Watchlists, subscriptions, coverage dashboard | 1 | **Done** |
 | 4 | **Queue Theory** — tonight's recommendation | 1 | **Done** |
-| 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | **Done** |
-| 6 | Polish, demo mode, deployment | 1 | **Built; not deployed** ← *résumé-ready line* |
-| 7 | Evaluation harness, MovieLens, baselines | 2 | **Harness built; one result** |
-| 8 | LightGBM → ONNX → JVM inference | 2 | **Pipeline built and proven; model not served** |
-| 9 | Pilot Season, preference profile | 2 | **Maths built; no API or screen** |
+| 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | **Done, merged** |
+| 6 | Polish, demo mode, deployment | 1 | **Merged; not deployed** ← *résumé-ready line* |
+| 7 | Evaluation harness, MovieLens, baselines | 2 | **Merged; one defensible result** |
+| 8 | LightGBM → ONNX → JVM inference | 2 | **Merged; pipeline proven, model not served** |
+| 9 | Pilot Season, preference profile | 2 | **Merged; maths only, no screen** |
 | 10 | Temporal workflows, outbox, Plot Armour detection | 2 | |
 | 11 | End Credits analytics, load testing, observability | 2 | |
 | 12 | Stretch: removal-risk model, Group Plot, Side Quest | 3 | |
@@ -36,57 +40,327 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-35 tables · 13 migrations · 107 Kotlin source files · **313 API tests** ·
-26 frontend tests · 21 API paths · 8 ADRs · 107 provider aliases · 17 seeded
-plan prices · 1 trained model.
+35 tables · 13 migrations · 107 Kotlin source files · **313 API tests, all
+green in CI** · 26 frontend tests · 21 API paths · 8 ADRs · 107 provider
+aliases · 17 seeded plan prices · 1 trained model.
 
-Of those, **219 run on this machine and 94 skip** — 10 classes need Docker and
-2 need CP-SAT. That is a third of the suite unverified since CI stopped, and it
-is the third that covers the database. Measured from a local run, not from CI,
-for the reason in the next section.
+**219 of the 313 run on a developer machine; 94 need CI** — 10 classes need
+Docker and 2 need CP-SAT. That third is the one covering the database and the
+optimiser, which is exactly why it is worth knowing which number you are
+quoting. These are CI's, from run 31145985713.
 
 ---
 
-## CI was down for the whole of phases 5–9 (GitHub incident, 2026-08-06)
+## What is still open, and how to finish it
 
-Phases 5 to 9 are written, linted and green on everything that runs without
-Docker. **None of the last several commits has been executed by CI**, and the
-cause was a GitHub Actions **major outage** beginning 15:22 UTC — the same minute
-as this repository's last successful run.
+Read this first if you are picking the project up. Every item below is either
+**blocked on a person**, **blocked on data**, or **plumbing** — none of it is
+blocked on a hard problem, and that is deliberate: the hard parts were done
+first, on purpose, so that what remains is finishable.
 
-Symptoms here, in order, all explained by the incident:
+| # | What is missing | Blocked on | Effort |
+|---|---|---|---|
+| 2 | Seed has 119 titles, not 500; pipeline never run end to end | A person's taste + API budget | half a day |
+| 2 | `PLOTTED_SNAPSHOT_ENABLED` never turned on | An environment that runs continuously | one env var |
+| 4 | `blocked_titles` can be read but never written | Nothing — it is an endpoint | an hour |
+| 6 | Never deployed | A person with a cloud account | half a day |
+| 6 | No demo video | A person, a seeded database, a deployment | an hour |
+| 7 | No real evaluation data | Users, and one timestamp column | a day, then wait |
+| 8 | Model trained on synthetic data; explanations unsolved | Phase 7's data | a week |
+| 9 | No persistence, API or screen | Nothing — it is plumbing | two days |
 
-1. A run whose three remaining jobs failed with *"not acquired by Runner of type
+---
+
+### Phase 2 — grow the seed to 500, and start the snapshot clock
+
+**What is missing.** `make seed` has never been run against live TMDB with a real
+database, and the curated list is 119 titles where section 7.3 asks for 500.
+
+**The plan is already written** — `NEXT.md` Part 1 has the five-step procedure and
+the exact budget: **~200 Watchmode calls (8% of a month), 500 MDBList (half a
+day), ~1000 free TMDB**. The Canadian source ids are verified and listed there.
+
+**How to make it excellent.** Do not guess a list and then check it. Enumerate
+what is *actually streaming in Canada* from Watchmode's `/v1/list-titles/` — one
+call per 250 titles per service rather than one per title — and derive the seed
+from that. Then, where TMDB's watch-providers and Watchmode's enumeration
+disagree, **file the disagreement through the availability-correction endpoint
+rather than editing rows**. Two independent sources disagreeing is precisely the
+signal the `confidence` column exists for, and a seed that records its own
+uncertainty is worth more than one that hides it.
+
+**Do this before anything else that needs a catalogue**, because the demo, the
+evaluation and Pilot Season all choose from whatever is in it. Every one of them
+is currently choosing from 119 titles.
+
+**Separately: turn on `PLOTTED_SNAPSHOT_ENABLED`** in the first environment that
+runs continuously. Plot Armour (phase 10) needs months of nightly history and
+**a night not collected cannot be recovered**. This is the most time-sensitive
+item in the project — it costs one environment variable today and cannot be
+bought back later.
+
+---
+
+### Phase 4 — `blocked_titles` has a reader and no writer
+
+**A precise gap.** `WatchlistRepository.blockedTitleIds` is read through the SPI
+by both `TonightService` (as a hard filter) and `CancelCultureService`. Nothing
+anywhere **writes** to that table — no endpoint, no repository insert. So the
+filter is live and the table can never be populated.
+
+**The fix** is a `POST /api/v1/watchlist/blocked`, a delete, and a control on the
+title page. An hour of work.
+
+**Where it belongs**, and this is the part worth getting right: blocking must not
+hide a title from *catalogue search*. Someone searching for something they
+blocked should still find it, because hiding it there reads as a missing
+catalogue entry rather than a preference being honoured. `CatalogueQueryService`
+already carries a comment saying so.
+
+---
+
+### Phase 6 — deploy it, and record the ninety seconds
+
+**Deployment.** `DEPLOYMENT.md` is the checklist. Three things will bite, in
+order of likelihood:
+
+1. **`CREATE EXTENSION` permissions.** The schema needs `citext`, `pg_trgm` and
+   `btree_gist`. Some managed Postgres providers restrict this. Without
+   `btree_gist` the GiST exclusion constraints silently do not exist — and those
+   are what make duplicate availability rows unrepresentable, which is what keeps
+   every coverage number the optimiser depends on honest. **Do not fence them out
+   to get past it.**
+2. **Scheduled jobs do not run on a scale-to-zero host.** The nightly snapshot
+   and the hourly demo sweep are Spring `@Scheduled` methods; they fire only
+   while an instance is alive. Pin a minimum instance or drive them from an
+   external scheduler. Deploying with neither means the snapshot silently never
+   runs, which looks exactly like it running and finding nothing.
+3. **Same-origin cookies.** The refresh token is `HttpOnly`, `SameSite=Lax`,
+   scoped to `/api/v1/auth`. A cross-origin split breaks session persistence in a
+   way that presents as random sign-outs rather than as a configuration error.
+
+**The video.** `DEMO.md` is a shot-by-shot script. Two notes matter more than the
+rest: seed the catalogue *first*, and pick the two runtime figures from the demo
+persona's **actual** list rather than the placeholders — getting those wrong
+makes the best moment in the demo look like a bug.
+
+**Lead with the refusals.** Tonight Mode returning "nothing fits: everything on
+your list is longer than the time you have", and the optimiser explaining an
+infeasible plan. Every competitor can show a list of films; almost none can show
+a system that knows when to say no.
+
+---
+
+### Phase 7 — the harness is built; it needs outcomes
+
+**What is missing is data, not code.** The harness takes queries and returns
+numbers, so pointing it at real data is a data problem.
+
+**In order:**
+
+1. **A timestamp on the outcome.** `watchlist_items.status` already reaches
+   `completed`, which is the closest available label to "the recommendation
+   worked". What is missing is *when* it got there — the temporal split needs it.
+   **A column and a write, not a feature.** Do this first; everything else waits
+   on it.
+2. **Join logged decisions to outcomes.** `recommendation_requests` and
+   `recommendation_items` already carry the score, the feature contributions and
+   the propensity. The propensity is the one that could not have been added
+   retroactively, and it is already there.
+3. **Off-policy estimation.** With propensities logged, inverse-propensity
+   scoring estimates how a *different* ranker would have done on traffic the
+   shipped one served. That is what the 10% exploration slot exists for.
+4. **Then, and only then, a claim about beating popularity.**
+
+**How to make it excellent: keep reporting where it loses.** The current page
+already does — sorting by watchlist priority alone beats the five-feature model
+on precision@3. A harness that only produces flattering numbers is not a harness,
+and the credibility of the one real result rests on the honesty of the rest.
+
+---
+
+### Phase 8 — a real model needs phase 7's data, and explanations need solving
+
+**Two blockers, and the second is the interesting one.**
+
+*Training data.* The committed model is a distillation of the linear ranker. It
+proves the pipeline and nothing else. A model worth serving needs the outcomes
+phase 7 is waiting for.
+
+*Explanations.* The product's rule is that a reason must be a real feature
+contribution, never prose that sounds like one. A gradient-boosted tree does not
+hand you contributions; SHAP does, and ONNX does not export it. **Serving the
+learned ranking beside the linear model's explanations would have the interface
+confidently explaining a decision it did not make** — the invented-prose failure
+this project refuses everywhere else, in a better costume.
+
+**A candidate approach worth trying**, and it has not been: serve the learned
+ranking only where it *agrees* with the linear model, and fall back where they
+differ. That is testable, honest, and degrades toward the model whose
+explanations are real. Measure the agreement rate first — if it is 95%, the
+learned model is buying very little, and that is worth knowing before building
+anything.
+
+**MovieLens stays deferred, with the reason recorded.** It gives
+`(user, item, rating, timestamp)`; five of the eight features here are session
+context — how much *you* want it, whether it fits the time *you* have, what *you*
+pay for — for which MovieLens has no analogue. Using it would mean fabricating
+those five. Its real home is phase 9's taste model.
+
+---
+
+### Phase 9 — the maths is done; the questionnaire is not
+
+**Missing: persistence, API, screen.** A `pilot_comparisons` table, an endpoint
+that serves the next question and records an answer, and fifteen taps on a phone.
+Nothing about it is subtle.
+
+**Three things that are, and should not be skipped:**
+
+1. **Allow "skip".** A forced choice between two titles somebody has not seen
+   produces a coin flip recorded as evidence. The ladder already tolerates a
+   short questionnaire, so a skipped pair should simply not become a comparison.
+2. **Make the population prior real.** It is currently zero-mean, which for a
+   population nobody has measured is the same thing — but it is a placeholder,
+   not a finding. Once profiles exist, the prior mean should be their average.
+   That single change turns "assume you are indifferent" into "assume you are
+   typical".
+3. **Then measure whether taste helps.** `taste_match` is plumbed into the
+   feature schema and carries no learned signal, because the training target does
+   not read taste. The harness is where that question gets answered.
+
+**Do not make the ladder adaptive yet.** Adaptive selection tunes against a model
+of the population, and there is no population; it would be adapting to the prior,
+which is a fixed ladder reached by a more complicated route and much harder to
+test.
+
+---
+
+## Phases 10 to 12, and how to approach them
+
+### Phase 10 — Temporal workflows, the outbox, Plot Armour
+
+The outbox table and writer already exist. What is missing is the relay and the
+durable workflows.
+
+**Plot Armour is the one with a clock on it.** Removal-risk detection needs
+months of nightly availability snapshots, and those accumulate only if
+`PLOTTED_SNAPSHOT_ENABLED` is on somewhere that runs continuously. **Every day
+this is not deployed is a day of history that cannot be recovered.** If you do
+one thing from this document, do that one.
+
+**How to make it excellent: alert suppression.** A job that fires nightly is a
+job the user turns off, and a notification feature nobody has enabled is worth
+less than none. The interesting engineering here is deciding what *not* to say —
+a title leaving a service the user does not subscribe to is not news, and neither
+is one leaving a service they have already watched it on.
+
+### Phase 11 — End Credits analytics and load testing
+
+**Two metrics carry the product's thesis**: decision latency (does it actually
+save time?) and accepted-and-completed rate (did they watch the thing?).
+Everything else is decoration.
+
+**A load-testing target already exists.** The optimiser's worst case is four
+solves at a five-second cap — a **20-second bound** — even though real instances
+finish in milliseconds. That is the number to aim the section 13.1 budget at, and
+it is written up in the phase 5 section below.
+
+**And a loose end to close here:** the Redis health contributor is disabled in
+the `prod` profile because nothing uses Redis yet. Re-enable it **in the same
+change that gives Redis its first caller**, which is this phase's rate limiter. A
+disabled health check that outlives its reason is how a dependency silently stops
+being monitored.
+
+### Phase 12 — stretch, and only if the earlier ones are genuinely done
+
+Removal-risk model, Group Plot, Side Quest, household fairness, history import,
+interleaved experiments. The spec is explicit and it is right: **two complete
+headline features with measured results beat five half-built ones.**
+
+---
+
+## The order I would actually do it in
+
+1. **Deploy** (phase 6) and **turn the snapshot job on**. Time-sensitive, and it
+   unblocks everything that needs a running environment.
+2. **Seed to 500** (phase 2). Every other feature chooses from this list.
+3. **Record the video** (phase 6). Now it has something real to show.
+4. **`blocked_titles` writer** (phase 4). An hour, and it closes a half-wired
+   feature.
+5. **Pilot Season's screen** (phase 9). Two days, and it is the last thing that
+   makes the product feel finished.
+6. **The outcome timestamp** (phase 7). One column — and the clock on collecting
+   real data starts the moment it ships.
+7. Then phases 10 and 11, with real data behind them.
+
+Items 1 and 2 are worth more than everything below them combined, because they
+are what turn honest answers over 119 titles into honest answers over a
+catalogue.
+
+---
+
+
+## The GitHub Actions outage of 2026-08-06, and what it cost
+
+Phases 5 to 9 were written while GitHub Actions was in a **major outage**, and
+merged afterwards. All five are now on `main` and **every one of them was
+verified by CI before merging** — 313 tests, nothing skipped, nothing failing,
+including the ~94 that only ever run there.
+
+Kept because the failure mode is worth recognising again, and because the first
+diagnosis was wrong.
+
+**What it looked like.** Three symptoms over about nine hours:
+
+1. A run whose remaining jobs failed with *"not acquired by Runner of type
    hosted"*.
 2. No workflow runs created at all for six consecutive pushes, despite the pushes
    landing and the pull request's head advancing.
 3. A manually triggered re-run accepted, then sitting `queued` indefinitely.
 
-GitHub's status page during the incident: *"Webhook triggers are currently
-throttled to help with recovery and we are processing approximately 15% of
-webhooks"*, and *"runners are stuck retrying jobs that are no longer
-available"*. That is exactly (1), (2) and (3).
+GitHub's status page said it plainly: *"Webhook triggers are currently throttled
+to help with recovery and we are processing approximately 15% of webhooks"*, and
+*"runners are stuck retrying jobs that are no longer available"*. That is exactly
+(1), (2) and (3).
 
-**Recorded because the first diagnosis was wrong.** The pattern was read as an
-exhausted Actions allowance on a private repository — which fits the symptoms
-just as well and is the more common cause. Everything checkable with this token
-was checked (Actions enabled, all actions permitted, workflow `active`) and the
-conclusion was then asserted with a hedge rather than confirmed. The billing
-endpoint needs an OAuth scope this token does not have. **The status page needed
-no scope at all and answered it in one request: check the platform before blaming
-the account.**
+**The wrong diagnosis.** The pattern was first read as an exhausted Actions
+allowance on a private repository — which fits the symptoms just as well and is
+the more common cause. Everything checkable with the available token *was*
+checked: Actions enabled, all actions permitted, workflow `active`. That felt
+like diligence and was still the wrong shape of investigation, because the one
+source that could settle it in a single unauthenticated request — the status
+page — was never consulted. **Check whether the platform is up before reasoning
+about your account.**
 
-**So nothing is merged.** What that costs, specifically: the 94 Docker-gated and
-CP-SAT tests only ever run in CI, so `V13`, every query in `DemoRepository` and
-the whole solver suite have never touched a real Postgres or a Linux JVM.
-Everything else — 179 tests, both linters, the Angular production build, the
-evaluation harness — is verified locally.
+**Two things that outlived the outage.**
 
-Once Actions recovers, push and merge in order: phase 5, then 6, then 7, then 8,
-then 9. Note
-that PR #7 targets `phase-5-cancel-culture` while the workflow only triggers on
-pull requests into `main`, so it gets no checks until GitHub retargets it when
-#6 merges.
+*A lost webhook never replays.* Once Actions recovered, the pull requests still
+had no checks: the events for their heads had been dropped, and retargeting a
+base does not create one either. Closing and reopening each PR fired a fresh
+`reopened` event, which is cleaner than an empty commit.
+
+*A conflicted PR runs nothing, silently.* After squash-merging phase 5, the
+stacked branches went `CONFLICTING` — and GitHub cannot build a merge commit for
+a dirty PR, so `pull_request` workflows never fire at all. "No checks reported"
+looked like the outage lingering and was actually a conflict. Rebasing each
+branch onto the new `main` fixed it. **`gh pr view --json mergeStateStatus` is
+the first thing to check when a PR has no checks.**
+
+**What the delay actually bought.** Three real bugs were found by reading the
+code during the wait rather than by CI:
+
+- `DemoRepositoryIntegrationTest` built availability rows with the typed jOOQ
+  API, but `title_availability.validity` is `DATERANGE NOT NULL` with no default
+  and is fenced out of the generator's view. Every insert would have failed a
+  not-null violation — on Postgres only, which is to say only in CI. Fixed by
+  going through `AvailabilityRepository.open`, which is the phase 3 lesson from a
+  new direction: *write fixtures the same way the repository writes*.
+- A plan-lookup assertion read `== cheap || != dear`, which is true for any value
+  including null and so had no way to fail.
+- The committed OpenAPI document was missing the demo endpoint. That one CI did
+  catch, on the first green-able run.
+
 
 ## Read this before doing anything else
 

@@ -16,10 +16,11 @@ every design decision here protects it.
 
 ---
 
-## Status: phases 1–9 built, not yet deployed
+## Status: phases 1–9 merged, not yet deployed
 
 This repository is built in phases against a written specification. Both headline
-features are complete, tested and — where it was possible without users — measured.
+features are complete, and every phase below was verified by CI before merging —
+**313 tests, none skipped**, including the ~94 that only run there.
 
 | | Phase | State |
 |---|---|---|
@@ -28,10 +29,10 @@ features are complete, tested and — where it was possible without users — me
 | 3 | Watchlists, subscriptions, coverage dashboard | **Done** |
 | 4 | **Queue Theory** — filters, scoring, diversification, explanations | **Done** |
 | 5 | **Cancel Culture** — CP-SAT optimiser, plan types, sensitivity | **Done** |
-| 6 | Polish, demo mode, deployment | **Built, not deployed** |
-| 7 | Evaluation harness, baselines, ablations | **Harness built; one defensible result** |
-| 8 | Learned ranking — LightGBM → ONNX → JVM | **Pipeline built and proven; not served** |
-| 9 | Pilot Season — Bradley–Terry taste profile | **Maths built; no screen** |
+| 6 | Polish, demo mode, deployment | **Merged, not deployed** |
+| 7 | Evaluation harness, baselines, ablations | **Merged; one defensible result** |
+| 8 | Learned ranking — LightGBM → ONNX → JVM | **Merged; proven, not served** |
+| 9 | Pilot Season — Bradley–Terry taste profile | **Merged; maths only, no screen** |
 | 10–12 | Temporal, analytics, stretch | |
 
 ### The two things worth looking at
