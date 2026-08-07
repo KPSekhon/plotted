@@ -13,7 +13,8 @@ No Spring context, no database, no API keys. A report that needs an environment
 is a report nobody regenerates, and one nobody regenerates stops being true
 without anybody noticing.
 
-Last run: 2026-08-06.
+Last run: 2026-08-06, against feature schema **v2** (nine features, including
+phase 9's `taste_match`).
 
 ---
 
@@ -37,7 +38,7 @@ where there is none is worse than no evaluation section.
 
 ---
 
-## The result: renormalisation is worth 0.017 NDCG@3
+## The result: renormalisation is worth 0.019 NDCG@3
 
 `FeatureVector.score()` divides the weighted sum by the weight *actually present*
 on a candidate. Without it, a candidate missing a 0.10-weight feature caps at
@@ -54,12 +55,12 @@ renormalisation recover?*
 
 | Strategy | NDCG@3 | 95% CI | Precision@3 | MRR |
 |---|---|---|---|---|
-| learned-distill | 0.9604 | 0.9588 – 0.9620 | 0.9845 | 0.9956 |
-| **linear-v1** | 0.9604 | 0.9587 – 0.9620 | 0.9842 | 0.9956 |
-| watchlist-priority | 0.9479 | 0.9458 – 0.9499 | **0.9953** | 0.9995 |
-| linear-v1-no-renormalisation | 0.9434 | 0.9415 – 0.9454 | 0.9927 | **1.0000** |
-| popularity | 0.8197 | 0.8158 – 0.8237 | 0.8505 | 0.9266 |
-| random | 0.7956 | 0.7916 – 0.7997 | 0.8267 | 0.9036 |
+| **linear-v1** | 0.9615 | 0.9599 – 0.9631 | 0.9875 | 0.9980 |
+| learned-distill | 0.9614 | 0.9598 – 0.9630 | 0.9878 | 0.9975 |
+| watchlist-priority | 0.9481 | 0.9461 – 0.9503 | **0.9962** | **0.9998** |
+| linear-v1-no-renormalisation | 0.9425 | 0.9405 – 0.9446 | 0.9922 | **0.9998** |
+| popularity | 0.8204 | 0.8164 – 0.8242 | 0.8628 | 0.9298 |
+| random | 0.8000 | 0.7956 – 0.8042 | 0.8357 | 0.9097 |
 
 `learned-distill` is the phase 8 ONNX model. It sits level with `linear-v1`
 because it was **trained to imitate it**, which is the point of it rather than a
@@ -67,8 +68,8 @@ disappointment — see below and [MODEL.md](MODEL.md).
 
 Paired bootstrap over identical queries, 2,000 resamples, seed 20260806:
 
-> **linear-v1 ahead of linear-v1-no-renormalisation by 0.0170 NDCG@3
-> (95% CI 0.0145 – 0.0194, n = 2000).**
+> **linear-v1 ahead of linear-v1-no-renormalisation by 0.0191 NDCG@3
+> (95% CI 0.0166 – 0.0215, n = 2000).**
 
 The interval excludes zero, so the effect is real at this censoring rate. It is
 also small in absolute terms, and the section below explains why the absolute
@@ -89,7 +90,7 @@ measures the difference between two implementations and calls it an effect.
 
 ### The absolute numbers are compressed, and random scoring 0.80 proves it
 
-A shuffle scores 0.7956 NDCG@3. That is not a good shuffle — it is what NDCG does
+A shuffle scores 0.8000 NDCG@3. That is not a good shuffle — it is what NDCG does
 when relevances are graded and similar. With twelve candidates whose true scores
 mostly sit between 0.5 and 0.9, almost any ordering accumulates most of the ideal
 gain, so the metric's useful range is squeezed into the top fifth of its scale.
@@ -101,9 +102,9 @@ relevance distribution.
 ### The full model loses on two of the three metrics it is winning on
 
 `watchlist-priority` sorts by nothing but the number the user typed in. It comes
-within 0.0125 NDCG@3 of the five-feature model and is **ahead on precision@3**
-(0.9953 against 0.9842). The ablated model — the one this page is arguing is
-worse — takes **the best MRR on the table** (1.0000 against 0.9956).
+within 0.0134 NDCG@3 of the five-feature model and is **ahead on precision@3**
+(0.9962 against 0.9875). The ablated model — the one this page is arguing is
+worse — **ties for the best MRR on the table** (0.9998 against 0.9980).
 
 Both of those are real and both are reported because they are. NDCG@3 is the
 metric this product should be judged on, because it is graded and
@@ -123,8 +124,8 @@ any.
 
 ### The learned model matching the linear one is a passing test, not a null result
 
-> **learned-distill against linear-v1: no measurable difference (0.0000 NDCG@3,
-> 95% CI −0.0002 to 0.0003, n = 2000).**
+> **learned-distill against linear-v1: no measurable difference (−0.0001 NDCG@3,
+> 95% CI −0.0004 to 0.0001, n = 2000).**
 
 Read as a model comparison this says nothing — and it is not one. The ONNX model
 was distilled from the linear ranker, so a correct pipeline *must* produce this
@@ -138,7 +139,7 @@ whatsoever is known about whether a learned ranker would be *better*.
 
 ### Popularity barely beats random, and that is a property of the simulation
 
-0.8197 against 0.7956. In the real world popularity is a strong baseline and hard
+0.8204 against 0.8000. In the real world popularity is a strong baseline and hard
 to beat. Here it is weak because `ACCLAIM` carries only 0.10 of the ground-truth
 score, so a ranker that reads nothing else is discarding 90% of the signal *by
 construction*.
@@ -204,7 +205,7 @@ Listed rather than omitted, in rough order of how much they should worry you.
    obscure titles are both more likely to lack metadata and less likely to be
    wanted. Where those correlate, the un-normalised scorer is accidentally right
    some of the time, so **the real renormalisation effect is probably smaller
-   than 0.017.** This is the conservative direction to be wrong in, but it is
+   than 0.019.** This is the conservative direction to be wrong in, but it is
    still a direction.
 4. **One censoring rate (30%).** The effect size is a function of it. The
    direction is asserted by a test; the magnitude is not, because pinning it

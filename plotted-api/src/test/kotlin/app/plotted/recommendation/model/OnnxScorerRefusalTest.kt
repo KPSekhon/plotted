@@ -73,7 +73,11 @@ class OnnxScorerRefusalTest {
         // order would pass every other test in this file.
         val reordered = fingerprintOf(FeatureSchema.VERSION, FeatureSchema.names.reversed())
         val renamed = fingerprintOf(FeatureSchema.VERSION, FeatureSchema.names.dropLast(1) + "something_else")
-        val rebumped = fingerprintOf("v2", FeatureSchema.names)
+        // Derived from the real version rather than hard-coded. The first draft
+        // used the literal "v2" as "some other version", and passed right up
+        // until phase 9 bumped the schema *to* v2 — at which point the test was
+        // asserting the fingerprint differed from itself.
+        val rebumped = fingerprintOf(FeatureSchema.VERSION + "-other", FeatureSchema.names)
 
         val actual = FeatureSchema.fingerprint
         listOf(reordered, renamed, rebumped).forEach { (it == actual) shouldBe false }

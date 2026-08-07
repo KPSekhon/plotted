@@ -28,6 +28,20 @@ data class Candidate(
     /** 0..10 as stored, or null when nobody has rated it. Null is not zero. */
     val communityRating: Double?,
     val offers: List<Offer>,
+    /**
+     * How well this matches the user's Pilot Season profile, 0..1, or null.
+     *
+     * Null in two quite different situations that both mean the same thing here:
+     * the user has not answered the questionnaire, or they answered it and it
+     * found nothing it could defend saying. `PreferenceProfile` collapses the
+     * second into null on purpose — a profile with no supportable opinion would
+     * otherwise contribute a real-looking number computed from noise.
+     *
+     * Computed by the caller rather than derived here, because it needs the
+     * title's genres and the fitted profile, and `Candidate` is what the ranker
+     * sees rather than what the database holds.
+     */
+    val tasteMatch: Double? = null,
 ) {
     data class Offer(
         val providerId: UUID,

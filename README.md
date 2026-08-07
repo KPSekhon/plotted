@@ -16,7 +16,7 @@ every design decision here protects it.
 
 ---
 
-## Status: phases 1–7 built, not yet deployed
+## Status: phases 1–9 built, not yet deployed
 
 This repository is built in phases against a written specification. Both headline
 features are complete, tested and — where it was possible without users — measured.
@@ -31,7 +31,8 @@ features are complete, tested and — where it was possible without users — me
 | 6 | Polish, demo mode, deployment | **Built, not deployed** |
 | 7 | Evaluation harness, baselines, ablations | **Harness built; one defensible result** |
 | 8 | Learned ranking — LightGBM → ONNX → JVM | **Pipeline built and proven; not served** |
-| 9–12 | Pilot Season, Temporal, analytics | |
+| 9 | Pilot Season — Bradley–Terry taste profile | **Maths built; no screen** |
+| 10–12 | Temporal, analytics, stretch | |
 
 ### The two things worth looking at
 
@@ -57,7 +58,7 @@ Both are more interesting when they refuse. That is what the
 ### What has been measured
 
 Renormalising scores over the features a candidate actually has is worth
-**0.0170 NDCG@3 (95% CI 0.0145–0.0194)** under a 30% metadata-censoring
+**0.0191 NDCG@3 (95% CI 0.0166–0.0215)** under a 30% metadata-censoring
 simulation. [EVALUATION.md](docs/EVALUATION.md) reports that, and is equally
 explicit that it is the *only* non-circular number on the page — there are no
 users yet, so the simulation's ground truth is the model's own score. It also
@@ -286,6 +287,8 @@ state of every phase including the bugs.
   defensible result, and an explicit list of what the numbers do not say
 - [`docs/MODEL.md`](docs/MODEL.md) — the learned ranker, and the four mechanisms
   that stop training-serving skew shipping silently
+- [`docs/PILOT.md`](docs/PILOT.md) — taste elicitation, why the prior is not
+  optional, and why two of the four verdicts mean "we do not know"
 - [`docs/PROGRESS.md`](docs/PROGRESS.md) — where every phase actually stands,
   and the six bugs that reported success while doing nothing
 - [`docs/NEXT.md`](docs/NEXT.md) — the forward plan and how to spend the API

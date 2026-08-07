@@ -271,13 +271,34 @@ timestamp)`; five of the eight features here are session context it has no
 analogue for. Using it would mean fabricating them. Its real home is phase 9's
 taste model.
 
-### Phases 9–11
+### Phase 9 — Pilot Season (maths built; screen not)
 
-Pilot Season (Bradley–Terry, fixed ladder first — adaptive selection has no data
-to be adaptive about yet), Temporal workflows and Plot Armour, End Credits
-analytics. Decision latency and accepted-and-completed rate are the two metrics
-that carry the product's thesis.
+The fitter, the ladder and the profile are done and tested — see
+[PILOT.md](PILOT.md). What is left is plumbing, and one thing that is not:
 
+1. **Persistence, API and screen.** A `pilot_comparisons` table, an endpoint that
+   serves the next question and records an answer, and fifteen taps on a phone.
+   Straightforward; nothing about it is subtle.
+2. **Allow "skip".** A forced choice between two titles somebody has not seen
+   produces a coin flip recorded as evidence. The ladder already tolerates a
+   short questionnaire, so a skipped pair should simply not become a comparison.
+3. **Make the population prior real.** It is currently zero-mean, which for a
+   population nobody has measured is the same thing — but it is a placeholder,
+   not a finding. Once profiles exist, the prior mean should be their average,
+   and that single change is what turns "assume you are indifferent" into
+   "assume you are typical".
+4. **Then measure whether taste helps.** `taste_match` is plumbed into the
+   feature schema and carries no learned signal, because the training target is
+   the linear ranker's score and that does not read taste. The harness in
+   `recommendation.evaluation` is where that question gets answered, and it needs
+   the same real outcome data phase 7 needs.
+
+**Do not make the ladder adaptive yet.** Adaptive selection tunes against a model
+of the population, and there is no population; it would be adapting to the prior,
+which is a fixed ladder reached by a more complicated route and much harder to
+test.
+
+### Phases 10–11
 ---
 
 ## The standing lesson

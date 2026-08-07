@@ -25,7 +25,7 @@ the world; that one is what to do about it.
 | 6 | Polish, demo mode, deployment | 1 | **Built; not deployed** ← *résumé-ready line* |
 | 7 | Evaluation harness, MovieLens, baselines | 2 | **Harness built; one result** |
 | 8 | LightGBM → ONNX → JVM inference | 2 | **Pipeline built and proven; model not served** |
-| 9 | Pilot Season, preference profile | 2 | |
+| 9 | Pilot Season, preference profile | 2 | **Maths built; no API or screen** |
 | 10 | Temporal workflows, outbox, Plot Armour detection | 2 | |
 | 11 | End Credits analytics, load testing, observability | 2 | |
 | 12 | Stretch: removal-risk model, Group Plot, Side Quest | 3 | |
@@ -36,20 +36,20 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-35 tables · 13 migrations · 104 Kotlin source files · **284 API tests** ·
+35 tables · 13 migrations · 107 Kotlin source files · **313 API tests** ·
 26 frontend tests · 21 API paths · 8 ADRs · 107 provider aliases · 17 seeded
 plan prices · 1 trained model.
 
-Of the 284, **190 run on this machine and 94 skip** — 10 classes need Docker and
+Of those, **219 run on this machine and 94 skip** — 10 classes need Docker and
 2 need CP-SAT. That is a third of the suite unverified since CI stopped, and it
 is the third that covers the database. Measured from a local run, not from CI,
 for the reason in the next section.
 
 ---
 
-## CI was down for the whole of phases 5–8 (GitHub incident, 2026-08-06)
+## CI was down for the whole of phases 5–9 (GitHub incident, 2026-08-06)
 
-Phases 5 to 8 are written, linted and green on everything that runs without
+Phases 5 to 9 are written, linted and green on everything that runs without
 Docker. **None of the last several commits has been executed by CI**, and the
 cause was a GitHub Actions **major outage** beginning 15:22 UTC — the same minute
 as this repository's last successful run.
@@ -82,8 +82,8 @@ the whole solver suite have never touched a real Postgres or a Linux JVM.
 Everything else — 179 tests, both linters, the Angular production build, the
 evaluation harness — is verified locally.
 
-Once Actions recovers, push and merge in order: phase 5, then 6, then 7, then 8.
-Note
+Once Actions recovers, push and merge in order: phase 5, then 6, then 7, then 8,
+then 9. Note
 that PR #7 targets `phase-5-cancel-culture` while the workflow only triggers on
 pull requests into `main`, so it gets no checks until GitHub retargets it when
 #6 merges.
@@ -625,10 +625,48 @@ representable values near 0.9 are ~6e-8 apart. It was asserting something finer
 than the type can express and failed for a reason unrelated to batching. *A
 tolerance tighter than the data type is not a strict test, it is a broken one.*
 
-## Phases 9–11 (Tier 2) — what turns "built" into "measured"
-- **9 — Pilot Season.** Bradley–Terry over ~15 comparisons with population
-  priors. Start with a fixed ladder of pairs; adaptive selection is a later
-  refinement with no data to be adaptive about yet.
+## Phase 9 — Pilot Season (the maths, not the screen)
+
+**Built.** A feature-parameterised Bradley–Terry model fitted by Newton on the
+log-posterior, a fixed ladder that chooses informative pairs, and a profile layer
+that decides which fitted weights are worth saying out loud. 29 tests, none
+skipped. Full write-up in [PILOT.md](PILOT.md).
+
+**The prior is not optional.** With fifteen comparisons and six axes, maximum
+likelihood is frequently **undefined** — somebody who picks the comedy every time
+drives that weight to infinity, and an unregularised fit reports whatever it
+reached when the iteration cap stopped it. The Gaussian prior makes the posterior
+strictly concave so the mode always exists, and its mean is the *population's*
+taste rather than zero: "assume you are typical" rather than "assume you are
+indifferent".
+
+**Two of the four verdicts are ways of saying we do not know.** `NO_PREFERENCE`
+(we asked, you were balanced — a real finding) and `NOT_ASKED` (the ladder never
+contrasted this axis) produce nearly identical weights and completely different
+advice. Only the posterior width separates them, which is why the fitter returns
+one. A profile with nothing it can defend saying returns **null** rather than
+0.5: both rankers already handle an absent feature properly, and a real-looking
+number computed from noise is noise a decision would treat as signal.
+
+**It made phase 8's guard fire on a real change.** Adding `taste_match` bumped
+the feature schema v1 → v2, the committed model was refused for a fingerprint
+mismatch, and the fix was to retrain rather than override anything. That is
+`MODEL.md`'s central claim, observed rather than asserted.
+
+**And caught one of my own tests being wrong.** `OnnxScorerRefusalTest` used the
+literal `"v2"` as "some other version". It passed until the schema *became* v2,
+at which point it was asserting the fingerprint differed from itself. A test that
+hard-codes "some other value" breaks when the real value becomes that value.
+
+**The linear ranker was deliberately left alone.** Adding a sixth feature would
+mean rebalancing five designed weights, invalidating the phase 7 ablation with no
+evidence to justify a new arrangement. Do not change a measured thing without a
+measurement.
+
+**Not built: persistence, API, screen.** The part that is hard to get right is
+done; the plumbing is not.
+
+## Phases 10–11 (Tier 2) — what turns "built" into "measured"
 - **10 — Temporal workflows.** Durable refresh and renewal analysis, the outbox
   relay (the table and writer already exist), and Plot Armour change detection
   from the snapshot diffs. Alert suppression matters — a job that fires nightly
