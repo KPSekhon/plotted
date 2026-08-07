@@ -66,7 +66,7 @@ first, on purpose, so that what remains is finishable.
 
 | # | What is missing | Blocked on | Effort |
 |---|---|---|---|
-| 2 | Seed has 119 titles, not 500; pipeline never run end to end | A person's taste + API budget | half a day |
+| 2 | Seed list is built (519 entries); `make seed` has never run | A database to ingest into | an hour |
 | 2 | `PLOTTED_SNAPSHOT_ENABLED` never turned on | An environment that runs continuously | one env var |
 | 6 | Never deployed | A person with a cloud account | half a day |
 | 6 | No demo video | A person, a seeded database, a deployment | an hour |
@@ -85,27 +85,42 @@ turns the extension-permission risk into a five-second check.
 
 ---
 
-### Phase 2 — grow the seed to 500, and start the snapshot clock
+### Phase 2 — the seed is built; the pipeline has still never run
 
-**What is missing.** `make seed` has never been run against live TMDB with a real
-database, and the curated list is 119 titles where section 7.3 asks for 500.
+**Done: the list.** 519 entries — 400 derived from a live Watchmode enumeration
+of what is actually streaming in Canada, plus the 119 curated names kept. About
+500 unique titles once the overlap resolves at ingest; the seed run's own report
+is the number to quote, because the curated half is names and the derived half is
+ids and matching them is what TMDB resolution does.
 
-**The plan is already written** — `NEXT.md` Part 1 has the five-step procedure and
-the exact budget: **~200 Watchmode calls (8% of a month), 500 MDBList (half a
-day), ~1000 free TMDB**. The Canadian source ids are verified and listed there.
+**The query was inverted, which is the part worth understanding.** The old seed
+was names checked one request at a time — guess, then verify, and only ever about
+titles somebody thought of. `/v1/list-titles/` filters by *source* and returns
+titles in bulk carrying `tmdb_id`, so the seed is derived from availability
+instead. **18 Watchmode requests bought 2550 unique titles**, against a
+2500-a-month cap. The budgeted figure was 150–200, which was for enumerating
+complete catalogues; picking 500 needs only the popular head.
 
-**How to make it excellent.** Do not guess a list and then check it. Enumerate
-what is *actually streaming in Canada* from Watchmode's `/v1/list-titles/` — one
-call per 250 titles per service rather than one per title — and derive the seed
-from that. Then, where TMDB's watch-providers and Watchmode's enumeration
-disagree, **file the disagreement through the availability-correction endpoint
-rather than editing rows**. Two independent sources disagreeing is precisely the
-signal the `confidence` column exists for, and a seed that records its own
-uncertainty is worth more than one that hides it.
+`tools/seed/enumerate_watchmode.py` pulls it, `tools/seed/build_seed.py` buckets
+it by release year on the recency weighting. The raw enumeration is committed as
+provenance — it is the evidence for what was on each service on 2026-08-07, and
+it means nobody re-spends quota to recover it.
 
-**Do this before anything else that needs a catalogue**, because the demo, the
-evaluation and Pilot Season all choose from whatever is in it. Every one of them
-is currently choosing from 119 titles.
+**One deviation from the plan, recorded because it is not what NEXT.md says.**
+Ranking uses Watchmode's `popularity_percentile` rather than TMDB's `popularity`.
+It arrived free in the enumeration response so it cost no extra quota, but it is
+a different number from the one the procedure names.
+
+**Still missing: steps 3 to 5, all of which need a database.** TMDB hydration,
+the MDBList ratings cross-check (500 calls, half a day's quota), and filing the
+places TMDB's watch-providers and Watchmode's enumeration disagree through the
+**availability-correction endpoint rather than editing rows**. That last one is
+the interesting data: two independent sources disagreeing is precisely the signal
+the `confidence` column exists for, and a seed that records its own uncertainty
+is worth more than one that hides it.
+
+**`make seed` has still never run**, so the ingestion pipeline is still unproven
+end to end against live TMDB.
 
 **Separately: turn on `PLOTTED_SNAPSHOT_ENABLED`** in the first environment that
 runs continuously. Plot Armour (phase 10) needs months of nightly history and
@@ -403,25 +418,25 @@ headline features with measured results beat five half-built ones.**
 
 ## The order I would actually do it in
 
-Items 4 to 6 of the original list are done. What is left is what needed a person
-all along, plus phase 11.
+Everything that could be built without a person has been built. The list is now
+one item long.
 
-1. **Deploy** (phase 6) and **turn the snapshot job on**. Time-sensitive, and it
-   unblocks everything that needs a running environment. Run
-   `ops/deploy/preflight.sql` against the database before anything else.
-2. **Seed to 500** (phase 2). Every other feature chooses from this list.
+1. **Deploy** (phase 6), and **turn the snapshot job on**. Run
+   `ops/deploy/preflight.sql` against the database before anything else — if a
+   managed Postgres refuses an extension, that is the moment to find out, and the
+   fix is never to fence the constraints out.
+2. **Run `make seed` once**, then turn it off. The list is built; the ingestion
+   has never executed against live TMDB.
 3. **Record the video** (phase 6). Now it has something real to show.
 
-Everything that could be built without a person has been. What is left on this
-list is one cloud account and a person's taste, and both of the remaining Tier 2
-gaps — Plot Armour's first real removal, and both End Credits metrics returning a
-number instead of null — are waiting on time rather than on work.
+Everything else is waiting on time rather than on work: Plot Armour has never
+seen a real removal because nothing has produced one, and both End Credits
+metrics return null because no decision has been accepted yet. Both are correct
+answers to an empty log, and both start producing numbers the day step 1 happens.
 
-Items 1 and 2 are worth more than everything below them combined, because they
-are what turn honest answers over 119 titles into honest answers over a
-catalogue. Item 1 is also what starts Plot Armour: the suppression rules and the
-relay are built and tested, and they have never seen a real removal because
-nothing has ever produced one.
+Step 1 also starts the only clock that cannot be rewound. The snapshot history
+Plot Armour's removal-risk model needs accumulates from the night the job first
+runs, and a night not collected is gone.
 
 ---
 
@@ -598,14 +613,18 @@ reason worth keeping straight:
    to change it but to set the variable in the first long-lived environment.
    Both this flag and `PLOTTED_SEED_ENABLED` are now listed in `.env.example`,
    which is where someone setting that environment up will actually look.
-5. **Grow the seed toward 500 hand-verified titles** (119 today), and enter
-   provider plan prices per `docs/seed/provider-plans.md`. *Deliberately manual,
-   and must stay that way.* The value of a curated seed is precisely that a
-   person checked it, and invented prices would put fabricated money into the
-   optimiser's objective function — which does not produce a visibly broken
-   feature, it produces confident, wrong financial advice. Compare what comes
-   back against the provider's own app and record disagreements through the
-   correction endpoint rather than editing rows.
+5. **The seed list is built** — 519 entries, ~500 unique. *Done*, and the part
+   that was genuinely manual stayed manual: the 119 curated names are still
+   there, because popularity ordering drops the Canadian originals, CBC Gem, the
+   anime and the subtitled film, and those are what keep the coverage numbers
+   informative rather than flattering.
+
+   **Provider plan prices are still hand-entered** per
+   `docs/seed/provider-plans.md`, and that must stay true. Invented prices put
+   fabricated money into the optimiser's objective function, which does not
+   produce a visibly broken feature — it produces confident, wrong financial
+   advice. Compare what comes back against the provider's own app and record
+   disagreements through the correction endpoint rather than editing rows.
 
 ---
 

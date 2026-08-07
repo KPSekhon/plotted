@@ -144,15 +144,22 @@ day-to-day drift.
 
 ## Part 2 — What is missing, phase by phase
 
-### Phase 2 — Catalogue (done; seeding owed)
+### Phase 2 — Catalogue (list built; ingestion never run)
 
-Missing: the pipeline has never run end to end, and the seed is 119 titles.
+**Steps 1 and 2 of the procedure above are done.** The enumeration cost 18
+Watchmode requests and produced 2550 unique Canadian titles; the stratification
+took 400 of them and kept the 119 curated names. Both scripts are in
+`tools/seed/` and the raw enumeration is committed as provenance.
 
-**Plan.** Needs Postgres, so it is gated on Docker. Then the five-step procedure
-above. This is now *mechanically* solvable — my earlier claim that verifying the
-seed "needs a person" was only half right. Watchmode answers "is this actually
-on Crave in Canada". What still needs a person is deciding which titles are
-worth having on the list at all; taste is not an API.
+Both halves of the earlier claim turned out right. Watchmode answers "is this
+actually on Crave in Canada", so that part was mechanical. Deciding which titles
+are worth having at all was not — popularity ordering drops the awkward cases the
+curated list exists for, which is why it survives alongside the derived set.
+
+**Steps 3 to 5 are still owed and all need a database:** TMDB hydration, the
+MDBList cross-check, and filing the TMDB-versus-Watchmode disagreements through
+the correction endpoint. `make seed` has never run against live TMDB, so the
+ingestion pipeline remains unproven end to end.
 
 Also outstanding: `PLOTTED_SNAPSHOT_ENABLED` in the first environment that runs
 continuously. Every night not collected is unrecoverable, and Plot Armour
@@ -190,10 +197,10 @@ Still open, and neither blocks anything:
    ruled out. Start from the module list in `hs_err_pid*.log`. CI is Linux and
    runs all ten solver tests, so this is a developer-machine inconvenience
    rather than a product problem.
-2. **The optimiser has a thin catalogue to work with.** Everything it says is
-   real, but it chooses among 119 seeded titles and 17 researched prices. The
-   seed procedure in Part 1 is what makes the answers *interesting* as well as
-   correct, and it is the highest-value thing left before phase 6.
+2. **The optimiser still has an empty catalogue to work with.** The seed *list*
+   is now ~500 titles rather than 119, but nothing has been ingested, so the
+   answers stay uninteresting until `make seed` runs against a real database.
+   Prices are unchanged at 17 researched figures, and those stay manual.
 
 **One result worth carrying into phase 6.** A limit on services held *at once*
 is much weaker than it looks once the model has a time dimension: given two
