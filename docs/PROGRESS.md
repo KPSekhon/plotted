@@ -29,8 +29,8 @@ the world; that one is what to do about it.
 | 6 | Polish, demo mode, deployment | 1 | **Merged; not deployed** ← *résumé-ready line* |
 | 7 | Evaluation harness, MovieLens, baselines | 2 | **Merged; one defensible result** |
 | 8 | LightGBM → ONNX → JVM inference | 2 | **Merged; pipeline proven, model not served** |
-| 9 | Pilot Season, preference profile | 2 | **Merged; maths only, no screen** |
-| 10 | Temporal workflows, outbox, Plot Armour detection | 2 | |
+| 9 | Pilot Season, preference profile | 2 | **Done** — persistence, API and screen merged |
+| 10 | Temporal workflows, outbox, Plot Armour detection | 2 | **Relay and Plot Armour merged; no Temporal** |
 | 11 | End Credits analytics, load testing, observability | 2 | |
 | 12 | Stretch: removal-risk model, Group Plot, Side Quest | 3 | |
 
@@ -62,12 +62,19 @@ first, on purpose, so that what remains is finishable.
 |---|---|---|---|
 | 2 | Seed has 119 titles, not 500; pipeline never run end to end | A person's taste + API budget | half a day |
 | 2 | `PLOTTED_SNAPSHOT_ENABLED` never turned on | An environment that runs continuously | one env var |
-| 4 | `blocked_titles` can be read but never written | Nothing — it is an endpoint | an hour |
 | 6 | Never deployed | A person with a cloud account | half a day |
 | 6 | No demo video | A person, a seeded database, a deployment | an hour |
-| 7 | No real evaluation data | Users, and one timestamp column | a day, then wait |
+| 7 | No real evaluation data | Users, and the timestamp column that now exists | wait, not work |
 | 8 | Model trained on synthetic data; explanations unsolved | Phase 7's data | a week |
-| 9 | No persistence, API or screen | Nothing — it is plumbing | two days |
+| 10 | No Temporal workflows | Somewhere to run a Temporal server | unknown |
+| 10 | Plot Armour has never seen a real removal | A deployment with the snapshot job on | wait, not work |
+| 11 | Not started | Nothing | — |
+
+**Closed since this table was last written:** `blocked_titles` now has a writer
+(#12), `watchlist_items.completed_at` records when an outcome happened (#11),
+Pilot Season has its persistence, API and screen (#14), and the outbox has a
+relay with Plot Armour behind it (#15). The deployment preflight (#13) is what
+turns the extension-permission risk into a five-second check.
 
 ---
 
@@ -101,21 +108,25 @@ bought back later.
 
 ---
 
-### Phase 4 — `blocked_titles` has a reader and no writer
+### Phase 4 — `blocked_titles` now has a writer
 
-**A precise gap.** `WatchlistRepository.blockedTitleIds` is read through the SPI
-by both `TonightService` (as a hard filter) and `CancelCultureService`. Nothing
-anywhere **writes** to that table — no endpoint, no repository insert. So the
-filter is live and the table can never be populated.
+**Closed.** `GET`, `POST` and `DELETE` on `/api/v1/watchlist/blocked`, plus a
+control on the title page. The filter had been live since phase 4 over a table
+nothing could put a row in.
 
-**The fix** is a `POST /api/v1/watchlist/blocked`, a delete, and a control on the
-title page. An hour of work.
+Three decisions worth not undoing:
 
-**Where it belongs**, and this is the part worth getting right: blocking must not
-hide a title from *catalogue search*. Someone searching for something they
-blocked should still find it, because hiding it there reads as a missing
-catalogue entry rather than a preference being honoured. `CatalogueQueryService`
-already carries a comment saying so.
+- **Catalogue search is untouched.** `TitleSearchRepository.search` takes no user
+  id, so it cannot filter — and that is the design. A blocked title missing from
+  search reads as a missing catalogue entry rather than a preference being
+  honoured, and it leaves no way to change your mind. A test asserts it, so a
+  later "fix" fails there rather than shipping.
+- **Blocking does not delete the watchlist entry.** That would destroy the
+  priority and notes as a side effect of a different request. The entry comes
+  back marked and the screen says so — otherwise it sits there never being
+  recommended with nothing on screen explaining why.
+- **A second block keeps the first reason and timestamp** rather than
+  overwriting with an empty one.
 
 ---
 
@@ -234,26 +245,82 @@ of the population, and there is no population; it would be adapting to the prior
 which is a fixed ladder reached by a more complicated route and much harder to
 test.
 
+**Built since:** `pilot_comparisons`, the four endpoints and the screen. Skip is
+recorded and is not evidence — the repository filters on a non-null choice and
+the schema refuses half-skipped rows in either direction. The attribute
+difference is frozen at answer time rather than recomputed, because RECENCY is
+measured against the current year and refitting an old answer would restate it.
+
+**And it exposed an infinite loop in `PilotLadder.build`.** The exhaustion guard
+sat below a `continue` that skipped it, so a catalogue too small to fill the
+ladder span forever rather than returning short. It needed a *non-empty* ladder
+to trigger, which is why the existing identical-titles test never found it: that
+case produces an empty ladder, and the empty path was the one that terminated. So
+"too uniform to ask anything" was covered and "too small to ask fifteen" was not
+— which is every catalogue smaller than the seeded one, including a fresh deploy
+before `make seed` runs. The new test carries a `@Timeout`, because the failure
+does not throw, and it was run against the original code to check it fails there.
+
+**Still a placeholder: the population prior.** Zero-mean, which for a population
+nobody has measured is the same number and a different claim. Once profiles
+exist the mean should be their average. Left until there are users, because an
+average over nobody is still zero.
+
 ---
 
 ## Phases 10 to 12, and how to approach them
 
-### Phase 10 — Temporal workflows, the outbox, Plot Armour
+### Phase 10 — the outbox relay and Plot Armour (built; no Temporal)
 
-The outbox table and writer already exist. What is missing is the relay and the
-durable workflows.
+**Four things existed and did nothing.** The `outbox` table had a writer nobody
+called, `availability_changes` and `alerts` had no writer at all, and the nightly
+diff computed added and removed offers and discarded them. They are connected
+now.
 
-**Plot Armour is the one with a clock on it.** Removal-risk detection needs
-months of nightly availability snapshots, and those accumulate only if
-`PLOTTED_SNAPSHOT_ENABLED` is on somewhere that runs continuously. **Every day
-this is not deployed is a day of history that cannot be recovered.** If you do
-one thing from this document, do that one.
+**The claim is a lease, not a lock.** The obvious implementation is
+`SELECT ... FOR UPDATE SKIP LOCKED`, and it is wrong here in a way that looks
+right: a row lock lasts only as long as its transaction, and delivery happens in
+a later one so a single failure does not roll back the batch. By the time a
+handler runs the locks are gone, and two instances would deliver everything twice
+while appearing to use `SKIP LOCKED` correctly. `claim` is an
+`UPDATE ... RETURNING` that pushes `next_attempt_at` out instead.
 
-**How to make it excellent: alert suppression.** A job that fires nightly is a
-job the user turns off, and a notification feature nobody has enabled is worth
-less than none. The interesting engineering here is deciding what *not* to say —
-a title leaving a service the user does not subscribe to is not news, and neither
-is one leaving a service they have already watched it on.
+**Delivery is a separate bean** because `@Transactional` works through a proxy
+and a self-call gets no transaction at all — the annotation is read, looks
+applied, and does nothing. `REQUIRES_NEW`, so recording a failure survives the
+failure that caused it. Phase 1 shipped that exact bug once already.
+
+**Alert suppression is the product.** Seven rules, all counted and logged,
+ordered so the reported reason is the first that applied. The one that matters
+most is `NOT_SUBSCRIBED`: a title leaving Paramount+ is nothing to somebody who
+never had Paramount+, and it is the alert that would make the feature feel like
+spam. `PlotArmourTest` covers one case per rule plus a check that every reason is
+reachable — a reason nothing can produce is a rule edited out of the decision and
+left in the enum.
+
+**The alert says "has left", not "about to leave."** The diff sees departures
+that already happened. Predicting one needs the removal-risk model and months of
+snapshot history, which is phase 12 and cannot start until the snapshot job runs.
+
+**`ModuleBoundaryTest` could not catch a real violation here.** Plot Armour first
+read its event-type constant from `availability.domain`, straight across a
+feature boundary, and `featureModulesAreIndependent` passed — a Kotlin
+`const val` is inlined by the compiler, so the bytecode ArchUnit reads holds the
+string and no reference to the class. A cross-module constant is invisible to the
+rule that exists to forbid cross-module coupling. Moved to
+`platform.outbox.OutboxEventTypes`; where these live is discipline rather than
+enforcement.
+
+**Not built: Temporal.** There is no dependency and nowhere to run a worker. The
+relay is a Spring `@Scheduled` poller and says so. Writing workflow code that
+cannot be executed or tested here would be the pattern this project keeps
+catching.
+
+**Nothing has produced a real event.** `availability.removed` is emitted only by
+the nightly refresh, which needs `PLOTTED_SNAPSHOT_ENABLED` and a deployment.
+Every path is tested with synthetic events. **Every day this is not deployed is a
+day of history that cannot be recovered** — if you do one thing from this
+document, do that one.
 
 ### Phase 11 — End Credits analytics and load testing
 
@@ -282,21 +349,21 @@ headline features with measured results beat five half-built ones.**
 
 ## The order I would actually do it in
 
+Items 4 to 6 of the original list are done. What is left is what needed a person
+all along, plus phase 11.
+
 1. **Deploy** (phase 6) and **turn the snapshot job on**. Time-sensitive, and it
-   unblocks everything that needs a running environment.
+   unblocks everything that needs a running environment. Run
+   `ops/deploy/preflight.sql` against the database before anything else.
 2. **Seed to 500** (phase 2). Every other feature chooses from this list.
 3. **Record the video** (phase 6). Now it has something real to show.
-4. **`blocked_titles` writer** (phase 4). An hour, and it closes a half-wired
-   feature.
-5. **Pilot Season's screen** (phase 9). Two days, and it is the last thing that
-   makes the product feel finished.
-6. **The outcome timestamp** (phase 7). One column — and the clock on collecting
-   real data starts the moment it ships.
-7. Then phases 10 and 11, with real data behind them.
+4. **Phase 11**, which needs nothing and nobody.
 
 Items 1 and 2 are worth more than everything below them combined, because they
 are what turn honest answers over 119 titles into honest answers over a
-catalogue.
+catalogue. Item 1 is also what starts Plot Armour: the suppression rules and the
+relay are built and tested, and they have never seen a real removal because
+nothing has ever produced one.
 
 ---
 
