@@ -49,20 +49,37 @@ class CatalogueSeedRunner(
         log.info("Seeding {} titles for region {}", titles.size, tmdb.region)
         val report = Report()
 
-        titles.forEach { name ->
-            // Search then ingest, the same path a user adding to a watchlist
-            // takes, so a seed run proves the real pipeline works.
-            val match = ingestion.search(name).firstOrNull()
-            if (match == null) {
-                log.warn("No TMDB match for '{}'", name)
-                report.unmatched += name
-                return@forEach
+        titles.forEach { entry ->
+            val name = entry.label
+
+            val resolved = when (entry) {
+                // Derived from the Watchmode enumeration, which carries the tmdb
+                // id itself. No search, so nothing to resolve wrongly -- and one
+                // fewer request per title, which over four hundred of them is the
+                // difference between a seed run and a seed afternoon.
+                is SeedEntry.ByTmdbId -> entry.tmdbId to entry.mediaType
+
+                // Curated by hand, so it is a name and has to be looked up. The
+                // same path a user adding to a watchlist takes, which is what
+                // makes a seed run proof that the real pipeline works.
+                is SeedEntry.ByName -> {
+                    val match = ingestion.search(entry.name).firstOrNull()
+                    val tmdbId = match?.externalId?.toIntOrNull()
+                    if (match == null || tmdbId == null) {
+                        log.warn("No TMDB match for '{}'", entry.name)
+                        report.unmatched += entry.name
+                        return@forEach
+                    }
+                    tmdbId to match.mediaType
+                }
+
+                is SeedEntry.Malformed -> {
+                    log.warn("Malformed seed line, skipped: '{}'", entry.line)
+                    report.failed += "${entry.line}: not a valid tmdb:<id>:<movie|tv> line"
+                    return@forEach
+                }
             }
-            val tmdbId = match.externalId.toIntOrNull()
-            if (tmdbId == null) {
-                report.unmatched += name
-                return@forEach
-            }
+            val (tmdbId, mediaType) = resolved
 
             // Series go through the season path so the seeded catalogue carries
             // measured runtimes rather than episode-count times an average.
@@ -70,10 +87,10 @@ class CatalogueSeedRunner(
             // estimates would make its promise only as good as a guess. It costs
             // one extra request per season, which is what the seed is for.
             val outcome =
-                if (match.mediaType == MediaType.SERIES) {
+                if (mediaType == MediaType.SERIES) {
                     ingestion.ingestWithSeasons(tmdbId)
                 } else {
-                    ingestion.ingest(match.mediaType, tmdbId)
+                    ingestion.ingest(mediaType, tmdbId)
                 }
 
             when (outcome) {
@@ -108,11 +125,55 @@ class CatalogueSeedRunner(
         log.info("Availability is fetched per title after ingestion; check the log above for provider gaps.")
     }
 
-    private fun readSeedList(): List<String> = ClassPathResource(SEED_PATH).inputStream.bufferedReader().useLines { lines ->
+    private fun readSeedList(): List<SeedEntry> = ClassPathResource(SEED_PATH).inputStream.bufferedReader().useLines { lines ->
         lines
-            .map { it.trim() }
-            .filter { it.isNotEmpty() && !it.startsWith("#") }
+            // Trailing comments carry the human-readable title and the providers
+            // that were carrying it, which is what makes a file of ids reviewable
+            // by eye. Stripped here rather than in the generator so a person can
+            // annotate a line without breaking it.
+            .map { it.substringBefore('#').trim() }
+            .filter { it.isNotEmpty() }
+            .map(::parseEntry)
             .toList()
+    }
+
+    /**
+     * A seed line.
+     *
+     * `tmdb:634649:movie` is derived from the availability enumeration and needs
+     * no lookup. Anything else is a title somebody typed, and gets searched.
+     * A malformed `tmdb:` line is reported rather than silently searched as a
+     * name, because "tmdb:634649:movie" is not a film and the search would
+     * return something arbitrary.
+     */
+    private fun parseEntry(line: String): SeedEntry {
+        if (!line.startsWith(TMDB_PREFIX)) return SeedEntry.ByName(line)
+
+        val parts = line.removePrefix(TMDB_PREFIX).split(':')
+        val id = parts.getOrNull(0)?.toIntOrNull()
+        val mediaType = when (parts.getOrNull(1)) {
+            "movie" -> MediaType.MOVIE
+            "tv", "series" -> MediaType.SERIES
+            else -> null
+        }
+        return if (id == null || mediaType == null) SeedEntry.Malformed(line) else SeedEntry.ByTmdbId(id, mediaType)
+    }
+
+    private sealed interface SeedEntry {
+        /** What to call it in a log line, before anything has been resolved. */
+        val label: String
+
+        data class ByTmdbId(val tmdbId: Int, val mediaType: MediaType) : SeedEntry {
+            override val label: String get() = "tmdb:$tmdbId"
+        }
+
+        data class ByName(val name: String) : SeedEntry {
+            override val label: String get() = name
+        }
+
+        data class Malformed(val line: String) : SeedEntry {
+            override val label: String get() = line
+        }
     }
 
     private class Report {
@@ -128,5 +189,6 @@ class CatalogueSeedRunner(
 
     private companion object {
         const val SEED_PATH = "seed/canadian-seed.txt"
+        const val TMDB_PREFIX = "tmdb:"
     }
 }

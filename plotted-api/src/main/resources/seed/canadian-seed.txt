@@ -1,26 +1,464 @@
 # Plotted :: Canadian catalogue seed
 #
-# One title per line. Blank lines and lines starting with # are ignored.
-# Each entry is resolved through TMDB search and ingested with its Canadian
-# availability, exactly as a user adding it by hand would be.
+# Two kinds of line, and the difference is the provenance:
+#
+#   tmdb:634649:movie   Derived from a live Watchmode enumeration of what is
+#                       actually streaming in Canada. Resolved by id, so there
+#                       is no name-matching to get wrong.
+#   Schitt's Creek      Curated by hand. Resolved through TMDB search.
+#
+# Blank lines, lines starting with #, and anything after a # are ignored.
 #
 #     make seed          (needs TMDB_READ_ACCESS_TOKEN and a running database)
 #
-# WHAT THIS IS, HONESTLY
+# WHERE THE DERIVED HALF CAME FROM
 #
-# Section 7.3 of the specification asks for roughly 500 titles, hand-verified,
-# with correct prices and deep links. This file is not that yet. It is a
-# starting set chosen to span the Canadian services and the awkward cases --
-# Canadian originals, public broadcasters, prestige cable, anime, subtitled
-# film, older titles that have drifted between services -- so that the coverage
-# numbers it produces are informative rather than flattering.
+# `tools/seed/enumerate_watchmode.py` asked Watchmode which titles each Canadian
+# subscription service carries, one page of 250 per service per media type --
+# 2550 unique titles for 18 requests, against a 2500-a-month cap.
+# `tools/seed/build_seed.py` then bucketed them by release year and took the
+# most popular of each, no further requests needed.
 #
-# Growing it to 500 is manual work and deliberately so: the point of a curated
-# seed is that a person checked it. Add titles you would actually watch, run
-# the seed, and check the availability that comes back against the provider's
-# own app. Where they disagree, that disagreement is the interesting data --
-# record it through the availability-correction endpoint rather than editing
-# the row.
+# That is the inversion worth understanding: the old approach was to guess a
+# list and check it one title at a time, which costs a request per guess and
+# answers only for titles somebody thought of. This starts from what is
+# streaming and selects from it.
+#
+# The enumeration is a snapshot, not a subscription. It says these titles were
+# on these services on the day it ran; the nightly job is what keeps that
+# current, and disagreements between it and TMDB's watch-providers belong in the
+# availability-correction endpoint rather than in edits to this file.
+#
+# WHY THE CURATED HALF STAYS
+#
+# 119 titles below were chosen by a person to span the awkward cases --
+# Canadian originals, public broadcasters, anime, subtitled film, titles that
+# have drifted between services. Popularity ordering drops most of them, and
+# they are what keeps the coverage numbers informative rather than flattering.
+# Taste is not an API.
+#
+# Some of them will also appear in the derived set. Ingestion is idempotent and
+# keyed on tmdb id, so the overlap resolves on the first run rather than
+# producing duplicates -- which is why this file has more lines than it has
+# titles, and why the seed run's own report is the number to quote.
+
+# === Derived from live Canadian availability ===============================
+
+
+# --- 2026 --------------------------------------------------------
+tmdb:1316092:movie  # "Wuthering Heights" — crave
+tmdb:1656220:movie  # 23 000 Lives — netflix
+tmdb:1272837:movie  # 28 Years Later: The Bone Temple — crave
+tmdb:949838:movie  # 72 Hours — netflix
+tmdb:1318447:movie  # Apex — netflix
+tmdb:980431:movie  # Avatar Aang: The Last Airbender — paramount-plus
+tmdb:1595852:movie  # Boulevard — prime-video
+tmdb:1171145:movie  # Crime 101 — prime-video
+tmdb:1668364:movie  # Desire — netflix
+tmdb:1202033:movie  # Enola Holmes 3 — netflix
+tmdb:1716513:movie  # Extreme Makeover: Homer Edition — disney-plus
+tmdb:840464:movie  # Greenland 2: Migration — prime-video
+tmdb:1327819:movie  # Hoppers — disney-plus
+tmdb:1304313:movie  # Lee Cronin's The Mummy — crave
+tmdb:1397385:movie  # Little Brother — netflix
+tmdb:454639:movie  # Masters of the Universe — prime-video
+tmdb:1236153:movie  # Mercy — prime-video
+tmdb:1630423:movie  # My Dearest Assassin — netflix
+tmdb:1358005:movie  # Office Romance — netflix
+tmdb:1390300:movie  # Over Your Dead Body — prime-video
+tmdb:875828:movie  # Peaky Blinders: The Immortal Man — netflix
+tmdb:1057265:movie  # Peddi — netflix
+tmdb:687163:movie  # Project Hail Mary — prime-video
+tmdb:1451078:movie  # Raakaasa — netflix
+tmdb:1266127:movie  # Ready or Not 2: Here I Come — disney-plus
+tmdb:1330021:movie  # Remarkably Bright Creatures — netflix
+tmdb:1613798:movie  # Revenge — prime-video
+tmdb:1159559:movie  # Scream 7 — paramount-plus
+tmdb:1198994:movie  # Send Help — disney-plus
+tmdb:1290821:movie  # Shelter — prime-video
+tmdb:1007757:movie  # Swapped — netflix
+tmdb:1159831:movie  # The Bride! — crave
+tmdb:1630409:movie  # The Debt Collector — netflix
+tmdb:1481343:movie  # The Devil's Mouth — prime-video
+tmdb:1325734:movie  # The Drama — paramount-plus
+tmdb:1306368:movie  # The Rip — netflix
+tmdb:1301421:movie  # The Sheep Detectives — prime-video
+tmdb:1226863:movie  # The Super Mario Galaxy Movie — prime-video
+tmdb:1659155:movie  # The Truthers — netflix
+tmdb:1168190:movie  # The Wrecking Crew — prime-video
+tmdb:1380291:movie  # Tom Clancy's Jack Ryan: Ghost War — prime-video
+tmdb:614945:movie  # Voicemails for Isabelle — netflix
+tmdb:1265609:movie  # War Machine — netflix
+tmdb:1477317:movie  # Your Fault: London — prime-video
+tmdb:241372:tv  # 56 Days — prime-video
+tmdb:224372:tv  # A Knight of the Seven Kingdoms — crave
+tmdb:296206:tv  # Agent Kim Reactivated — netflix
+tmdb:297438:tv  # Akane-banashi — netflix
+tmdb:300054:tv  # BAKI-DOU: The Invincible Samurai — netflix
+tmdb:289560:tv  # CIA — paramount-plus
+tmdb:312949:tv  # Chainsmoker Cat — netflix
+tmdb:260463:tv  # Daemons of the Shadow Realm — disney-plus,netflix
+tmdb:299167:tv  # Dutton Ranch — paramount-plus
+tmdb:281281:tv  # Elite Force — netflix
+tmdb:254420:tv  # Elle — prime-video
+tmdb:260592:tv  # Every Year After — prime-video
+tmdb:287238:tv  # Furious — disney-plus
+tmdb:245318:tv  # Margo's Got Money Troubles — apple-tv-plus
+tmdb:290856:tv  # Marshals — paramount-plus
+tmdb:291339:tv  # Memory of a Killer — crave
+tmdb:284725:tv  # Not Suitable for Work — disney-plus
+tmdb:273240:tv  # Off Campus — prime-video
+tmdb:279388:tv  # Pursuit of Jade — netflix
+tmdb:302074:tv  # R.J. Decker — crave,disney-plus
+tmdb:241882:tv  # Ride or Die — prime-video
+tmdb:240740:tv  # Scarpetta — prime-video
+tmdb:295778:tv  # Scrubs — crave,disney-plus
+tmdb:289763:tv  # See You at Work Tomorrow! — prime-video
+tmdb:153217:tv  # Sparks of Tomorrow — netflix
+tmdb:220102:tv  # Spider-Noir — prime-video
+tmdb:298610:tv  # Spooky in Love — netflix
+tmdb:252107:tv  # Star City — apple-tv-plus
+tmdb:289219:tv  # Star Wars: Maul - Shadow Lord — disney-plus
+tmdb:283297:tv  # Sterling Point — prime-video
+tmdb:255358:tv  # THE GHOST IN THE SHELL — prime-video
+tmdb:276161:tv  # Teach You a Lesson — netflix
+tmdb:224941:tv  # The Boroughs — netflix
+tmdb:300954:tv  # The Husband — disney-plus
+tmdb:322430:tv  # The Polygamist — netflix
+tmdb:283428:tv  # The Ramparts of Ice — netflix
+tmdb:298168:tv  # The Shards — disney-plus
+tmdb:287527:tv  # The Testaments — disney-plus
+tmdb:286709:tv  # The Westies — paramount-plus
+tmdb:259837:tv  # The Wonderfools — netflix
+tmdb:286345:tv  # Though I Am an Inept Villainess — disney-plus
+tmdb:270476:tv  # Widow's Bay — apple-tv-plus
+tmdb:198178:tv  # Wonder Man — disney-plus
+tmdb:255661:tv  # Young Sherlock — prime-video
+
+# --- 2025 --------------------------------------------------------
+tmdb:1100988:movie  # 28 Years Later — crave
+tmdb:950387:movie  # A Minecraft Movie — crave
+tmdb:1234731:movie  # Anaconda — crave
+tmdb:83533:movie  # Avatar: Fire and Ash — disney-plus
+tmdb:541671:movie  # Ballerina — crave
+tmdb:822119:movie  # Captain America: Brave New World — disney-plus
+tmdb:1084199:movie  # Companion — crave,netflix
+tmdb:1156594:movie  # Culpa Nuestra — prime-video
+tmdb:911430:movie  # F1 — apple-tv-plus
+tmdb:574475:movie  # Final Destination Bloodlines — crave
+tmdb:1228246:movie  # Five Nights at Freddy's 2 — prime-video
+tmdb:1443894:movie  # Forgive Us All — prime-video
+tmdb:1062722:movie  # Frankenstein — netflix
+tmdb:858024:movie  # Hamnet — prime-video
+tmdb:1087192:movie  # How to Train Your Dragon — prime-video
+tmdb:1234821:movie  # Jurassic World: Rebirth — prime-video
+tmdb:803796:movie  # KPop Demon Hunters — netflix
+tmdb:552524:movie  # Lilo & Stitch — disney-plus
+tmdb:1317288:movie  # Marty Supreme — prime-video
+tmdb:696506:movie  # Mickey 17 — crave
+tmdb:575265:movie  # Mission: Impossible - The Final Reckoning — paramount-plus
+tmdb:980477:movie  # Ne Zha 2 — paramount-plus
+tmdb:425274:movie  # Now You See Me: Now You Don't — crave
+tmdb:1054867:movie  # One Battle After Another — crave
+tmdb:1242898:movie  # Predator: Badlands — disney-plus
+tmdb:1315303:movie  # Primate — paramount-plus
+tmdb:1233413:movie  # Sinners — crave
+tmdb:447273:movie  # Snow White — disney-plus
+tmdb:1061474:movie  # Superman — crave
+tmdb:1038392:movie  # The Conjuring: Last Rites — crave
+tmdb:617126:movie  # The Fantastic 4: First Steps — disney-plus
+tmdb:1368166:movie  # The Housemaid — crave
+tmdb:604079:movie  # The Long Walk — crave
+tmdb:986056:movie  # Thunderbolts* — disney-plus
+tmdb:533533:movie  # Tron: Ares — disney-plus
+tmdb:1480387:movie  # Undertone — paramount-plus
+tmdb:812583:movie  # Wake Up Dead Man: A Knives Out Mystery — netflix
+tmdb:755898:movie  # War of the Worlds — prime-video
+tmdb:1078605:movie  # Weapons — crave
+tmdb:1084242:movie  # Zootopia 2 — disney-plus
+tmdb:284838:tv  # 9-1-1: Nashville — crave,disney-plus
+tmdb:260458:tv  # Adults — disney-plus
+tmdb:157239:tv  # Alien: Earth — disney-plus
+tmdb:258742:tv  # All's Fair — disney-plus
+tmdb:305379:tv  # Badly in Love — netflix
+tmdb:248361:tv  # Beyond the Gates — crave
+tmdb:284736:tv  # Boston Blue — crave,paramount-plus
+tmdb:227114:tv  # Butterfly — prime-video
+tmdb:202555:tv  # Daredevil: Born Again — disney-plus
+tmdb:259909:tv  # Dexter: Resurrection — paramount-plus
+tmdb:260823:tv  # From Old Country Bumpkin to Master Swordsman — prime-video
+tmdb:301507:tv  # Heated Rivalry — crave
+tmdb:243881:tv  # House of David — prime-video
+tmdb:200875:tv  # IT: Welcome to Derry — crave
+tmdb:138505:tv  # Marvel Zombies — disney-plus
+tmdb:237529:tv  # Medalist — disney-plus
+tmdb:232869:tv  # Mickey Mouse Clubhouse+ — disney-plus
+tmdb:261363:tv  # Mid-Century Modern — disney-plus
+tmdb:247718:tv  # MobLand — paramount-plus
+tmdb:246862:tv  # New PANTY & STOCKING with GARTERBELT — prime-video
+tmdb:236429:tv  # On Call — prime-video
+tmdb:245927:tv  # Paradise — disney-plus
+tmdb:225171:tv  # Pluribus — apple-tv-plus
+tmdb:240993:tv  # Ransom Canyon — netflix
+tmdb:240459:tv  # Spartacus: House of Ashur — prime-video
+tmdb:228305:tv  # Task — crave
+tmdb:271267:tv  # The Chair Company — crave
+tmdb:244447:tv  # The Hunting Wives — crave
+tmdb:221079:tv  # The Last Frontier — apple-tv-plus
+tmdb:226749:tv  # The Librarians: The Next Chapter — crave
+tmdb:239385:tv  # The Manipulated — disney-plus
+tmdb:250307:tv  # The Pitt — crave
+tmdb:247767:tv  # The Studio — apple-tv-plus
+tmdb:278196:tv  # The Summer Hikaru Died — netflix
+tmdb:219760:tv  # The Terminal List: Dark Wolf — prime-video
+tmdb:253811:tv  # Tougen Anki — prime-video
+tmdb:248852:tv  # UNTAMED — netflix
+tmdb:215522:tv  # We Were Liars — prime-video
+tmdb:219246:tv  # When Life Gives You Tangerines — netflix
+tmdb:241609:tv  # Your Friends & Neighbors — apple-tv-plus
+
+# --- 2024 --------------------------------------------------------
+tmdb:945961:movie  # Alien: Romulus — crave,disney-plus
+tmdb:1064213:movie  # Anora — prime-video
+tmdb:1118031:movie  # Apocalypse Z: The Beginning of the End — prime-video
+tmdb:1097549:movie  # Babygirl — prime-video
+tmdb:573435:movie  # Bad Boys: Ride or Die — netflix
+tmdb:917496:movie  # Beetlejuice Beetlejuice — netflix
+tmdb:365177:movie  # Borderlands — crave,netflix
+tmdb:1005331:movie  # Carry-On — netflix
+tmdb:937287:movie  # Challengers — crave
+tmdb:974576:movie  # Conclave — prime-video
+tmdb:533535:movie  # Deadpool & Wolverine — crave,disney-plus
+tmdb:519182:movie  # Despicable Me 4 — netflix
+tmdb:823219:movie  # Flow — crave
+tmdb:1138194:movie  # Heretic — crave,paramount-plus
+tmdb:1022789:movie  # Inside Out 2 — disney-plus
+tmdb:653346:movie  # Kingdom of the Planet of the Apes — crave,disney-plus
+tmdb:539972:movie  # Kraven the Hunter — crave
+tmdb:1011985:movie  # Kung Fu Panda 4 — netflix
+tmdb:1241982:movie  # Moana 2 — disney-plus
+tmdb:762509:movie  # Mufasa: The Lion King — disney-plus
+tmdb:426063:movie  # Nosferatu — prime-video
+tmdb:516729:movie  # Paddington in Peru — crave
+tmdb:845781:movie  # Red One — crave,prime-video
+tmdb:359410:movie  # Road House — prime-video
+tmdb:939243:movie  # Sonic the Hedgehog 3 — netflix
+tmdb:1196470:movie  # Survive — prime-video
+tmdb:866398:movie  # The Beekeeper — crave,netflix
+tmdb:549509:movie  # The Brutalist — prime-video
+tmdb:746036:movie  # The Fall Guy — netflix
+tmdb:843527:movie  # The Idea of You — prime-video
+tmdb:975511:movie  # The Return — crave
+tmdb:933260:movie  # The Substance — paramount-plus
+tmdb:1184918:movie  # The Wild Robot — netflix
+tmdb:1032823:movie  # Trap — netflix
+tmdb:912649:movie  # Venom: The Last Dance — crave
+tmdb:1198984:movie  # We Bury the Dead — paramount-plus
+tmdb:402431:movie  # Wicked — prime-video
+tmdb:1156593:movie  # Your Fault — prime-video
+tmdb:218342:tv  # A Good Girl's Guide to Murder — netflix
+tmdb:215072:tv  # A Shop for Killers — disney-plus
+tmdb:82452:tv  # Avatar: The Last Airbender — netflix
+tmdb:125909:tv  # Batman: Caped Crusader — prime-video
+tmdb:246246:tv  # Beauty in Black — netflix
+tmdb:207347:tv  # Blue Box — netflix
+tmdb:213306:tv  # Cross — paramount-plus,prime-video
+tmdb:240411:tv  # Dandadan — netflix,prime-video
+tmdb:196322:tv  # Dark Matter — apple-tv-plus
+tmdb:262469:tv  # Dating Naked UK — paramount-plus
+tmdb:207784:tv  # Delicious in Dungeon — netflix
+tmdb:239770:tv  # Doctor Who — disney-plus
+tmdb:236994:tv  # Dragon Ball Daima — netflix
+tmdb:226285:tv  # Elsbeth — paramount-plus
+tmdb:106379:tv  # Fallout — prime-video
+tmdb:243875:tv  # Georgie & Mandy's First Marriage — crave
+tmdb:215799:tv  # Go! Go! Loser Ranger! — disney-plus
+tmdb:94954:tv  # Hazbin Hotel — prime-video
+tmdb:226637:tv  # High Potential — crave,disney-plus
+tmdb:262838:tv  # India's Got Latent — netflix
+tmdb:157741:tv  # Landman — paramount-plus
+tmdb:226174:tv  # Matlock — paramount-plus
+tmdb:243006:tv  # NCIS: Origins — paramount-plus
+tmdb:207333:tv  # One Hundred Years of Solitude — netflix
+tmdb:259140:tv  # Ranma1/2 — netflix
+tmdb:204024:tv  # Rock, Paper, Scissors — paramount-plus
+tmdb:232865:tv  # Shaman King: Flowers — netflix,prime-video
+tmdb:126308:tv  # Shōgun — disney-plus
+tmdb:203744:tv  # Sugar — apple-tv-plus
+tmdb:236385:tv  # T-P Bon — netflix
+tmdb:219971:tv  # The Agency — paramount-plus
+tmdb:236235:tv  # The Gentlemen — netflix
+tmdb:117830:tv  # Tomb Raider: The Legend of Lara Croft — netflix
+tmdb:243140:tv  # Tonbo! — prime-video
+tmdb:211288:tv  # Tracker — crave,disney-plus,paramount-plus
+tmdb:223500:tv  # Wind Breaker — netflix
+tmdb:245026:tv  # Wizards Beyond Waverly Place — disney-plus
+tmdb:138502:tv  # X-Men '97 — disney-plus
+
+# --- 2023 --------------------------------------------------------
+tmdb:964980:movie  # Air — crave,prime-video
+tmdb:640146:movie  # Ant-Man and the Wasp: Quantumania — disney-plus
+tmdb:1072790:movie  # Anyone But You — netflix
+tmdb:804150:movie  # Cocaine Bear — crave
+tmdb:976573:movie  # Elemental — disney-plus
+tmdb:299054:movie  # Expend4bles — netflix
+tmdb:507089:movie  # Five Nights at Freddy's — netflix
+tmdb:940721:movie  # Godzilla Minus One — netflix
+tmdb:980489:movie  # Gran Turismo — netflix
+tmdb:447365:movie  # Guardians of the Galaxy Vol. 3 — disney-plus
+tmdb:603692:movie  # John Wick: Chapter 4 — crave
+tmdb:466420:movie  # Killers of the Flower Moon — apple-tv-plus
+tmdb:575264:movie  # Mission: Impossible - Dead Reckoning Part One — crave,paramount-plus
+tmdb:1010581:movie  # My Fault — prime-video
+tmdb:884605:movie  # No Hard Feelings — netflix
+tmdb:872585:movie  # Oppenheimer — netflix
+tmdb:666277:movie  # Past Lives — crave
+tmdb:976893:movie  # Perfect Days — cbc-gem
+tmdb:792307:movie  # Poor Things — crave,disney-plus
+tmdb:930564:movie  # Saltburn — prime-video
+tmdb:951491:movie  # Saw X — netflix
+tmdb:934433:movie  # Scream VI — crave,paramount-plus
+tmdb:569094:movie  # Spider-Man: Across the Spider-Verse — netflix
+tmdb:508883:movie  # The Boy and the Heron — netflix
+tmdb:926393:movie  # The Equalizer 3 — netflix
+tmdb:840430:movie  # The Holdovers — netflix
+tmdb:695721:movie  # The Hunger Games: The Ballad of Songbirds & Snakes — netflix
+tmdb:800158:movie  # The Killer — netflix
+tmdb:447277:movie  # The Little Mermaid — disney-plus
+tmdb:609681:movie  # The Marvels — disney-plus
+tmdb:502356:movie  # The Super Mario Bros. Movie — crave
+tmdb:667538:movie  # Transformers: Rise of the Beasts — crave,paramount-plus
+tmdb:154385:tv  # Beef — netflix
+tmdb:226688:tv  # Beyblade X — disney-plus,netflix,prime-video
+tmdb:127529:tv  # Bloodhounds — netflix
+tmdb:197368:tv  # Blue Orchestra — prime-video
+tmdb:114922:tv  # Citadel — prime-video
+tmdb:209867:tv  # Frieren: Beyond Journey's End — netflix
+tmdb:205715:tv  # Gen V — prime-video
+tmdb:208891:tv  # Heavenly Delusion — disney-plus
+tmdb:117465:tv  # Hell's Paradise — netflix
+tmdb:201889:tv  # Kubo Won't Let Me Be Invisible — prime-video
+tmdb:212989:tv  # LEGO Ninjago: Dragons Rising — netflix,prime-video
+tmdb:113962:tv  # Lioness — paramount-plus,prime-video
+tmdb:202411:tv  # Monarch: Legacy of Monsters — apple-tv-plus
+tmdb:199001:tv  # My Life with the Walter Boys — netflix
+tmdb:111110:tv  # ONE PIECE — netflix
+tmdb:103540:tv  # Percy Jackson and the Olympians — disney-plus
+tmdb:220150:tv  # Pokémon Horizons: The Series — netflix
+tmdb:210879:tv  # Rurouni Kenshin — netflix
+tmdb:136311:tv  # Shrinking — apple-tv-plus
+tmdb:125988:tv  # Silo — apple-tv-plus,prime-video
+tmdb:201478:tv  # SuperKitties — disney-plus
+tmdb:261145:tv  # The Amazing Digital Circus — netflix
+tmdb:220542:tv  # The Apothecary Diaries — netflix
+tmdb:47663:tv  # The Ark — crave
+tmdb:100088:tv  # The Last of Us — crave
+tmdb:129552:tv  # The Night Agent — netflix
+tmdb:211684:tv  # The Walking Dead: Daryl Dixon — prime-video
+tmdb:194583:tv  # The Walking Dead: Dead City — prime-video
+tmdb:218038:tv  # Vivant — netflix
+tmdb:208569:tv  # Will Trent — crave,disney-plus
+tmdb:195670:tv  # XO, Kitty — netflix
+tmdb:203737:tv  # 【OSHI NO KO】 — disney-plus
+
+# --- 2022 --------------------------------------------------------
+tmdb:829557:movie  # 365 Days: This Day — netflix
+tmdb:937278:movie  # A Man Called Otto — netflix
+tmdb:49046:movie  # All Quiet on the Western Front — netflix
+tmdb:76600:movie  # Avatar: The Way of Water — disney-plus
+tmdb:615777:movie  # Babylon — crave
+tmdb:505642:movie  # Black Panther: Wakanda Forever — disney-plus
+tmdb:505026:movie  # Death on the Nile — cbc-gem,disney-plus,netflix,prime-video
+tmdb:453395:movie  # Doctor Strange in the Multiverse of Madness — disney-plus
+tmdb:545611:movie  # Everything Everywhere All at Once — crave
+tmdb:985939:movie  # Fall — crave,paramount-plus
+tmdb:338953:movie  # Fantastic Beasts: The Secrets of Dumbledore — crave
+tmdb:758330:movie  # Good Luck to You, Leo Grande — crave
+tmdb:507086:movie  # Jurassic World: Dominion — crave
+tmdb:438148:movie  # Minions: The Rise of Gru — crave
+tmdb:526896:movie  # Morbius — crave
+tmdb:766507:movie  # Prey — disney-plus,prime-video
+tmdb:315162:movie  # Puss in Boots: The Last Wish — crave
+tmdb:579974:movie  # RRR — netflix
+tmdb:646385:movie  # Scream — crave,paramount-plus
+tmdb:629542:movie  # The Bad Guys — crave
+tmdb:593643:movie  # The Menu — cbc-gem,disney-plus
+tmdb:785084:movie  # The Whale — crave
+tmdb:616037:movie  # Thor: Love and Thunder — disney-plus
+tmdb:361743:movie  # Top Gun: Maverick — crave,paramount-plus
+tmdb:508947:movie  # Turning Red — disney-plus
+tmdb:760104:movie  # X — netflix
+tmdb:157744:tv  # 1923 — netflix,paramount-plus
+tmdb:83867:tv  # Andor — disney-plus
+tmdb:128904:tv  # Dark Winds — crave
+tmdb:124364:tv  # FROM — paramount-plus
+tmdb:202297:tv  # Fire Country — crave,paramount-plus
+tmdb:52814:tv  # Halo — paramount-plus
+tmdb:94997:tv  # House of the Dragon — crave
+tmdb:128098:tv  # Interview with the Vampire — crave
+tmdb:123249:tv  # My Dress-Up Darling — netflix
+tmdb:110492:tv  # Peacemaker — crave
+tmdb:108978:tv  # Reacher — prime-video
+tmdb:95396:tv  # Severance — apple-tv-plus
+tmdb:95480:tv  # Slow Horses — apple-tv-plus
+tmdb:120089:tv  # Spy x Family — netflix
+tmdb:103516:tv  # Star Trek: Strange New Worlds — paramount-plus,prime-video
+tmdb:136315:tv  # The Bear — disney-plus
+tmdb:125282:tv  # The Cleaning Lady — netflix
+tmdb:119495:tv  # The Eminence in Shadow — disney-plus,prime-video
+tmdb:135934:tv  # The Legend of Vox Machina — prime-video
+tmdb:116799:tv  # The Lincoln Lawyer — netflix
+tmdb:84773:tv  # The Lord of the Rings: The Rings of Power — prime-video
+tmdb:194766:tv  # The Summer I Turned Pretty — prime-video
+tmdb:120911:tv  # The Terminal List — prime-video
+tmdb:153312:tv  # Tulsa King — paramount-plus
+tmdb:200709:tv  # Weak Hero — netflix
+tmdb:119051:tv  # Wednesday — netflix
+
+# --- 2021 --------------------------------------------------------
+tmdb:890825:movie  # 14 Peaks: Nothing Is Impossible — netflix
+tmdb:744275:movie  # After We Fell — crave
+tmdb:497698:movie  # Black Widow — disney-plus
+tmdb:337404:movie  # Cruella — disney-plus
+tmdb:568124:movie  # Encanto — disney-plus
+tmdb:524434:movie  # Eternals — disney-plus
+tmdb:550988:movie  # Free Guy — disney-plus
+tmdb:451048:movie  # Jungle Cruise — disney-plus
+tmdb:508943:movie  # Luca — disney-plus
+tmdb:370172:movie  # No Time to Die — crave
+tmdb:527774:movie  # Raya and the Last Dragon — disney-plus
+tmdb:566525:movie  # Shang-Chi and the Legend of the Ten Rings — disney-plus
+tmdb:634649:movie  # Spider-Man: No Way Home — crave
+tmdb:756999:movie  # The Black Phone — crave
+tmdb:476669:movie  # The King's Man — disney-plus
+tmdb:588228:movie  # The Tomorrow War — crave,prime-video
+tmdb:645710:movie  # The Voyeurs — prime-video
+tmdb:587807:movie  # Tom & Jerry — crave
+tmdb:637649:movie  # Wrath of Man — netflix
+tmdb:791373:movie  # Zack Snyder's Justice League — crave
+tmdb:125935:tv  # Abbott Elementary — disney-plus
+tmdb:94605:tv  # Arcane — netflix
+tmdb:93740:tv  # Foundation — apple-tv-plus
+tmdb:126027:tv  # Ghosts — netflix,paramount-plus
+tmdb:124101:tv  # Hacks — crave
+tmdb:95557:tv  # INVINCIBLE — prime-video
+tmdb:84958:tv  # Loki — disney-plus
+tmdb:96677:tv  # Lupin — netflix
+tmdb:97951:tv  # Mayor of Kingstown — paramount-plus
+tmdb:94664:tv  # Mushoku Tensei: Jobless Reincarnation — netflix
+tmdb:107113:tv  # Only Murders in the Building — disney-plus
+tmdb:124394:tv  # Power Book III: Raising Kanan — prime-video
+tmdb:96580:tv  # Resident Alien — crave,netflix
+tmdb:124920:tv  # Rugrats — paramount-plus
+tmdb:104699:tv  # Shaman King — netflix
+tmdb:127635:tv  # Spidey and His Amazing Friends — disney-plus
+tmdb:93405:tv  # Squid Game — netflix
+tmdb:127599:tv  # Super Crooks — netflix
+tmdb:111803:tv  # The White Lotus — crave
+tmdb:91363:tv  # What If...? — disney-plus
+
+
+# === Curated by hand =======================================================
 
 # --- Canadian originals and co-productions ---------------------------------
 Schitt's Creek
