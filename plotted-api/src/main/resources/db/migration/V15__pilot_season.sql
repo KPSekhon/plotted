@@ -83,6 +83,17 @@ COMMENT ON COLUMN pilot_comparisons.attribute_difference IS
 
 CREATE INDEX pilot_comparisons_user_idx ON pilot_comparisons (user_id, answered_at);
 
+-- One per title foreign key, for the cascade path.
+--
+-- Postgres does not index foreign keys automatically, and deleting a title has
+-- to find every row referencing it on each of these three columns. The unique
+-- pair index below does not help: it is built on LEAST/GREATEST expressions
+-- rather than on the columns themselves, so a planner looking for
+-- `left_title_id = ?` cannot use it.
+CREATE INDEX pilot_comparisons_left_title_idx ON pilot_comparisons (left_title_id);
+CREATE INDEX pilot_comparisons_right_title_idx ON pilot_comparisons (right_title_id);
+CREATE INDEX pilot_comparisons_chosen_title_idx ON pilot_comparisons (chosen_title_id);
+
 /* [jooq ignore start] */
 -- One answer per pair per user, regardless of which side each title was shown
 -- on. LEAST/GREATEST normalises the pair so that answering (A, B) also settles
