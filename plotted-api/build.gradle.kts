@@ -37,6 +37,12 @@ dependencies {
 
     implementation(libs.ortools.java)
 
+    // Phase 8: the learned ranker runs in-process. ONNX rather than a Python
+    // sidecar because a second service on the request path buys a deployment,
+    // a network hop and a new failure mode to answer a question that takes
+    // microseconds. See docs/MODEL.md.
+    implementation(libs.onnxruntime)
+
     implementation(libs.flyway.core)
     implementation(libs.flyway.postgresql)
     runtimeOnly(libs.postgresql)
@@ -162,6 +168,16 @@ springBoot {
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName = "plotted-api.jar"
+}
+
+// Phase 8: write a training set using the serving feature extractor, so the
+// training script never computes a feature and skew is unrepresentable rather
+// than merely guarded against. See docs/MODEL.md.
+tasks.register<JavaExec>("exportTrainingData") {
+    group = "verification"
+    description = "Write build/training/dataset.csv from the shared feature schema"
+    mainClass = "app.plotted.recommendation.model.TrainingDataExport"
+    classpath = sourceSets.main.get().runtimeClasspath
 }
 
 // Phase 7: regenerate the numbers in docs/EVALUATION.md. No Spring context and

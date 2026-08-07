@@ -1,0 +1,15 @@
+# Phase 8 training toolchain.
+#
+#   python -m venv .venv-ml
+#   .venv-ml/Scripts/pip install -r ml/requirements.txt      # Windows
+#   .venv-ml/bin/pip install -r ml/requirements.txt          # everything else
+#
+# Not in CI. CI verifies the *artefacts* — the committed model, the golden
+# vectors and the schema fingerprint — which is what actually has to be right.
+# Installing a training stack on every pull request to re-derive a file already
+# in the repository would be several minutes of build time buying nothing.
+
+numpy>=2.0
+lightgbm>=4.5
+onnxmltools>=1.12
+onnxruntime>=1.19

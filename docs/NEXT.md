@@ -248,11 +248,28 @@ Some of that is circularity, but the residue says the other four features buy
 less than their combined 0.65 weight suggests. A learned model should be measured
 against *that* baseline, not against random.
 
-### Phase 8 — Learned ranking
+### Phase 8 — Learned ranking (pipeline built and proven)
 
-LightGBM from MovieLens 32M via TMDB ids, ONNX, in-process. Guard
-training-serving skew with a shared feature schema and a golden-vector
-equivalence test — that test is the whole point.
+Done, and written up in [MODEL.md](MODEL.md). The schema, the fingerprint guard,
+the golden vectors and a committed distillation model that makes the whole chain
+falsifiable without a user.
+
+**Two things left, and both need data rather than code:**
+
+1. **Train on something real.** The committed model imitates the linear ranker,
+   which proves the plumbing and nothing else. A model worth serving needs logged
+   decisions with outcomes — the same blocker as phase 7.
+2. **Solve explanations before serving it.** A boosted tree has no feature
+   contributions, and the product's rule is that a reason must be a real
+   contribution rather than prose that sounds like one. SHAP is the usual answer
+   and ONNX does not export it; a candidate approach is to serve the learned
+   ranking only where the linear model agrees with it, and fall back where they
+   differ — which is testable and honest, and has not been tried.
+
+**MovieLens is deferred with a reason.** It gives `(user, item, rating,
+timestamp)`; five of the eight features here are session context it has no
+analogue for. Using it would mean fabricating them. Its real home is phase 9's
+taste model.
 
 ### Phases 9–11
 

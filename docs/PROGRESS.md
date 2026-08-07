@@ -24,7 +24,7 @@ the world; that one is what to do about it.
 | 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | **Done** |
 | 6 | Polish, demo mode, deployment | 1 | **Built; not deployed** ← *résumé-ready line* |
 | 7 | Evaluation harness, MovieLens, baselines | 2 | **Harness built; one result** |
-| 8 | LightGBM → ONNX → JVM inference | 2 | |
+| 8 | LightGBM → ONNX → JVM inference | 2 | **Pipeline built and proven; model not served** |
 | 9 | Pilot Season, preference profile | 2 | |
 | 10 | Temporal workflows, outbox, Plot Armour detection | 2 | |
 | 11 | End Credits analytics, load testing, observability | 2 | |
@@ -36,20 +36,20 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-35 tables · 13 migrations · 98 Kotlin source files · **273 API tests** ·
+35 tables · 13 migrations · 104 Kotlin source files · **284 API tests** ·
 26 frontend tests · 21 API paths · 8 ADRs · 107 provider aliases · 17 seeded
-plan prices.
+plan prices · 1 trained model.
 
-Of the 273, **179 run on this machine and 94 skip** — 10 classes need Docker and
+Of the 284, **190 run on this machine and 94 skip** — 10 classes need Docker and
 2 need CP-SAT. That is a third of the suite unverified since CI stopped, and it
 is the third that covers the database. Measured from a local run, not from CI,
 for the reason in the next section.
 
 ---
 
-## CI was down for the whole of phases 5–7 (GitHub incident, 2026-08-06)
+## CI was down for the whole of phases 5–8 (GitHub incident, 2026-08-06)
 
-Phases 5, 6 and 7 are written, linted and green on everything that runs without
+Phases 5 to 8 are written, linted and green on everything that runs without
 Docker. **None of the last several commits has been executed by CI**, and the
 cause was a GitHub Actions **major outage** beginning 15:22 UTC — the same minute
 as this repository's last successful run.
@@ -82,7 +82,8 @@ the whole solver suite have never touched a real Postgres or a Linux JVM.
 Everything else — 179 tests, both linters, the Angular production build, the
 evaluation harness — is verified locally.
 
-Once Actions recovers, push and merge in order: phase 5, then 6, then 7. Note
+Once Actions recovers, push and merge in order: phase 5, then 6, then 7, then 8.
+Note
 that PR #7 targets `phase-5-cancel-culture` while the workflow only triggers on
 pull requests into `main`, so it gets no checks until GitHub retargets it when
 #6 merges.
@@ -585,11 +586,46 @@ Plotted, so there are no outcomes to evaluate against. The first thing needed is
 a timestamp on the `watchlist_items.status` transition to `completed`, which is a
 column and a write rather than a feature.
 
-## Phases 8–11 (Tier 2) — what turns "built" into "measured"
+## Phase 8 — Learned ranking (pipeline built and proven)
 
-- **8 — Learned ranking.** LightGBM bootstrapped from MovieLens 32M via TMDB
-  ids, exported to ONNX, served in-process. Guard training-serving skew with a
-  shared feature schema and a golden-vector equivalence test.
+**Built.** `FeatureSchema` — one ordered declaration of the feature vector, used
+by both training and serving; `OnnxScorer` — in-process inference that **refuses
+to load a model whose schema fingerprint does not match**; `exportTrainingData`
+and `ml/train_ranker.py`; a committed ONNX model, golden vectors, and a
+deliberately-wrong model that exists to be rejected. Full write-up in
+[MODEL.md](MODEL.md).
+
+**The design decision worth pointing at.** Feature extraction exists in exactly
+one place — the serving code — and the training script consumes what serving
+produced. The usual arrangement computes features in Python and reimplements them
+for inference, and that pair is where most training-serving skew comes from. Here
+there is nothing to drift.
+
+**The pipeline is falsifiable end to end without a single user.** The committed
+model is a *distillation* of the linear ranker, so a correct pipeline has a known
+right answer: the two must rank alike. Measured over 2,000 queries, they differ
+by **0.0000 NDCG@3 (95% CI −0.0002 to 0.0003)**. Break any link — features
+exported out of order, `NaN` read as zero, the wrong float width — and that moves.
+
+**Not served, deliberately.** `plotted.model.enabled` is `false`. A boosted tree
+does not produce feature contributions, and serving its ranking beside the linear
+model's explanations would mean the interface confidently explaining a decision
+it did not make. That is the invented-prose failure this project refuses
+everywhere else.
+
+**MovieLens is not used, and that is a decision rather than an omission.** It
+gives `(user, item, rating, timestamp)`; Plotted's vector is almost entirely
+session context — time available, what you pay for, how much you want it — for
+which MovieLens has no analogue. Bootstrapping from it would mean fabricating
+five of eight columns. It belongs in phase 9's taste model instead.
+
+**A tolerance bug found while writing the tests.** The batch-invariance check
+demanded agreement within `1e-9` on a `float32` output, where adjacent
+representable values near 0.9 are ~6e-8 apart. It was asserting something finer
+than the type can express and failed for a reason unrelated to batching. *A
+tolerance tighter than the data type is not a strict test, it is a broken one.*
+
+## Phases 9–11 (Tier 2) — what turns "built" into "measured"
 - **9 — Pilot Season.** Bradley–Terry over ~15 comparisons with population
   priors. Start with a fixed ladder of pairs; adaptive selection is a later
   refinement with no data to be adaptive about yet.
