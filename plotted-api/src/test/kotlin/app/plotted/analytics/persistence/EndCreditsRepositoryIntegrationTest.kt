@@ -210,9 +210,22 @@ class EndCreditsRepositoryIntegrationTest {
 
     // --- helpers -----------------------------------------------------------
 
-    private fun minutesAgo(minutes: Long): OffsetDateTime = OffsetDateTime.now().minusMinutes(minutes)
+    /**
+     * One instant per test, so two fixture timestamps are exactly as far apart as
+     * they claim.
+     *
+     * The first version read `OffsetDateTime.now()` separately in each helper and
+     * asserted a latency of exactly two minutes. It failed in CI by four
+     * milliseconds -- the time between the two calls -- which is the standing rule
+     * about wall-clock in tests, broken in the fixture rather than the assertion.
+     * JUnit builds a fresh instance per test, so this is per-test rather than
+     * shared.
+     */
+    private val now: OffsetDateTime = OffsetDateTime.now()
 
-    private fun daysAgo(days: Long): OffsetDateTime = OffsetDateTime.now().minusDays(days)
+    private fun minutesAgo(minutes: Long): OffsetDateTime = now.minusMinutes(minutes)
+
+    private fun daysAgo(days: Long): OffsetDateTime = now.minusDays(days)
 
     private fun givenServedRequest(userId: UUID, titleId: UUID, requestedAt: OffsetDateTime): UUID {
         val requestId = UUID.randomUUID()

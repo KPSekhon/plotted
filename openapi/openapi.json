@@ -94,6 +94,38 @@
         }
       }
     },
+    "/api/v1/tonight/{requestId}/accept" : {
+      "post" : {
+        "tags" : [ "tonight-controller" ],
+        "summary" : "Record that you are watching one of tonight's picks",
+        "description" : "Attaches the choice to the exact item that was offered, which is what makes it usable for evaluation: the position and the propensity travel with it. Accepting a title that was not among the picks, or someone else's recommendation, is a 404. Only the first acceptance counts — the second click is not a second decision.",
+        "operationId" : "accept",
+        "parameters" : [ {
+          "name" : "requestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AcceptPickRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
     "/api/v1/titles" : {
       "post" : {
         "tags" : [ "catalogue-controller" ],
@@ -901,6 +933,26 @@
         }
       }
     },
+    "/api/v1/analytics/end-credits" : {
+      "get" : {
+        "tags" : [ "end-credits-controller" ],
+        "summary" : "Whether Plotted actually helped",
+        "description" : "Decision latency and accepted-and-completed rate. Both are null until there is enough to compute them from, rather than defaulting to a flattering zero, and both report what was excluded alongside what was counted.",
+        "operationId" : "endCredits",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EndCreditsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts" : {
       "get" : {
         "tags" : [ "alert-controller" ],
@@ -1080,6 +1132,17 @@
           }
         },
         "description" : "A title the user has asked never to be recommended. Blocking suppresses Tonight Mode and the subscription optimiser; it does not hide the title from catalogue search."
+      },
+      "AcceptPickRequest" : {
+        "required" : [ "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "description" : "Which of tonight's picks you are actually watching."
       },
       "IngestTitleRequest" : {
         "required" : [ "mediaType", "tmdbId" ],
@@ -1905,9 +1968,14 @@
         }
       },
       "TonightResponse" : {
-        "required" : [ "candidateCount", "eligibleCount", "picks" ],
+        "required" : [ "candidateCount", "eligibleCount", "picks", "requestId" ],
         "type" : "object",
         "properties" : {
+          "requestId" : {
+            "type" : "string",
+            "description" : "The decision this answer came from. Pass it back when accepting a pick, so the acceptance attaches to the exact item that was offered rather than merely to a title.",
+            "format" : "uuid"
+          },
           "picks" : {
             "type" : "array",
             "items" : {
@@ -2421,6 +2489,80 @@
           }
         },
         "description" : "A fitted taste profile. Null until at least one question has been answered — a profile fitted from no answers is the population's rather than yours, and reporting it would present the prior back as a discovery."
+      },
+      "CompletionRateResponse" : {
+        "required" : [ "completed", "judged", "tooRecentToJudge" ],
+        "type" : "object",
+        "properties" : {
+          "rate" : {
+            "type" : "number",
+            "description" : "0 to 1, or null when nothing has had the chance to be finished yet.",
+            "format" : "double"
+          },
+          "completed" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "judged" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tooRecentToJudge" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "description" : "Of the picks you accepted, how many you finished. Acceptances newer than fourteen days are held back rather than counted as failures, which would make the rate climb on its own as the log aged."
+      },
+      "DecisionLatencyResponse" : {
+        "required" : [ "excludedAsStale", "sampleSize" ],
+        "type" : "object",
+        "properties" : {
+          "medianSeconds" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "fastestSeconds" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "slowestSeconds" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "sampleSize" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "excludedAsStale" : {
+            "type" : "integer",
+            "description" : "Acceptances more than four hours after the request. A later session, not a slow decision.",
+            "format" : "int32"
+          }
+        },
+        "description" : "How long between being shown picks and choosing one. The median, because wall-clock has an unbounded tail. Null until at least one acceptance qualifies — a latency computed from nothing is not zero."
+      },
+      "EndCreditsResponse" : {
+        "required" : [ "acceptedAndCompleted", "decisionLatency", "nothingFitCount", "recommendationsServed" ],
+        "type" : "object",
+        "properties" : {
+          "decisionLatency" : {
+            "$ref" : "#/components/schemas/DecisionLatencyResponse"
+          },
+          "acceptedAndCompleted" : {
+            "$ref" : "#/components/schemas/CompletionRateResponse"
+          },
+          "recommendationsServed" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "nothingFitCount" : {
+            "type" : "integer",
+            "description" : "Requests that returned nothing. Reported beside the rest: refusing is a feature.",
+            "format" : "int32"
+          }
+        },
+        "description" : "The two metrics that carry Plotted's argument: does it save time, and did you watch the thing. Everything else is decoration."
       },
       "AlertResponse" : {
         "required" : [ "alertType", "createdAt", "id", "message", "severity" ],

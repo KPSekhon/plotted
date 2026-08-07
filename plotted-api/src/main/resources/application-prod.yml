@@ -15,19 +15,30 @@ plotted:
 
 management:
   health:
-    # Redis is a declared dependency that **nothing in the codebase uses yet** --
-    # it is there for the phase 11 rate limiter. Left enabled, its health
-    # contributor reports DOWN whenever no Redis is reachable, which takes the
-    # whole readiness probe with it and stops the service from ever receiving
-    # traffic. Paying for a Redis instance to satisfy a check on a component with
-    # no callers is the wrong way round; turn this back on in the same change
-    # that gives Redis its first caller.
+    # Back on, in the change that gave Redis its first caller -- the phase 11 rate
+    # limiter. It was off because a health check on a component with no callers
+    # can only ever be noise, and a disabled check that outlives its reason is how
+    # a dependency stops being monitored.
     redis:
-      enabled: false
+      enabled: true
   endpoint:
     health:
       probes:
         enabled: true
+      group:
+        # Readiness is "can this instance serve traffic", and it can serve almost
+        # all of it without Redis: every read, every write, both headline
+        # features. What it loses is rate limiting, which fails open where that is
+        # safe and refuses the one endpoint where it is not.
+        #
+        # So Redis is monitored and deliberately *not* in this group. Including it
+        # would mean a Redis outage removing every instance from the load
+        # balancer -- turning a degraded limiter into a total outage, which is a
+        # worse failure than the one the check exists to warn about.
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState
 
 server:
   forward-headers-strategy: framework
