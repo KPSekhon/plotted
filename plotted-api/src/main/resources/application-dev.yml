@@ -5,6 +5,21 @@ plotted:
       # Plain HTTP on localhost, so the Secure attribute would stop the browser
       # storing the refresh cookie at all.
       refresh-cookie-secure: false
+  outbox:
+    relay:
+      # The scheduled poller is off here, and on by default everywhere else.
+      #
+      # It is a background thread querying the database every few seconds, and
+      # the integration tests are Testcontainers-backed: the poller outlives the
+      # container its Spring context was wired to and then spends the rest of the
+      # run failing to connect. That is noise at best, and at worst it is nine
+      # tests failing for a reason that has nothing to do with what they assert.
+      #
+      # Nothing is lost by turning it off. `OutboxRelayIntegrationTest` drives
+      # `claim` and the settle methods directly, and `OutboxRelayTest` drives
+      # `drain` -- so the scheduling annotation is the only part not exercised,
+      # and it is one line of configuration rather than logic.
+      enabled: false
 
 logging:
   level:
