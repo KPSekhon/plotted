@@ -57,6 +57,12 @@ class OutboxRelayRepository(
         // the same bug from the other end: the repository written the way the
         // fixture was. The typed DSL avoids it everywhere it can be used, and
         // this statement cannot use it because `SKIP LOCKED` has no DSL form here.
+        //
+        // Only the temporal binds actually needed it -- the other plain SQL in
+        // this codebase binds strings, UUIDs and ints, which jOOQ maps
+        // unambiguously and which have been running in CI since phase 2. The
+        // casts on `limit` are belt and braces; the ones on the timestamps are
+        // the fix.
         """
             UPDATE outbox
                SET next_attempt_at = ?::timestamptz
