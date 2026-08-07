@@ -83,11 +83,12 @@ class PlanSolverBoundTest {
     }
 
     @Test
-    fun `an infeasible request does not re-solve at all`() {
-        // Nothing affordable, so the plan solve fails and the sensitivity pass
-        // never runs. Worth pinning because the infeasible path is the one where
-        // an accidental probe loop would be least noticeable -- there is no plan
-        // to look wrong, only a slow answer.
+    fun `one constraint costs one probe`() {
+        // The middle of the range, and the case that caught an error in the first
+        // version of this file. A budget below the cheapest service looks
+        // infeasible and is not: the model simply holds nothing, which satisfies
+        // every constraint and covers no titles. So this is a *solved* request
+        // with one constraint set, and the sensitivity pass probes it once.
         val request = PlanRequest(
             services = listOf(service(crave, "Crave", 2_500, currentlySubscribed = false)),
             titles = listOf(demand("Only on Crave", 5, crave)),
@@ -97,11 +98,37 @@ class PlanSolverBoundTest {
 
         solver.solve(request)
 
+        solver.solvesInLastRequest() shouldBe 2
+    }
+
+    @Test
+    fun `a genuinely infeasible request does not re-solve at all`() {
+        // A commitment is a hard equality in the model, so a commitment costing
+        // more than the budget cannot be satisfied by holding nothing. This is
+        // the real infeasible path.
+        //
+        // Worth pinning because the diagnosis is pure logic -- `explainInfeasibility`
+        // reasons about the constraints rather than probing them -- and if it ever
+        // grew a solve of its own, the infeasible path would silently cost more
+        // than the feasible one. It is also where a stray probe would be least
+        // visible: no plan to look wrong, only a slower answer.
+        val request = PlanRequest(
+            services = listOf(committed(crave, "Crave", 2_500, months = 3)),
+            titles = listOf(demand("Only on Crave", 5, crave)),
+            constraints = PlanConstraints(horizonMonths = 3, maximumMonthlyCents = 1_000, null, null),
+            weights = PlanWeights.DEFAULT,
+        )
+
+        val outcome = solver.solve(request)
+
+        (outcome is PlanOutcome.Infeasible) shouldBe true
         solver.solvesInLastRequest() shouldBe 1
     }
 
     private fun service(id: UUID, name: String, cents: Long, currentlySubscribed: Boolean) =
         ServiceOption(id, name, cents, 0, currentlySubscribed)
+
+    private fun committed(id: UUID, name: String, cents: Long, months: Int) = ServiceOption(id, name, cents, months, true)
 
     private fun demand(name: String, points: Int, vararg on: UUID) = TitleDemand(UUID.randomUUID(), name, points, on.toSet())
 
