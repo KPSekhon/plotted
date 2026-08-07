@@ -40,6 +40,11 @@ import { AuthService } from '../../core/auth/auth.service';
         <p class="secondary muted">
           Paying for too much? <a routerLink="/plan">Work out what to cancel</a>.
         </p>
+
+        <p class="secondary muted">
+          New here? <a routerLink="/pilot">Answer fifteen quick questions</a> and Plotted will
+          tell you what it can — and cannot — work out about your taste.
+        </p>
       </section>
     }
   `,

@@ -222,10 +222,76 @@ class TitleSearchRepository(
         )
     }
 
+    /**
+     * Titles with their genres attached, most popular first.
+     *
+     * Pilot Season needs genres to place a title on its six axes, and nothing
+     * else in the application does -- so this is a separate query rather than a
+     * column added to [findSummaries], which every watchlist render would then
+     * pay a join for and never read.
+     *
+     * Genres are aggregated in SQL rather than by a second query keyed on the
+     * ids that came back. The alternative is the classic N+1 in its "only two
+     * queries, it is fine" costume: it is fine until the ladder's candidate pool
+     * grows, and then it is two hundred round trips to build fifteen questions.
+     *
+     * `FILTER (WHERE g.name IS NOT NULL)` is what keeps a title with no genres
+     * as an empty set rather than a set containing one null. Without it the
+     * `LEFT JOIN` puts a null in the array and `TasteAxes` counts it as a genre
+     * belonging to neither side -- which is the same answer by luck, and would
+     * stop being so the moment anyone counted the array's length.
+     */
+    fun findForTasteProfiling(limit: Int): List<ProfilableTitle> = dsl.fetch(
+        """
+            SELECT t.id,
+                   t.name,
+                   t.media_type,
+                   t.release_date,
+                   t.community_rating,
+                   t.poster_url,
+                   COALESCE(
+                       array_agg(g.name) FILTER (WHERE g.name IS NOT NULL),
+                       '{}'
+                   ) AS genre_names
+              FROM titles t
+              LEFT JOIN title_genres tg ON tg.title_id = t.id
+              LEFT JOIN genres g ON g.id = tg.genre_id
+             WHERE t.metadata_status = 'complete'
+             GROUP BY t.id, t.name, t.media_type, t.release_date, t.community_rating,
+                      t.poster_url, t.popularity_score
+             ORDER BY t.popularity_score DESC NULLS LAST, t.name ASC
+             LIMIT ?
+        """.trimIndent(),
+        limit.coerceIn(1, MAX_PROFILING_POOL),
+    ).map { record ->
+        ProfilableTitle(
+            titleId = record.get("id", UUID::class.java),
+            name = record.get("name", String::class.java),
+            mediaType = MediaType.fromDb(record.get("media_type", String::class.java)),
+            releaseDate = record.get("release_date", LocalDate::class.java),
+            communityRating = record.get("community_rating", BigDecimal::class.java),
+            posterUrl = record.get("poster_url", String::class.java),
+            genres = (record.get("genre_names") as? Array<*>)
+                ?.filterIsInstance<String>()
+                ?.toSet()
+                .orEmpty(),
+        )
+    }
+
     data class DueTitle(
         val titleId: UUID,
         val mediaType: MediaType,
         val externalId: String,
+    )
+
+    data class ProfilableTitle(
+        val titleId: UUID,
+        val name: String,
+        val mediaType: MediaType,
+        val releaseDate: LocalDate?,
+        val communityRating: BigDecimal?,
+        val posterUrl: String?,
+        val genres: Set<String>,
     )
 
     private companion object {
@@ -240,5 +306,13 @@ class TitleSearchRepository(
          * screens that read it page anyway.
          */
         const val MAX_SUMMARY_BATCH = 500
+
+        /**
+         * The ladder scores every remaining pair for every axis, which is
+         * quadratic in the pool. A few hundred candidates is ample to find
+         * fifteen contrasting pairs and keeps that arithmetic trivial; the pool
+         * is popularity-ordered, so a larger one adds titles nobody recognises.
+         */
+        const val MAX_PROFILING_POOL = 400
     }
 }

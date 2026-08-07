@@ -171,6 +171,47 @@
         }
       }
     },
+    "/api/v1/pilot/answers" : {
+      "post" : {
+        "tags" : [ "pilot-controller" ],
+        "summary" : "Answer a question, or skip it",
+        "description" : "Omit chosenTitleId to skip. A skipped pair is recorded so it is not asked again and is excluded from the fit: a forced choice between two unseen titles is a coin flip, and recording one as a preference is worse than a shorter questionnaire. Idempotent on the pair — answering the same comparison twice keeps the first answer, because the fit counts rows and a duplicate would weight one opinion twice. Returns the state that follows, so a client needs one request per answer rather than two.",
+        "operationId" : "answer",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PilotAnswerRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PilotStateResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "pilot-controller" ],
+        "summary" : "Discard every answer and start again",
+        "description" : "Deletes the comparisons rather than marking them superseded. Somebody who wants to redo the questionnaire is saying the old answers were wrong, and keeping them to fit against later would be disagreeing with them.",
+        "operationId" : "reset",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
     "/api/v1/demo/session" : {
       "post" : {
         "tags" : [ "demo-controller" ],
@@ -788,6 +829,46 @@
         }
       }
     },
+    "/api/v1/pilot" : {
+      "get" : {
+        "tags" : [ "pilot-controller" ],
+        "summary" : "The next question, and how far through the user is",
+        "description" : "The ladder is deterministic given the catalogue, so abandoning the flow and returning continues it rather than restarting on different questions.",
+        "operationId" : "next",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PilotStateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pilot/profile" : {
+      "get" : {
+        "tags" : [ "pilot-controller" ],
+        "summary" : "The fitted taste profile",
+        "description" : "204 when nothing has been answered yet. A profile fitted from no answers is the population's rather than yours, and returning it would report the prior as a finding.",
+        "operationId" : "profile",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PreferenceProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/watchlist/blocked/{titleId}" : {
       "delete" : {
         "tags" : [ "watchlist-controller" ],
@@ -1134,6 +1215,103 @@
             "type" : "string"
           }
         }
+      },
+      "PilotAnswerRequest" : {
+        "required" : [ "leftTitleId", "rightTitleId" ],
+        "type" : "object",
+        "properties" : {
+          "leftTitleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "rightTitleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "chosenTitleId" : {
+            "type" : "string",
+            "description" : "The title picked. Null or absent means skip.",
+            "format" : "uuid"
+          }
+        },
+        "description" : "An answer. Omit `chosenTitleId` to skip: a forced choice between two titles somebody has not seen is a coin flip, and it is recorded as declined rather than as a preference."
+      },
+      "PilotOptionResponse" : {
+        "required" : [ "mediaType", "name", "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "mediaType" : {
+            "type" : "string"
+          },
+          "releaseYear" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "posterUrl" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PilotQuestionResponse" : {
+        "required" : [ "axis", "axisLabel", "left", "position", "right" ],
+        "type" : "object",
+        "properties" : {
+          "left" : {
+            "$ref" : "#/components/schemas/PilotOptionResponse"
+          },
+          "right" : {
+            "$ref" : "#/components/schemas/PilotOptionResponse"
+          },
+          "axis" : {
+            "type" : "string",
+            "description" : "The axis this pair was chosen to isolate. Shown for transparency, not required to answer."
+          },
+          "axisLabel" : {
+            "type" : "string"
+          },
+          "position" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PilotStateResponse" : {
+        "required" : [ "answered", "complete", "exhausted", "skipped", "total" ],
+        "type" : "object",
+        "properties" : {
+          "question" : {
+            "$ref" : "#/components/schemas/PilotQuestionResponse"
+          },
+          "answered" : {
+            "type" : "integer",
+            "description" : "Answers that count as evidence. Skipped questions are not among them.",
+            "format" : "int32"
+          },
+          "skipped" : {
+            "type" : "integer",
+            "description" : "Questions declined. Recorded so they are not asked again, and excluded from the fit.",
+            "format" : "int32"
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "complete" : {
+            "type" : "boolean"
+          },
+          "exhausted" : {
+            "type" : "boolean",
+            "description" : "True when the ladder ran out of usable pairs before reaching `total`. The catalogue is too small or too uniform, which is a different problem from a finished questionnaire."
+          }
+        },
+        "description" : "Where the signed-in user is in the questionnaire. `question` is null when there is nothing left to ask, and `exhausted` says which kind of nothing: a finished questionnaire, or a catalogue too thin to supply another contrasting pair."
       },
       "DemoSessionResponse" : {
         "required" : [ "accessToken", "catalogueIsEmpty", "displayName", "expiresAt", "subscriptions", "tokenType", "userId", "watchlistSize" ],
@@ -2118,6 +2296,69 @@
             }
           }
         }
+      },
+      "AxisOpinionResponse" : {
+        "required" : [ "axis", "label", "negative", "positive", "sentence", "standardError", "stated", "verdict", "weight" ],
+        "type" : "object",
+        "properties" : {
+          "axis" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "positive" : {
+            "type" : "string"
+          },
+          "negative" : {
+            "type" : "string"
+          },
+          "weight" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "standardError" : {
+            "type" : "number",
+            "description" : "Posterior standard deviation. What separates a finding from an unasked question.",
+            "format" : "double"
+          },
+          "verdict" : {
+            "type" : "string",
+            "enum" : [ "LIKES", "DISLIKES", "NO_PREFERENCE", "NOT_ASKED" ]
+          },
+          "stated" : {
+            "type" : "boolean"
+          },
+          "sentence" : {
+            "type" : "string"
+          }
+        },
+        "description" : "One axis. NO_PREFERENCE and NOT_ASKED are both ways of saying we do not know, and they are not interchangeable: the first means we asked and you were balanced, the second that the ladder never contrasted this axis, so the weight is the population's rather than yours."
+      },
+      "PreferenceProfileResponse" : {
+        "required" : [ "axes", "converged", "informative", "observations" ],
+        "type" : "object",
+        "properties" : {
+          "observations" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "converged" : {
+            "type" : "boolean"
+          },
+          "informative" : {
+            "type" : "boolean",
+            "description" : "Whether the profile has anything it can defend saying. When false, ranking ignores it."
+          },
+          "axes" : {
+            "type" : "array",
+            "description" : "Every axis, including the ones with no verdict. What was not found is part of the answer.",
+            "items" : {
+              "$ref" : "#/components/schemas/AxisOpinionResponse"
+            }
+          }
+        },
+        "description" : "A fitted taste profile. Null until at least one question has been answered — a profile fitted from no answers is the population's rather than yours, and reporting it would present the prior back as a discovery."
       }
     },
     "securitySchemes" : {

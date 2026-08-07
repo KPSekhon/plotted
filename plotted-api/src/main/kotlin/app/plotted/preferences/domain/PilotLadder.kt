@@ -71,21 +71,31 @@ object PilotLadder {
         // every axis instead of knowing everything about levity and nothing else.
         var axisIndex = 0
         while (ladder.size < questions) {
+            // Checked at the top, before anything can `continue` past it. A
+            // catalogue that cannot fill the ladder stops it here; stopping short
+            // is the honest outcome, and the alternative is padding the ladder
+            // with pairs that teach nothing.
+            //
+            // This guard used to sit at the *bottom* of the loop, which meant the
+            // one path that needed it never reached it: when no pair could be
+            // found the `?:` below jumped straight back to the `while`, so a
+            // catalogue too small to supply `questions` pairs span forever rather
+            // than returning a short ladder. It could not happen with an empty
+            // ladder, which is the case the identical-titles reasoning covers, so
+            // the bug lived exactly where a small *non-uniform* catalogue lives —
+            // which is every catalogue this has ever run against except the
+            // seeded one.
+            if (axisIndex >= TasteAxis.size * questions) break
+
             val axis = TasteAxis.ordered[axisIndex % TasteAxis.size]
             axisIndex++
 
-            val best = bestPairFor(axis, choices, appearances, used)
-                ?: if (axisIndex % TasteAxis.size == 0 && ladder.isEmpty()) break else continue
+            val best = bestPairFor(axis, choices, appearances, used) ?: continue
 
             ladder += best
             used += setOf(best.left.titleId, best.right.titleId)
             appearances.merge(best.left.titleId, 1, Int::plus)
             appearances.merge(best.right.titleId, 1, Int::plus)
-
-            // Every axis exhausted in a full cycle means the catalogue cannot
-            // support more questions. Stopping short is the honest outcome; the
-            // alternative is padding the ladder with pairs that teach nothing.
-            if (axisIndex > TasteAxis.size * questions) break
         }
         return ladder
     }

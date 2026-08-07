@@ -5,7 +5,9 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 /**
  * What the profile is allowed to say.
@@ -208,6 +210,28 @@ class PilotLadderTest {
         // Every pair has zero contrast on every axis. Asking anyway would record
         // coin flips as preferences.
         PilotLadder.build(identical, questions = 10) shouldBe emptyList()
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    fun `a catalogue that cannot fill the ladder returns a short one rather than spinning`() {
+        // Four titles that genuinely contrast, and far more questions than the
+        // pairs between them can supply once the appearance cap applies.
+        //
+        // This is the gap the test above left. Identical titles produce an *empty*
+        // ladder, and the exhaustion path for an empty ladder happened to be the
+        // one that terminated -- so "too small to ask a question" was covered and
+        // "too small to ask fifteen" was not. The guard sat below a `continue`
+        // that skipped it, and with a non-empty ladder and no pair left to find,
+        // `build` never returned. Every catalogue smaller than the seeded one is
+        // in that range, which includes every catalogue a first deployment has
+        // before `make seed` runs.
+        //
+        // The timeout is the assertion. This failure does not throw.
+        val ladder = PilotLadder.build(catalogue().take(4), questions = 15)
+
+        (ladder.size < 15) shouldBe true
+        ladder.forEach { pair -> (pair.left.titleId != pair.right.titleId) shouldBe true }
     }
 
     private fun catalogue(): List<PilotLadder.Choice> = listOf(
