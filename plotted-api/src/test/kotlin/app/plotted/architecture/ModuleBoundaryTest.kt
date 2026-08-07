@@ -72,6 +72,7 @@ class ModuleBoundaryTest {
                     "app.plotted.viewing..",
                     "app.plotted.recommendation..",
                     "app.plotted.optimisation..",
+                    "app.plotted.preferences..",
                     "app.plotted.subscriptions..",
                     "app.plotted.households..",
                     "app.plotted.notifications..",

@@ -60,7 +60,7 @@ object FeatureSchema {
      * effect: a model trained on a different vector is not a model for this
      * vector, however well it scores.
      */
-    const val VERSION = "v1"
+    const val VERSION = "v2"
 
     /**
      * The feature vector, in order. **Order is the contract.**
@@ -110,6 +110,14 @@ object FeatureSchema {
         },
         ModelFeature("is_series") { candidate, _, _, _ ->
             if (candidate.mediaType == "series") 1.0 else 0.0
+        },
+        ModelFeature("taste_match") { candidate, _, _, _ ->
+            // Phase 9. Null for anyone who has not answered the questionnaire —
+            // which is most people — and also for anyone whose answers did not
+            // support a claim. A tree model handles that as missing and learns
+            // its own split, which is exactly the case this vector's NaN
+            // convention exists for.
+            candidate.tasteMatch
         },
     )
 

@@ -106,6 +106,16 @@ class MetadataCensoringSimulation(
         desiredByDate = today.plusDays(random.nextLong(1, 40)),
         communityRating = random.nextDouble(4.0, 9.5),
         offers = listOf(Candidate.Offer(provider, "Simulated service", isFree = false)),
+        // Present for some candidates, absent for others, exactly as it will be
+        // in life: most people have not answered the questionnaire.
+        //
+        // It is deliberately **unrelated to the target**, because the target is
+        // the linear ranker's score and the linear ranker does not read taste.
+        // So the correct thing for the learned model to do with this column is
+        // ignore it, and `DistillationFidelityTest` still holding is the check
+        // that it did. A column that were always absent instead would leave the
+        // feature untested rather than tested and found uninformative.
+        tasteMatch = if (random.nextDouble() < TASTE_PRESENT_RATE) random.nextDouble(0.0, 1.0) else null,
     )
 
     /**
@@ -132,5 +142,15 @@ class MetadataCensoringSimulation(
 
         /** Queries are spread over a period so the temporal split has something to split. */
         const val SPREAD_DAYS = 120L
+
+        /**
+         * How often a simulated candidate carries a taste score.
+         *
+         * Under a half, because a profile requires answering fifteen questions
+         * and most people will not. The exact rate does not matter for the
+         * distillation — nothing depends on this column — but a rate of 0 or 1
+         * would make it constant, and a constant column is not exercised.
+         */
+        const val TASTE_PRESENT_RATE = 0.4
     }
 }
