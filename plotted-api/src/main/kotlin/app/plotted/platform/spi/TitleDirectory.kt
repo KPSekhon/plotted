@@ -31,6 +31,19 @@ interface TitleDirectory {
      */
     fun findSummaries(titleIds: Collection<UUID>): List<TitleSummary>
 
+    /**
+     * Titles with enough detail to place them on a taste axis, most popular first.
+     *
+     * Genres come with it, which nothing else here needs -- Pilot Season derives
+     * its axes from them, and fetching them per title would turn building one
+     * fifteen-question ladder into a query per candidate.
+     *
+     * Ordered by popularity because the ladder should ask about films someone has
+     * plausibly heard of. A question about two titles the user does not recognise
+     * gets skipped or, worse, guessed.
+     */
+    fun findForTasteProfiling(limit: Int): List<TitleProfile>
+
     data class TitleRef(
         val titleId: UUID,
         /** `movie` or `series`, as stored. A String so no enum crosses the boundary. */
@@ -59,5 +72,29 @@ interface TitleDirectory {
          * every obscure title down every list.
          */
         val communityRating: Double?,
+    )
+
+    /**
+     * A title as a taste-profiling candidate.
+     *
+     * Separate from [TitleSummary] rather than an extension of it because it
+     * carries genres and drops runtime -- the two are wanted by different callers
+     * for different reasons, and one struct answering both would make every
+     * watchlist render pay for a genre join it never reads.
+     */
+    data class TitleProfile(
+        val titleId: UUID,
+        val name: String,
+        /** `movie` or `series`, as stored. A String so no enum crosses the boundary. */
+        val mediaType: String,
+        val releaseYear: Int?,
+        val communityRating: Double?,
+        val posterUrl: String?,
+        /**
+         * Genre names as TMDB gives them. Empty when the title has none recorded,
+         * which contributes nothing to the genre-derived axes rather than being
+         * guessed -- the same rule the rankers follow for a missing feature.
+         */
+        val genres: Set<String>,
     )
 }

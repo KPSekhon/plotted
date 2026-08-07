@@ -41,4 +41,16 @@ class CatalogueTitleDirectory(
                 communityRating = title.communityRating?.toDouble(),
             )
         }
+
+    override fun findForTasteProfiling(limit: Int): List<TitleDirectory.TitleProfile> = titles.findForTasteProfiling(limit).map { title ->
+        TitleDirectory.TitleProfile(
+            titleId = title.titleId,
+            name = title.name,
+            mediaType = title.mediaType.dbValue,
+            releaseYear = title.releaseDate?.year,
+            communityRating = title.communityRating?.toDouble(),
+            posterUrl = title.posterUrl,
+            genres = title.genres,
+        )
+    }
 }

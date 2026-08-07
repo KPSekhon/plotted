@@ -180,12 +180,45 @@ without a measurement.
 
 ---
 
-## What is not built
+## The flow
 
-- **No persistence, API or screen.** The maths, the ladder and the profile are
-  complete and tested; storing answers and asking the questions in a browser are
-  not. That is the honest split: the part that is hard to get right is done, and
-  the part that is mostly plumbing is not.
+`pilot_comparisons` stores one row per question shown, answered or skipped.
+`GET /api/v1/pilot` returns the next question, `POST /api/v1/pilot/answers`
+records one and returns the state that follows, `GET /api/v1/pilot/profile`
+returns the fit (204 until something has been answered), and
+`DELETE /api/v1/pilot/answers` starts over.
+
+**Skipping is a first-class answer.** A skipped row is stored, so the ladder does
+not offer the pair again, and it carries no choice and no attribute difference,
+so it cannot reach the fitter. Three things enforce that rather than one: the
+repository filters on `chosen_title_id IS NOT NULL`, and the schema refuses both
+a choice with no difference and a difference with no choice.
+
+**The attribute difference is frozen at answer time**, stored as JSONB rather
+than recomputed. RECENCY is measured against the current year, so re-deriving an
+old answer would restate a 2026 comparison in the language of 2029 — and a title
+later removed from the catalogue would otherwise take its evidence with it.
+
+**A duplicate answer is refused, not counted.** The unique index normalises the
+pair with `LEAST`/`GREATEST`, so answering (A, B) settles (B, A) too. The fit
+counts rows, so a double-tap would weight one opinion twice and report a tighter
+interval than the evidence supports.
+
+### The ladder could hang
+
+Found while wiring this up. `PilotLadder.build` put its exhaustion guard at the
+bottom of the loop, below a `continue` that skipped it — so when no pair could be
+found and the ladder was already non-empty, it span forever instead of returning
+short. The guard now runs at the top.
+
+The existing test covered a catalogue of *identical* titles, which produces an
+empty ladder, and the empty case happened to be the one path that terminated. So
+"too uniform to ask a question" was tested and "too small to ask fifteen" was
+not, which is every catalogue smaller than the seeded one. The new test carries a
+`@Timeout`, because this failure does not throw. It was run against the original
+code and fails there.
+
+## What is not built
 - **`taste_match` carries no learned signal.** It is plumbed into the schema and
   the simulation varies it, but the training target — the linear ranker's score —
   does not depend on taste, so the model correctly learns to ignore it. Confirmed

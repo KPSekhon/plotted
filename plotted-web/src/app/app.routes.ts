@@ -48,6 +48,12 @@ export const routes: Routes = [
     title: 'Your list · Plotted',
   },
   {
+    path: 'pilot',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/pilot/pilot.page').then((m) => m.PilotPage),
+    title: 'Pilot Season · Plotted',
+  },
+  {
     path: 'coverage',
     canActivate: [authGuard],
     loadComponent: () => import('./features/coverage/coverage.page').then((m) => m.CoveragePage),
