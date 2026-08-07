@@ -46,6 +46,54 @@
         }
       }
     },
+    "/api/v1/watchlist/blocked" : {
+      "get" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "Titles the signed-in user has asked never to be recommended",
+        "description" : "Most recently blocked first. This list is what makes blocking reversible: a preference you can set and never see again is a one-way door.",
+        "operationId" : "listBlocked",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BlockedTitlesResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "Block a title from recommendations",
+        "description" : "Suppresses the title in Tonight Mode and in the subscription optimiser. It does NOT hide the title from catalogue search, and it does not remove it from the watchlist -- a blocked watchlist entry is returned marked rather than deleted, so unblocking restores the priority and notes intact. Idempotent: blocking twice returns the original block, reason and timestamp included.",
+        "operationId" : "block",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BlockTitleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BlockedTitleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/titles" : {
       "post" : {
         "tags" : [ "catalogue-controller" ],
@@ -739,6 +787,28 @@
           }
         }
       }
+    },
+    "/api/v1/watchlist/blocked/{titleId}" : {
+      "delete" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "Stop blocking a title",
+        "description" : "404 when the title was not blocked, so a client can tell an undo from a no-op.",
+        "operationId" : "unblock",
+        "parameters" : [ {
+          "name" : "titleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -770,7 +840,7 @@
         }
       },
       "WatchlistItemResponse" : {
-        "required" : [ "addedAt", "id", "priority", "status", "titleId" ],
+        "required" : [ "addedAt", "blocked", "id", "priority", "status", "titleId" ],
         "type" : "object",
         "properties" : {
           "id" : {
@@ -805,6 +875,10 @@
           "notes" : {
             "type" : "string"
           },
+          "blocked" : {
+            "type" : "boolean",
+            "description" : "True when this title is also blocked. It keeps its place on the list rather than being deleted, but neither recommender will offer it while the block stands."
+          },
           "title" : {
             "$ref" : "#/components/schemas/WatchlistTitleResponse"
           }
@@ -835,6 +909,44 @@
           }
         },
         "description" : "Null when the title has been removed from the catalogue since it was added."
+      },
+      "BlockTitleRequest" : {
+        "required" : [ "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "reason" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Optional free-text note. Stored, shown back, never interpreted."
+          }
+        }
+      },
+      "BlockedTitleResponse" : {
+        "required" : [ "blockedAt", "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "reason" : {
+            "type" : "string",
+            "description" : "Why they blocked it, if they said. Free text, never interpreted."
+          },
+          "blockedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "title" : {
+            "$ref" : "#/components/schemas/WatchlistTitleResponse"
+          }
+        },
+        "description" : "A title the user has asked never to be recommended. Blocking suppresses Tonight Mode and the subscription optimiser; it does not hide the title from catalogue search."
       },
       "IngestTitleRequest" : {
         "required" : [ "mediaType", "tmdbId" ],
@@ -1437,6 +1549,18 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/CoveredTitleResponse"
+            }
+          }
+        }
+      },
+      "BlockedTitlesResponse" : {
+        "required" : [ "blocked" ],
+        "type" : "object",
+        "properties" : {
+          "blocked" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlockedTitleResponse"
             }
           }
         }
