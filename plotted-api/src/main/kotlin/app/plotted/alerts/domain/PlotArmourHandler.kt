@@ -78,6 +78,13 @@ class PlotArmourHandler(
         var sent = 0
 
         watchers.forEach { watcher ->
+            // One subscription lookup per watcher, which is a query per person on
+            // a popular title. Left as it is because it runs on the relay thread
+            // rather than in a request, and because the alternative is a batched
+            // SPI method designed against no measurement -- nothing has produced a
+            // real event yet, so the shape of the load is a guess. The place to
+            // fix it is a `currentSubscriptions(userIds)` on SubscriptionDirectory
+            // once there is a number to point at.
             val held = subscriptions.currentSubscriptions(watcher.userId, LocalDate.now(clock))
             val leaving = held.firstOrNull { it.providerId == leavingProviderId }
 
