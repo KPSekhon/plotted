@@ -343,6 +343,21 @@ schema in the published contract, and an evaluation report that claimed in its
 own comments to be seeded and reproducible while its intervals moved between
 runs. None of them threw. All of them passed their tests.
 
+A seventh joined them in phase 9: `PilotLadder.build` put its exhaustion guard
+below a `continue` that skipped it, so a catalogue too small to fill the ladder
+looped forever. It needed a *non-empty* ladder to trigger, and the test that
+existed used identical titles — which produces an empty ladder, and the empty
+path was the one that terminated. The case that was covered and the case that
+was broken sat next to each other.
+
+And one guard turned out not to be able to fire at all. `ModuleBoundaryTest`
+cannot see a cross-module `const val`: Kotlin inlines it, so the bytecode ArchUnit
+reads holds the string with no reference to the class it came from. Plot Armour
+read an event type straight across a feature boundary and
+`featureModulesAreIndependent` passed. **Be suspicious of a rule that has never
+failed, including the ones written to catch a real defect earlier** — this one
+did catch a real collision in phase 5, and is still blind to this shape.
+
 Two more nearly shipped, from the other direction:
 
 - The Redis health contributor was live for a dependency **nothing in the

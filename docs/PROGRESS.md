@@ -311,6 +311,15 @@ rule that exists to forbid cross-module coupling. Moved to
 `platform.outbox.OutboxEventTypes`; where these live is discipline rather than
 enforcement.
 
+**The phase 3 bind bug, from the other end.** The claim failed in CI with
+`operator does not exist: timestamp with time zone <= character varying`. Phase 3
+recorded exactly this, in a *test fixture*, under the heading "write fixtures the
+same way the repository writes" — in plain SQL jOOQ has no target column to infer
+a bind type from, so an `OffsetDateTime` crosses as `varchar`. This was the
+repository written the way that fixture was. Every bind in the statement is cast
+explicitly now. The lesson generalises further than it was written: the typed DSL
+is the protection, and *any* plain SQL gives it up, whichever side it is on.
+
 **Not built: Temporal.** There is no dependency and nowhere to run a worker. The
 relay is a Spring `@Scheduled` poller and says so. Writing workflow code that
 cannot be executed or tested here would be the pattern this project keeps
