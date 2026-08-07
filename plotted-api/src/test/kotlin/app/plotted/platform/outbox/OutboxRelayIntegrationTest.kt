@@ -90,6 +90,12 @@ class OutboxRelayIntegrationTest {
         val second = givenEvent("test.order")
         val third = givenEvent("test.order")
 
+        // This failed on its first run, returning the batch reversed, and it was
+        // right to. `RETURNING` has no ordering guarantee: the `ORDER BY id`
+        // inside the claim decides which rows are taken, not what order they come
+        // back in. The repository sorts afterwards, and this is the assertion
+        // that says so -- without it the relay would deliver a transaction's
+        // events out of order, occasionally, depending on how Postgres felt.
         relay.claim(10, Duration.ofMinutes(2)).map { it.id } shouldBe listOf(first, second, third)
     }
 

@@ -311,6 +311,14 @@ rule that exists to forbid cross-module coupling. Moved to
 `platform.outbox.OutboxEventTypes`; where these live is discipline rather than
 enforcement.
 
+**`RETURNING` has no ordering guarantee**, and a comment here claimed it did.
+The `ORDER BY id` inside the claim decides *which* rows are taken — oldest first,
+so nothing starves — and says nothing about the order they come back. Postgres
+returned a batch reversed and the ordering test caught it. The repository sorts
+after claiming. Without that, the relay would occasionally deliver one
+transaction's events out of order, depending on how the update happened to walk
+the rows.
+
 **The phase 3 bind bug, from the other end.** The claim failed in CI with
 `operator does not exist: timestamp with time zone <= character varying`. Phase 3
 recorded exactly this, in a *test fixture*, under the heading "write fixtures the

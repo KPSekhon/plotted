@@ -43,10 +43,16 @@ class OutboxRelayRepository(
      * loses nothing: the lease expires and the event is claimed again, which is
      * the at-least-once behaviour handlers are already required to tolerate.
      *
-     * Ordered by id, so events queued by one transaction are delivered in the
-     * order it wrote them. Across concurrent relays that ordering is per-batch
-     * rather than global, which is the honest limit of a poller and why handlers
-     * may not assume a total order.
+     * The `ORDER BY id` in the subquery decides *which* rows are taken -- oldest
+     * first, so nothing starves -- and says nothing about the order they come
+     * back. `RETURNING` has no ordering guarantee at all, and Postgres returned
+     * this batch reversed, which a test caught and an earlier version of this
+     * comment cheerfully claimed otherwise about. The sort below is what actually
+     * delivers events in the order they were written.
+     *
+     * Across concurrent relays that ordering is per-batch rather than global,
+     * which is the honest limit of a poller and why handlers may not assume a
+     * total order.
      */
     fun claim(limit: Int, lease: Duration): List<OutboxRecord> = dsl.fetch(
         // Every bind is cast explicitly. In plain SQL jOOQ has no target column to
@@ -93,7 +99,7 @@ class OutboxRelayRepository(
             createdAt = record.get("created_at", OffsetDateTime::class.java).toInstant(),
             attempts = record.get("attempts", Int::class.java),
         )
-    }
+    }.sortedBy { it.id }
 
     /** Marks an event delivered. `published_at` is the only thing that stops it being claimed again. */
     fun markPublished(id: Long) {
