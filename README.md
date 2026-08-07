@@ -16,36 +16,63 @@ every design decision here protects it.
 
 ---
 
-## Status: phase 1 complete, phase 2 in progress
+## Status: phases 1–7 built, not yet deployed
 
-This repository is being built in phases against a written specification. Phase 1
-is the foundation: schema, authentication, module boundaries, local stack, CI.
+This repository is built in phases against a written specification. Both headline
+features are complete, tested and — where it was possible without users — measured.
 
 | | Phase | State |
 |---|---|---|
 | 1 | Skeleton — Compose, Flyway, jOOQ, Spring Security, Angular shell, CI | **Done** |
-| 2 | Catalogue — TMDB ingestion, search, availability snapshots | **In progress** |
-| 3 | Watchlists, subscriptions, coverage dashboard | |
-| 4 | **Queue Theory** — filters, scoring, diversification, explanations | |
-| 5 | **Cancel Culture** — CP-SAT optimiser, plan types, sensitivity | |
-| 6 | Polish, demo mode, deployment | |
-| 7–11 | Evaluation harness, learned ranking, Pilot Season, Temporal, analytics | |
+| 2 | Catalogue — TMDB ingestion, search, availability snapshots | **Done** (119-title seed, not the 500 the spec asks for) |
+| 3 | Watchlists, subscriptions, coverage dashboard | **Done** |
+| 4 | **Queue Theory** — filters, scoring, diversification, explanations | **Done** |
+| 5 | **Cancel Culture** — CP-SAT optimiser, plan types, sensitivity | **Done** |
+| 6 | Polish, demo mode, deployment | **Built, not deployed** |
+| 7 | Evaluation harness, baselines, ablations | **Harness built; one defensible result** |
+| 8–12 | Learned ranking, Pilot Season, Temporal, analytics | |
 
-There is no Tonight Mode screen yet, and the application does not pretend to have
-one.
+### The two things worth looking at
 
-### What actually works today
+**[Cancel Culture](docs/ARCHITECTURE.md#cancel-culture--which-subscriptions-to-keep)** —
+a CP-SAT model over which services to hold each month, with start and stop as
+separate variables because starting costs money you were not spending and
+stopping costs access you had. Every number it shows is recomputed by
+`PlanChecker`, an independent reimplementation of the rules written *before* the
+solver so its logic could not be shaped by the model it audits.
+`PlanSolverAgreementTest` enumerates every possible plan for small instances,
+scores them with the checker alone, and asserts CP-SAT found the best of them —
+because a solver will optimally solve a model you specified wrong, and the result
+looks exactly like a correct answer.
 
-- Account creation, sign-in, sign-out, and session restore across a page reload
-- Rotating refresh tokens with **reuse detection** — replaying a spent token
-  revokes the whole token family
-- Recommendation and budget defaults, readable and editable end to end
-- 27-table PostgreSQL schema with the temporal-integrity constraints in place
-- Module boundaries enforced by ArchUnit, failing the build on a violation
-- RFC 9457 Problem Details on every error path
-- One-command local stack
+**[Queue Theory](docs/ARCHITECTURE.md#queue-theory--what-to-watch-tonight)** —
+one pick and two backups, each with the ranker's real feature contributions
+rather than generated prose. When nothing fits it returns a *diagnosis* naming
+the constraint that did the damage instead of quietly relaxing one.
 
-### Phase 2 so far
+Both are more interesting when they refuse. That is what the
+[demo script](docs/DEMO.md) leads with.
+
+### What has been measured
+
+Renormalising scores over the features a candidate actually has is worth
+**0.0170 NDCG@3 (95% CI 0.0145–0.0194)** under a 30% metadata-censoring
+simulation. [EVALUATION.md](docs/EVALUATION.md) reports that, and is equally
+explicit that it is the *only* non-circular number on the page — there are no
+users yet, so the simulation's ground truth is the model's own score. It also
+reports where the model loses: sorting by watchlist priority alone beats it on
+precision@3.
+
+### What is not true yet
+
+- **Never deployed.** No container image has been built, and no migration has run
+  against a managed Postgres. [DEPLOYMENT.md](docs/DEPLOYMENT.md) is the plan and
+  lists what has never been executed.
+- **The catalogue is a 119-title hand-checked seed.** Every answer is real; the
+  range it chooses from is narrow.
+- **No demo video yet.** [DEMO.md](docs/DEMO.md) is the shot list.
+
+### How the catalogue works
 
 Search TMDB, ingest a title, see where it streams in Canada, and keep
 re-checking nightly — backend and screens both.
@@ -212,14 +239,18 @@ make test
 
 | Layer | Tool | What it covers |
 |---|---|---|
-| Architecture | ArchUnit | Module boundaries, layering, SQL containment |
-| Unit | Kotest, MockK | Token issue and verification, rotation and reuse detection |
-| Integration | Testcontainers | The real schema: case-insensitive email, defaults, fenced DDL |
+| Architecture | ArchUnit | Module boundaries, layering, SQL containment, and that no two API classes share a schema name |
+| Unit | Kotest, MockK | Ranking, scoring, the plan checker, demo persona construction |
+| Integration | Testcontainers | The real schema: exclusion constraints, partial indexes, cascade behaviour, fenced DDL |
+| Optimiser | CP-SAT + exhaustive search | Every possible plan enumerated and scored by an independent checker, then compared to the solver's |
 | Contract | OpenAPI drift check | The committed specification matches the running API |
-| Frontend | Karma, Jasmine | Session state, error rendering |
+| Evaluation | Seeded simulation | The report reproduces byte-for-byte, and the ablation isolates one variable |
+| Frontend | Karma, Jasmine | Session state, the demo flow, error rendering |
 
-Container-backed tests are skipped where Docker is unavailable and always run in
-CI, so they cannot be quietly lost.
+Container-backed tests skip where Docker is unavailable and CP-SAT tests skip on
+Windows, where the JNI binding crashes the JVM. Both always run in CI, so they
+cannot be quietly lost — `DockerSupport` and `SolverSupport` gate them explicitly
+rather than letting them disappear.
 
 ---
 
@@ -243,6 +274,22 @@ This product is not endorsed or certified by TMDB or JustWatch.
 
 ## Documentation
 
+Start with `ARCHITECTURE.md` if you want the shape of it, `EVALUATION.md` if you
+want to know what is actually measured, and `PROGRESS.md` if you want the honest
+state of every phase including the bugs.
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the module graph, both
+  headline pipelines, and a table of what *enforces* each correctness property
+  rather than what documents it
+- [`docs/EVALUATION.md`](docs/EVALUATION.md) — metrics, baselines, the one
+  defensible result, and an explicit list of what the numbers do not say
+- [`docs/PROGRESS.md`](docs/PROGRESS.md) — where every phase actually stands,
+  and the six bugs that reported success while doing nothing
+- [`docs/NEXT.md`](docs/NEXT.md) — the forward plan and how to spend the API
+  budgets
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — how to deploy it, and what has
+  never been executed
+- [`docs/DEMO.md`](docs/DEMO.md) — the 90-second shot list
 - [`docs/adr/`](docs/adr/) — architecture decision records, including what was
   deliberately *not* built
 - [`docs/data-sources.md`](docs/data-sources.md) — sources, terms, attribution

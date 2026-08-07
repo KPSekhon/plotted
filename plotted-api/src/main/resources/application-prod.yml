@@ -13,6 +13,22 @@ plotted:
     jwt:
       refresh-cookie-secure: true
 
+management:
+  health:
+    # Redis is a declared dependency that **nothing in the codebase uses yet** --
+    # it is there for the phase 11 rate limiter. Left enabled, its health
+    # contributor reports DOWN whenever no Redis is reachable, which takes the
+    # whole readiness probe with it and stops the service from ever receiving
+    # traffic. Paying for a Redis instance to satisfy a check on a component with
+    # no callers is the wrong way round; turn this back on in the same change
+    # that gives Redis its first caller.
+    redis:
+      enabled: false
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 server:
   forward-headers-strategy: framework
 

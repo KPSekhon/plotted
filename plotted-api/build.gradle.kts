@@ -164,6 +164,16 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName = "plotted-api.jar"
 }
 
+// Phase 7: regenerate the numbers in docs/EVALUATION.md. No Spring context and
+// no database -- a report that needs an environment is a report nobody
+// regenerates, and one nobody regenerates stops being true silently.
+tasks.register<JavaExec>("evaluate") {
+    group = "verification"
+    description = "Run the ranking evaluation and print it as markdown"
+    mainClass = "app.plotted.recommendation.evaluation.EvaluationReport"
+    classpath = sourceSets.main.get().runtimeClasspath
+}
+
 // Appendix A, item 1: confirm TMDB returns useful Canadian availability before
 // building anything on top of it. No Spring context and no database, so it runs
 // on a clean checkout with nothing but a token.

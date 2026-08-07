@@ -123,6 +123,27 @@
         }
       }
     },
+    "/api/v1/demo/session" : {
+      "post" : {
+        "tags" : [ "demo-controller" ],
+        "summary" : "Start a demo session without signing up",
+        "description" : "Creates a throwaway account with a watchlist and subscriptions built from the seeded catalogue, and returns a normal session for it. The account expires and is swept. Returns 404 when demo mode is not enabled on this deployment, and 429 when the demo is at its account ceiling — this endpoint writes and is unauthenticated, so it refuses rather than degrading.",
+        "operationId" : "start",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DemoSessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
     "/api/v1/auth/register" : {
       "post" : {
         "tags" : [ "auth-controller" ],
@@ -996,6 +1017,47 @@
             "type" : "string"
           }
         }
+      },
+      "DemoSessionResponse" : {
+        "required" : [ "accessToken", "catalogueIsEmpty", "displayName", "expiresAt", "subscriptions", "tokenType", "userId", "watchlistSize" ],
+        "type" : "object",
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "tokenType" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "watchlistSize" : {
+            "type" : "integer",
+            "description" : "How many titles the demo persona's list was built with.",
+            "format" : "int32"
+          },
+          "subscriptions" : {
+            "type" : "array",
+            "description" : "Services the persona pays for, chosen from what actually covers their list.",
+            "items" : {
+              "type" : "string",
+              "description" : "Services the persona pays for, chosen from what actually covers their list."
+            }
+          },
+          "catalogueIsEmpty" : {
+            "type" : "boolean",
+            "description" : "True when the catalogue has not been seeded, so the demo has no titles to work with. Reported rather than hidden: two empty screens caused by a missing catalogue look exactly like two broken features, and the difference matters to whoever is looking."
+          }
+        },
+        "description" : "A demo session. Shaped like the normal session response so the client's sign-in path does not need a second branch, with the demo-specific facts alongside it."
       },
       "RegisterRequest" : {
         "required" : [ "displayName", "email", "password" ],
