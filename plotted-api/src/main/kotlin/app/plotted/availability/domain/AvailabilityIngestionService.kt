@@ -1,12 +1,15 @@
 package app.plotted.availability.domain
 
 import app.plotted.availability.integration.tmdb.TmdbOfferMapper
+import app.plotted.availability.persistence.AvailabilityChangeRepository
 import app.plotted.availability.persistence.AvailabilityRepository
 import app.plotted.platform.events.TitleIngested
 import app.plotted.platform.integration.tmdb.TmdbClient
 import app.plotted.platform.integration.tmdb.TmdbException
 import app.plotted.platform.integration.tmdb.TmdbMediaType
 import app.plotted.platform.integration.tmdb.TmdbProperties
+import app.plotted.platform.outbox.OutboxEventTypes
+import app.plotted.platform.persistence.OutboxRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -37,6 +40,8 @@ class AvailabilityIngestionService(
     private val offerMapper: TmdbOfferMapper,
     private val resolver: ProviderResolver,
     private val availability: AvailabilityRepository,
+    private val changes: AvailabilityChangeRepository,
+    private val outbox: OutboxRepository,
     private val properties: TmdbProperties,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -103,6 +108,8 @@ class AvailabilityIngestionService(
         diff.removed.forEach { availability.close(it.id) }
         availability.markVerified(diff.unchanged.map { it.id })
 
+        recordChanges(titleId, region, diff, resolution.hasGaps)
+
         val hash = hashOf(resolution.offers)
         availability.recordSnapshot(
             titleId = titleId,
@@ -122,6 +129,67 @@ class AvailabilityIngestionService(
         }
 
         return RefreshOutcome.Refreshed(titleId, diff, resolution.unmapped.size, hash)
+    }
+
+    /**
+     * Writes the diff to the change log, and queues a removal for Plot Armour.
+     *
+     * Both happen inside `refresh`'s transaction, alongside the window open and
+     * close they describe. That is the whole reason the outbox exists: a change
+     * recorded but never announced, or announced but never recorded, are both
+     * possible the moment the two writes are in different transactions.
+     *
+     * Only removals produce an event. A title *arriving* on a service is good
+     * news nobody is waiting on, and it is already visible on the title page —
+     * an alert for it would be the kind of notification that trains people to
+     * turn alerts off, which is the thing Plot Armour has to avoid to be worth
+     * having at all.
+     */
+    private fun recordChanges(titleId: UUID, region: String, diff: AvailabilityDiff, hasGaps: Boolean) {
+        val confidence = if (hasGaps) REDUCED_CONFIDENCE.toDouble() else FULL_CONFIDENCE.toDouble()
+
+        diff.added.forEach { offer ->
+            changes.record(
+                titleId = titleId,
+                providerId = offer.provider.id,
+                regionCode = region,
+                changeType = ChangeType.ADDED,
+                oldAccessType = null,
+                newAccessType = offer.accessType.dbValue,
+                confidence = confidence,
+            )
+        }
+
+        diff.removed.forEach { stored ->
+            changes.record(
+                titleId = titleId,
+                providerId = stored.providerId,
+                regionCode = region,
+                changeType = ChangeType.REMOVED,
+                oldAccessType = stored.accessType.dbValue,
+                newAccessType = null,
+                confidence = confidence,
+            )
+
+            outbox.append(
+                OutboxRepository.OutboxEvent(
+                    aggregateType = "title",
+                    aggregateId = titleId,
+                    eventType = OutboxEventTypes.AVAILABILITY_REMOVED,
+                    payload = mapOf(
+                        "titleId" to titleId.toString(),
+                        "providerId" to stored.providerId.toString(),
+                        "regionCode" to region,
+                        "accessType" to stored.accessType.dbValue,
+                        // Carried on the event rather than looked up later. By the
+                        // time a handler runs, another pass may have changed what
+                        // the tables say, and the handler needs to act on what was
+                        // actually observed.
+                        "confidence" to confidence,
+                    ),
+                ),
+            )
+        }
     }
 
     /**

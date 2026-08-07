@@ -5,6 +5,7 @@ import app.plotted.generated.jooq.tables.references.WATCHLISTS
 import app.plotted.generated.jooq.tables.references.WATCHLIST_ITEMS
 import app.plotted.watchlist.domain.BlockedTitle
 import app.plotted.watchlist.domain.Priority
+import app.plotted.watchlist.domain.TitleWatcher
 import app.plotted.watchlist.domain.WatchStatus
 import app.plotted.watchlist.domain.Watchlist
 import app.plotted.watchlist.domain.WatchlistItem
@@ -302,6 +303,41 @@ class WatchlistRepository(
         return blockedTitles(userId).first { it.titleId == titleId }
     }
 
+    /**
+     * Users still waiting on a title, highest priority first.
+     *
+     * The reverse of [findItems], for Plot Armour: a title is leaving a service
+     * and the question is who to tell. Blocked titles are excluded in the query
+     * with a `NOT EXISTS`, so the one suppression that needs no judgement cannot
+     * be forgotten by a caller.
+     *
+     * Only personal watchlists. A household list has a null `user_id`, and there
+     * is nobody on it to notify until households ship.
+     */
+    fun watchersOf(titleId: UUID): List<TitleWatcher> = dsl.select(
+        WATCHLISTS.USER_ID,
+        WATCHLIST_ITEMS.PRIORITY,
+    )
+        .from(WATCHLIST_ITEMS)
+        .join(WATCHLISTS).on(WATCHLISTS.ID.eq(WATCHLIST_ITEMS.WATCHLIST_ID))
+        .where(WATCHLIST_ITEMS.TITLE_ID.eq(titleId))
+        .and(WATCHLISTS.USER_ID.isNotNull)
+        .and(WATCHLIST_ITEMS.STATUS.`in`(OUTSTANDING_STATUSES))
+        .andNotExists(
+            dsl.selectOne()
+                .from(BLOCKED_TITLES)
+                .where(BLOCKED_TITLES.USER_ID.eq(WATCHLISTS.USER_ID))
+                .and(BLOCKED_TITLES.TITLE_ID.eq(titleId)),
+        )
+        .orderBy(WATCHLIST_ITEMS.PRIORITY.asc())
+        .fetch()
+        .map {
+            TitleWatcher(
+                userId = it[WATCHLISTS.USER_ID]!!,
+                priority = Priority(it[WATCHLIST_ITEMS.PRIORITY]!!.toInt()),
+            )
+        }
+
     fun unblock(userId: UUID, titleId: UUID): Boolean = dsl.deleteFrom(BLOCKED_TITLES)
         .where(BLOCKED_TITLES.USER_ID.eq(userId))
         .and(BLOCKED_TITLES.TITLE_ID.eq(titleId))
@@ -325,5 +361,13 @@ class WatchlistRepository(
 
     private companion object {
         const val DEFAULT_NAME = "My list"
+
+        /**
+         * Derived from the enum rather than written out, so a new status cannot
+         * be added to one and forgotten in the other. `WatchStatus.isOutstanding`
+         * stays the single definition of who is still waiting on a title.
+         */
+        val OUTSTANDING_STATUSES: List<String> =
+            WatchStatus.entries.filter { it.isOutstanding }.map { it.dbValue }
     }
 }

@@ -77,6 +77,7 @@ class ModuleBoundaryTest {
                     "app.plotted.households..",
                     "app.plotted.notifications..",
                     "app.plotted.analytics..",
+                    "app.plotted.alerts..",
                 ),
             )
 

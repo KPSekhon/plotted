@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../core/auth/auth.service';
+import { AlertListComponent } from '../alerts/alert-list.component';
 
 /**
  * The signed-in landing page.
@@ -15,10 +16,16 @@ import { AuthService } from '../../core/auth/auth.service';
 @Component({
   selector: 'plotted-home',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, AlertListComponent],
   template: `
     @if (auth.user(); as user) {
       <section class="hero">
+        <!-- Renders nothing when there is nothing to say, which is the common
+             case by design. A permanent "no alerts" panel would put the feature
+             on screen every day for exactly the outcome it works hardest to
+             produce. -->
+        <plotted-alert-list />
+
         <p class="eyebrow">{{ greeting() }}, {{ user.displayName }}</p>
         <h1>What are you watching tonight?</h1>
         <p class="lede muted">

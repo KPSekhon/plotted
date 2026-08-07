@@ -162,18 +162,16 @@ Nothing missing. The one thing to keep intact: coverage is **priority-weighted,
 not counted**, and unchecked titles are **excluded from the denominator**, not
 scored as uncovered. `CoverageServiceTest` pins both.
 
-### Phase 4 — Queue Theory (done, with one half-wired feature)
+### Phase 4 — Queue Theory (done)
 
-**Correction to an earlier note here:** `blocked_titles` *does* have a reader.
-`WatchlistRepository.blockedTitleIds` is read through the SPI by both
-`TonightService` (as a hard filter) and `CancelCultureService`. What it does not
-have is a **writer** — no endpoint, no insert anywhere — so the filter is live
-and the table can never be populated. An hour of work, described in
-`PROGRESS.md`.
+`blocked_titles` now has its writer, so the filter both recommenders have been
+running since phase 4 finally has something to filter on.
 
-The part worth getting right: blocking must not hide a title from catalogue
-search, because that reads as a missing catalogue entry rather than a preference
-being honoured. `CatalogueQueryService` carries the note.
+The part that was worth getting right, and still is: blocking does not hide a
+title from catalogue search. `TitleSearchRepository.search` takes no user id and
+cannot filter, a test asserts it, and the reason is that a blocked title missing
+from search reads as a missing catalogue entry rather than a preference being
+honoured — and leaves no way to change your mind.
 
 ### Phase 5 — Cancel Culture (done)
 
@@ -278,23 +276,21 @@ timestamp)`; five of the eight features here are session context it has no
 analogue for. Using it would mean fabricating them. Its real home is phase 9's
 taste model.
 
-### Phase 9 — Pilot Season (maths built; screen not)
+### Phase 9 — Pilot Season (done)
 
-The fitter, the ladder and the profile are done and tested — see
-[PILOT.md](PILOT.md). What is left is plumbing, and one thing that is not:
+The fitter, the ladder and the profile were done in phase 9 — see
+[PILOT.md](PILOT.md). The persistence, the four endpoints and the screen are now
+done too, skip included: a skipped pair is recorded so it is not re-asked and
+carries no choice and no difference, so it cannot reach the fitter.
 
-1. **Persistence, API and screen.** A `pilot_comparisons` table, an endpoint that
-   serves the next question and records an answer, and fifteen taps on a phone.
-   Straightforward; nothing about it is subtle.
-2. **Allow "skip".** A forced choice between two titles somebody has not seen
-   produces a coin flip recorded as evidence. The ladder already tolerates a
-   short questionnaire, so a skipped pair should simply not become a comparison.
-3. **Make the population prior real.** It is currently zero-mean, which for a
-   population nobody has measured is the same thing — but it is a placeholder,
-   not a finding. Once profiles exist, the prior mean should be their average,
-   and that single change is what turns "assume you are indifferent" into
-   "assume you are typical".
-4. **Then measure whether taste helps.** `taste_match` is plumbed into the
+Two things are left, and both need users rather than code:
+
+1. **Make the population prior real.** Zero-mean today, which for a population
+   nobody has measured is the same number and a different claim. Once profiles
+   exist the mean should be their average, and that single change is what turns
+   "assume you are indifferent" into "assume you are typical". An average over
+   nobody is still zero, so there is nothing to do until then.
+2. **Then measure whether taste helps.** `taste_match` is plumbed into the
    feature schema and carries no learned signal, because the training target is
    the linear ranker's score and that does not read taste. The harness in
    `recommendation.evaluation` is where that question gets answered, and it needs
@@ -305,7 +301,36 @@ of the population, and there is no population; it would be adapting to the prior
 which is a fixed ladder reached by a more complicated route and much harder to
 test.
 
-### Phases 10–11
+### Phase 10 — the relay and Plot Armour (built; no Temporal)
+
+Built and merged: the outbox relay, the `availability_changes` writer, Plot
+Armour's suppression rules, the alerts API and a list on the home page. See
+`PROGRESS.md` for the two mistakes worth not repeating — the lease-versus-lock
+claim, and `@Transactional` on a self-call.
+
+Left open:
+
+1. **Temporal.** No dependency, and nowhere to run a worker. The relay is a
+   Spring `@Scheduled` poller, which is honest about what it is. Worth adding
+   once there is a server to point it at, and not before — workflow code that
+   cannot be executed is the failure mode this project keeps finding.
+2. **A real removal.** Nothing has ever produced an `availability.removed` event,
+   because that needs the nightly refresh, which needs
+   `PLOTTED_SNAPSHOT_ENABLED` and a deployment. Every path is tested with
+   synthetic events.
+3. **A batched subscription lookup**, if the load ever warrants it. Plot Armour
+   does one `currentSubscriptions` call per watcher. The fix is a
+   `currentSubscriptions(userIds)` on `SubscriptionDirectory`, and it should wait
+   for a number rather than a guess.
+
+### Phase 11 — End Credits
+
+Not started, and blocked on nothing. Two metrics carry the thesis: decision
+latency and accepted-and-completed rate. The load-testing target is the
+optimiser's four-solves-at-a-five-second-cap worst case — a 20-second bound.
+Re-enable the Redis health contributor in the same change that gives Redis its
+first caller, which is this phase's rate limiter.
+
 ---
 
 ## The standing lesson
@@ -317,6 +342,21 @@ propensity of zero, two DTOs whose shared simple name silently collapsed to one
 schema in the published contract, and an evaluation report that claimed in its
 own comments to be seeded and reproducible while its intervals moved between
 runs. None of them threw. All of them passed their tests.
+
+A seventh joined them in phase 9: `PilotLadder.build` put its exhaustion guard
+below a `continue` that skipped it, so a catalogue too small to fill the ladder
+looped forever. It needed a *non-empty* ladder to trigger, and the test that
+existed used identical titles — which produces an empty ladder, and the empty
+path was the one that terminated. The case that was covered and the case that
+was broken sat next to each other.
+
+And one guard turned out not to be able to fire at all. `ModuleBoundaryTest`
+cannot see a cross-module `const val`: Kotlin inlines it, so the bytecode ArchUnit
+reads holds the string with no reference to the class it came from. Plot Armour
+read an event type straight across a feature boundary and
+`featureModulesAreIndependent` passed. **Be suspicious of a rule that has never
+failed, including the ones written to catch a real defect earlier** — this one
+did catch a real collision in phase 5, and is still blind to this shape.
 
 Two more nearly shipped, from the other direction:
 
