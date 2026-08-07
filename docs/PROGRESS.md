@@ -4,7 +4,7 @@ Where Plotted actually is, what each remaining phase involves, and what is still
 open. Written to be read by someone picking the project up cold — including a
 future me.
 
-Last updated: 2026-08-06.
+Last updated: 2026-08-07.
 
 **The forward plan lives in [NEXT.md](NEXT.md)** — how to spend the Watchmode
 and MDBList budgets, the verified Canadian source IDs, the 500-title seed
@@ -21,11 +21,11 @@ the world; that one is what to do about it.
 | 2 | Catalogue — TMDB ingestion, availability, search, screens | 1 | **Verified in CI; seeding still owed** |
 | 3 | Watchlists, subscriptions, coverage dashboard | 1 | **Done** |
 | 4 | **Queue Theory** — tonight's recommendation | 1 | **Done** |
-| 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | **Done** |
-| 6 | Polish, demo mode, deployment | 1 | **Built; not deployed** ← *résumé-ready line* |
-| 7 | Evaluation harness, MovieLens, baselines | 2 | **Harness built; one result** |
-| 8 | LightGBM → ONNX → JVM inference | 2 | **Pipeline built and proven; model not served** |
-| 9 | Pilot Season, preference profile | 2 | **Maths built; no API or screen** |
+| 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | **Done, merged** |
+| 6 | Polish, demo mode, deployment | 1 | **Merged; not deployed** ← *résumé-ready line* |
+| 7 | Evaluation harness, MovieLens, baselines | 2 | **Merged; one defensible result** |
+| 8 | LightGBM → ONNX → JVM inference | 2 | **Merged; pipeline proven, model not served** |
+| 9 | Pilot Season, preference profile | 2 | **Merged; maths only, no screen** |
 | 10 | Temporal workflows, outbox, Plot Armour detection | 2 | |
 | 11 | End Credits analytics, load testing, observability | 2 | |
 | 12 | Stretch: removal-risk model, Group Plot, Side Quest | 3 | |
@@ -36,57 +36,77 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-35 tables · 13 migrations · 107 Kotlin source files · **313 API tests** ·
-26 frontend tests · 21 API paths · 8 ADRs · 107 provider aliases · 17 seeded
-plan prices · 1 trained model.
+35 tables · 13 migrations · 107 Kotlin source files · **313 API tests, all
+green in CI** · 26 frontend tests · 21 API paths · 8 ADRs · 107 provider
+aliases · 17 seeded plan prices · 1 trained model.
 
-Of those, **219 run on this machine and 94 skip** — 10 classes need Docker and
-2 need CP-SAT. That is a third of the suite unverified since CI stopped, and it
-is the third that covers the database. Measured from a local run, not from CI,
-for the reason in the next section.
+**219 of the 313 run on a developer machine; 94 need CI** — 10 classes need
+Docker and 2 need CP-SAT. That third is the one covering the database and the
+optimiser, which is exactly why it is worth knowing which number you are
+quoting. These are CI's, from run 31145985713.
 
 ---
 
-## CI was down for the whole of phases 5–9 (GitHub incident, 2026-08-06)
+## The GitHub Actions outage of 2026-08-06, and what it cost
 
-Phases 5 to 9 are written, linted and green on everything that runs without
-Docker. **None of the last several commits has been executed by CI**, and the
-cause was a GitHub Actions **major outage** beginning 15:22 UTC — the same minute
-as this repository's last successful run.
+Phases 5 to 9 were written while GitHub Actions was in a **major outage**, and
+merged afterwards. All five are now on `main` and **every one of them was
+verified by CI before merging** — 313 tests, nothing skipped, nothing failing,
+including the ~94 that only ever run there.
 
-Symptoms here, in order, all explained by the incident:
+Kept because the failure mode is worth recognising again, and because the first
+diagnosis was wrong.
 
-1. A run whose three remaining jobs failed with *"not acquired by Runner of type
+**What it looked like.** Three symptoms over about nine hours:
+
+1. A run whose remaining jobs failed with *"not acquired by Runner of type
    hosted"*.
 2. No workflow runs created at all for six consecutive pushes, despite the pushes
    landing and the pull request's head advancing.
 3. A manually triggered re-run accepted, then sitting `queued` indefinitely.
 
-GitHub's status page during the incident: *"Webhook triggers are currently
-throttled to help with recovery and we are processing approximately 15% of
-webhooks"*, and *"runners are stuck retrying jobs that are no longer
-available"*. That is exactly (1), (2) and (3).
+GitHub's status page said it plainly: *"Webhook triggers are currently throttled
+to help with recovery and we are processing approximately 15% of webhooks"*, and
+*"runners are stuck retrying jobs that are no longer available"*. That is exactly
+(1), (2) and (3).
 
-**Recorded because the first diagnosis was wrong.** The pattern was read as an
-exhausted Actions allowance on a private repository — which fits the symptoms
-just as well and is the more common cause. Everything checkable with this token
-was checked (Actions enabled, all actions permitted, workflow `active`) and the
-conclusion was then asserted with a hedge rather than confirmed. The billing
-endpoint needs an OAuth scope this token does not have. **The status page needed
-no scope at all and answered it in one request: check the platform before blaming
-the account.**
+**The wrong diagnosis.** The pattern was first read as an exhausted Actions
+allowance on a private repository — which fits the symptoms just as well and is
+the more common cause. Everything checkable with the available token *was*
+checked: Actions enabled, all actions permitted, workflow `active`. That felt
+like diligence and was still the wrong shape of investigation, because the one
+source that could settle it in a single unauthenticated request — the status
+page — was never consulted. **Check whether the platform is up before reasoning
+about your account.**
 
-**So nothing is merged.** What that costs, specifically: the 94 Docker-gated and
-CP-SAT tests only ever run in CI, so `V13`, every query in `DemoRepository` and
-the whole solver suite have never touched a real Postgres or a Linux JVM.
-Everything else — 179 tests, both linters, the Angular production build, the
-evaluation harness — is verified locally.
+**Two things that outlived the outage.**
 
-Once Actions recovers, push and merge in order: phase 5, then 6, then 7, then 8,
-then 9. Note
-that PR #7 targets `phase-5-cancel-culture` while the workflow only triggers on
-pull requests into `main`, so it gets no checks until GitHub retargets it when
-#6 merges.
+*A lost webhook never replays.* Once Actions recovered, the pull requests still
+had no checks: the events for their heads had been dropped, and retargeting a
+base does not create one either. Closing and reopening each PR fired a fresh
+`reopened` event, which is cleaner than an empty commit.
+
+*A conflicted PR runs nothing, silently.* After squash-merging phase 5, the
+stacked branches went `CONFLICTING` — and GitHub cannot build a merge commit for
+a dirty PR, so `pull_request` workflows never fire at all. "No checks reported"
+looked like the outage lingering and was actually a conflict. Rebasing each
+branch onto the new `main` fixed it. **`gh pr view --json mergeStateStatus` is
+the first thing to check when a PR has no checks.**
+
+**What the delay actually bought.** Three real bugs were found by reading the
+code during the wait rather than by CI:
+
+- `DemoRepositoryIntegrationTest` built availability rows with the typed jOOQ
+  API, but `title_availability.validity` is `DATERANGE NOT NULL` with no default
+  and is fenced out of the generator's view. Every insert would have failed a
+  not-null violation — on Postgres only, which is to say only in CI. Fixed by
+  going through `AvailabilityRepository.open`, which is the phase 3 lesson from a
+  new direction: *write fixtures the same way the repository writes*.
+- A plan-lookup assertion read `== cheap || != dear`, which is true for any value
+  including null and so had no way to fail.
+- The committed OpenAPI document was missing the demo endpoint. That one CI did
+  catch, on the first green-able run.
+
 
 ## Read this before doing anything else
 

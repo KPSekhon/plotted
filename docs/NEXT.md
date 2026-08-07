@@ -308,18 +308,17 @@ nothing: reuse detection whose revocation was rolled back, a drift check that
 could never fail, a build step that had never run, an exploration slot logging a
 propensity of zero, two DTOs whose shared simple name silently collapsed to one
 schema in the published contract, and an evaluation report that claimed in its
-own comments to be seeded and reproducible while its confidence intervals moved
-between runs. None of them threw. All of them passed their tests.
+own comments to be seeded and reproducible while its intervals moved between
+runs. None of them threw. All of them passed their tests.
 
-A seventh nearly shipped and is the same shape from the other direction: the
-Redis health contributor was live for a dependency **nothing in the codebase
-uses**, so the first deployment would have failed its readiness probe on a
-component with no callers — a check reporting failure while doing nothing.
+Two more nearly shipped, from the other direction:
 
-The last one is the sharpest example yet, because a check *was* watching and
-still could not see it: the OpenAPI drift check compares the document to the
-committed copy, and the wrong document was internally consistent and matched
-itself perfectly. A check only catches what it compares against.
+- The Redis health contributor was live for a dependency **nothing in the
+  codebase uses**, so the first deployment would have failed its readiness probe
+  on a component with no callers.
+- A demo test fixture built rows with the typed jOOQ API while the schema
+  requires a column jOOQ has been told to ignore. Every insert would have failed
+  a not-null violation on Postgres — and only on Postgres.
 
 **Be suspicious of any check that has never had the chance to fail**, and prefer
 a second implementation that disagrees over a test that agrees. When you add a
@@ -328,21 +327,17 @@ guard, make it fail once on the real defect before you trust it —
 version of it also flagged 24 Kotlin companion objects, which is exactly the
 kind of thing you only find by looking.
 
-### And one that was not a code bug at all
+### And two that were not code at all
 
-When CI stopped running during phases 5–7, the symptoms were diagnosed as an
-exhausted Actions allowance on a private repository and written up that way. They
-were a GitHub platform outage — webhook delivery throttled to 15%, runners stuck
-retrying dead jobs.
+During the Actions outage, the symptoms were diagnosed as an exhausted allowance
+and written up that way. They were a platform incident. Everything checkable with
+the available token *was* checked first, which felt like diligence and was still
+the wrong shape of investigation: the status page needed no auth and would have
+answered it in one request. **Check whether the platform is up before reasoning
+about your account.**
 
-Everything checkable with the available token *was* checked first: Actions
-enabled, all actions permitted, workflow `active`. That felt like diligence and
-was still the wrong shape of investigation, because the one source that could
-have settled it in a single unauthenticated request — the status page — was never
-consulted. The hedge ("not confirmed, the billing endpoint needs a scope this
-token lacks") made the write-up honest without making it right.
-
-**When your own tooling misbehaves, check whether the platform is up before
-reasoning about your account.** The same instinct that says "be suspicious of a
-check that has never failed" should also say "be suspicious of a diagnosis whose
-only evidence is that it fits".
+And afterwards, three pull requests sat with **no checks at all** — not because
+CI was still broken, but because squash-merging their base had left them
+`CONFLICTING`, and GitHub will not build a merge commit for a dirty PR, so
+`pull_request` workflows never fire. Silence from CI is not the same as a passing
+CI. `gh pr view --json mergeStateStatus` is the first thing to look at.
