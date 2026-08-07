@@ -325,13 +325,23 @@ Left open:
    `currentSubscriptions(userIds)` on `SubscriptionDirectory`, and it should wait
    for a number rather than a guess.
 
-### Phase 11 — End Credits
+### Phase 11 — End Credits (built; the metrics need users)
 
-Not started, and blocked on nothing. Two metrics carry the thesis: decision
-latency and accepted-and-completed rate. The load-testing target is the
-optimiser's four-solves-at-a-five-second-cap worst case — a 20-second bound.
-Re-enable the Redis health contributor in the same change that gives Redis its
-first caller, which is this phase's rate limiter.
+Built and merged: the acceptance signal, both metrics, the Redis rate limiter
+with the health contributor restored, and the latency bound pinned as a solve
+count. See `PROGRESS.md` for why each metric refuses to flatter.
+
+Left open:
+
+1. **Both metrics return null**, which is correct on an empty log and not very
+   interesting. They need users and, for the completion rate, fourteen days.
+2. **A throughput benchmark**, against the deployment. The structural bound is
+   asserted; requests per second is not, and measuring it here would measure the
+   absence of a database.
+3. **A site-wide view.** End Credits is per-user because that needs no
+   authorisation concept. The same two queries without the user filter are the
+   product-level numbers, and that is worth having once there is more than one
+   person's data to pool — along with the roles to protect it.
 
 ---
 
