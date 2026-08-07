@@ -6,8 +6,11 @@ import com.google.ortools.sat.CpSolver
 import com.google.ortools.sat.CpSolverStatus
 import com.google.ortools.sat.LinearExpr
 import com.google.ortools.sat.Literal
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.springframework.stereotype.Component
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import kotlin.math.roundToLong
 
 /**
@@ -42,10 +45,32 @@ import kotlin.math.roundToLong
  * so this scale only affects which plan wins, never what the user is told it costs.
  */
 @Component
-class PlanSolver {
+class PlanSolver(
+    /**
+     * Optional so tests can build a solver without a registry, and so a missing
+     * metrics backend can never be the reason the optimiser fails to start.
+     */
+    private val meters: MeterRegistry = SimpleMeterRegistry(),
+) {
+    /**
+     * Solves in the request that is running now.
+     *
+     * The 20-second bound this whole endpoint is reasoned about comes from a
+     * count, not a measurement: one solve for the plan plus at most one per
+     * binding constraint, of which there are three, each capped at
+     * [SOLVE_TIME_LIMIT_SECONDS]. Counting it here makes that claim observable in
+     * production rather than only argued for in a comment -- and
+     * `PlanSolverBoundTest` asserts the count cannot exceed four.
+     */
+    private val solveCount = ThreadLocal.withInitial { 0 }
+
+    /** How many CP-SAT solves the last [solve] on this thread required. */
+    fun solvesInLastRequest(): Int = solveCount.get()
+
     fun solve(request: PlanRequest): PlanOutcome {
         Loader.loadNativeLibraries()
         val startedAt = System.nanoTime()
+        solveCount.set(0)
 
         val model = CpModel()
         val months = (0 until request.constraints.horizonMonths).toList()
@@ -65,7 +90,7 @@ class PlanSolver {
         // Bounded so a pathological instance degrades into "no answer yet"
         // rather than a hung request. Section 13.1 puts a latency budget on this.
         solver.parameters.setMaxTimeInSeconds(SOLVE_TIME_LIMIT_SECONDS)
-        val status = solver.solve(model)
+        val status = timed("plan") { solver.solve(model) }
         val elapsed = (System.nanoTime() - startedAt) / 1_000_000
 
         if (status != CpSolverStatus.OPTIMAL && status != CpSolverStatus.FEASIBLE) {
@@ -341,9 +366,28 @@ class PlanSolver {
 
         val solver = CpSolver()
         solver.parameters.setMaxTimeInSeconds(SOLVE_TIME_LIMIT_SECONDS)
-        val status = solver.solve(model)
+        val status = timed("sensitivity") { solver.solve(model) }
         if (status != CpSolverStatus.OPTIMAL && status != CpSolverStatus.FEASIBLE) return null
         return readPlan(solver, request, months, x, u, d)
+    }
+
+    /**
+     * Times one solve, counts it, and returns what it returned.
+     *
+     * Every call to CP-SAT goes through here, which is what makes the count
+     * trustworthy: a fourth solve added somewhere would show up in the metric and
+     * fail `PlanSolverBoundTest` rather than quietly moving the latency bound
+     * from twenty seconds to twenty-five.
+     */
+    private fun <T> timed(kind: String, solve: () -> T): T {
+        solveCount.set(solveCount.get() + 1)
+        val startedAt = System.nanoTime()
+        try {
+            return solve()
+        } finally {
+            meters.timer("plotted.optimiser.solve", "kind", kind)
+                .record(System.nanoTime() - startedAt, TimeUnit.NANOSECONDS)
+        }
     }
 
     /**
