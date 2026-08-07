@@ -48,6 +48,24 @@ data class WatchlistItem(
 )
 
 /**
+ * A title the user has asked never to be recommended.
+ *
+ * Keyed by user rather than by watchlist: this is a statement about taste, not
+ * about one list, and it has to survive them starting a new one.
+ *
+ * It is deliberately *not* a catalogue filter. Someone searching for something
+ * they blocked should still find it — hiding it there reads as a missing
+ * catalogue entry rather than as a preference being honoured, and it would also
+ * leave no way to change their mind. Blocking suppresses recommendations, which
+ * is what `TonightService` and `CancelCultureService` read it for.
+ */
+data class BlockedTitle(
+    val titleId: UUID,
+    val reason: String?,
+    val createdAt: Instant,
+)
+
+/**
  * User-assigned importance, 1 to 5.
  *
  * **1 is the highest.** The direction is stated in the column comment, in the

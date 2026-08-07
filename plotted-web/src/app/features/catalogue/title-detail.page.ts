@@ -104,10 +104,33 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
                 Add to your list
               </button>
             }
+            @if (blocked()) {
+              <button mat-stroked-button (click)="unblock(loaded.id)" [disabled]="blocking()">
+                <mat-icon>block</mat-icon>
+                Blocked &middot; undo
+              </button>
+            } @else {
+              <button mat-stroked-button (click)="block(loaded.id)" [disabled]="blocking()">
+                <mat-icon>block</mat-icon>
+                Not interested
+              </button>
+            }
+
             @if (listError(); as message) {
               <span class="list-error" role="alert">{{ message }}</span>
             }
           </div>
+
+          @if (blocked()) {
+            <!-- Says what blocking actually does. It is not a delete: the title
+                 stays in the catalogue and on the list if it was there, and the
+                 undo above restores it whole. -->
+            <p class="blocked-note">
+              <mat-icon inline>info</mat-icon>
+              Tonight Mode and the subscription planner will skip this. It stays searchable, and
+              anything you wrote about it on your list is untouched.
+            </p>
+          }
 
           @if (availability(); as loadedAvailability) {
             <plotted-availability-panel [availability]="loadedAvailability" />
@@ -221,6 +244,16 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
       font-size: 0.85rem;
       color: var(--mat-sys-error, #b3261e);
     }
+
+    .blocked-note {
+      display: flex;
+      gap: 0.4rem;
+      align-items: baseline;
+      font-size: 0.85rem;
+      opacity: 0.75;
+      max-width: 36rem;
+      margin: -1.25rem 0 2rem;
+    }
   `,
 })
 export class TitleDetailPage implements OnInit {
@@ -238,6 +271,9 @@ export class TitleDetailPage implements OnInit {
   protected readonly onList = signal(false);
   protected readonly adding = signal(false);
   protected readonly listError = signal<string | null>(null);
+
+  protected readonly blocked = signal(false);
+  protected readonly blocking = signal(false);
 
   /**
    * Adds this title to the default watchlist.
@@ -259,6 +295,43 @@ export class TitleDetailPage implements OnInit {
       },
     });
   }
+  /**
+   * Blocks this title, so neither recommender offers it again.
+   *
+   * The state is set from the response rather than optimistically, for the same
+   * reason the add button is: a failed request must not leave the interface
+   * claiming a preference the server never recorded.
+   */
+  protected block(titleId: string): void {
+    this.blocking.set(true);
+    this.listError.set(null);
+    this.watchlists.block({ titleId }).subscribe({
+      next: () => {
+        this.blocked.set(true);
+        this.blocking.set(false);
+      },
+      error: (failure: unknown) => {
+        this.listError.set(messageFrom(failure));
+        this.blocking.set(false);
+      },
+    });
+  }
+
+  protected unblock(titleId: string): void {
+    this.blocking.set(true);
+    this.listError.set(null);
+    this.watchlists.unblock(titleId).subscribe({
+      next: () => {
+        this.blocked.set(false);
+        this.blocking.set(false);
+      },
+      error: (failure: unknown) => {
+        this.listError.set(messageFrom(failure));
+        this.blocking.set(false);
+      },
+    });
+  }
+
   protected readonly availabilityError = signal(false);
 
   ngOnInit(): void {
@@ -277,6 +350,14 @@ export class TitleDetailPage implements OnInit {
       next: (availability) => this.availability.set(availability),
       // Availability failing must not blank the title.
       error: () => this.availabilityError.set(true),
+    });
+
+    this.watchlists.blocked().subscribe({
+      next: (blocked) => this.blocked.set(blocked.blocked.some((it) => it.titleId === this.titleId())),
+      // A signed-out visitor gets a 401 here. Leaving the control in its
+      // unblocked state is right for them, and surfacing an error for a
+      // preference they have not expressed would be noise.
+      error: () => this.blocked.set(false),
     });
   }
 

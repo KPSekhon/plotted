@@ -1,11 +1,13 @@
 package app.plotted.watchlist.persistence
 
+import app.plotted.catalogue.persistence.TitleSearchRepository
 import app.plotted.generated.jooq.tables.references.TITLES
 import app.plotted.generated.jooq.tables.references.USERS
 import app.plotted.generated.jooq.tables.references.WATCHLIST_ITEMS
 import app.plotted.watchlist.domain.Priority
 import app.plotted.watchlist.domain.WatchStatus
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -44,6 +46,13 @@ class WatchlistRepositoryIntegrationTest {
 
     @Autowired
     private lateinit var dsl: DSLContext
+
+    /**
+     * Catalogue search, autowired here so the rule that blocking must not touch
+     * it is asserted rather than only written down in a comment.
+     */
+    @Autowired
+    private lateinit var search: TitleSearchRepository
 
     @Test
     fun `the default watchlist is created once and returned thereafter`() {
@@ -265,6 +274,79 @@ class WatchlistRepositoryIntegrationTest {
         }
     }
 
+    @Test
+    fun `a blocked title is readable through the id set the recommenders filter on`() {
+        val userId = givenUser()
+        val titleId = givenTitle()
+
+        repository.blockedTitleIds(userId).shouldBeEmpty()
+
+        repository.block(userId, titleId, "seen it, hated it")
+
+        // This is the whole point of the change: the reader has existed since V6
+        // and both recommenders have filtered on it since phase 4, but nothing
+        // could put a row in the table, so the filter could never fire.
+        repository.blockedTitleIds(userId) shouldBe setOf(titleId)
+    }
+
+    @Test
+    fun `blocking twice keeps the first reason and the first timestamp`() {
+        val userId = givenUser()
+        val titleId = givenTitle()
+
+        val first = at(COMPLETED_ON).block(userId, titleId, "too violent")
+        val second = at(MUCH_LATER).block(userId, titleId, null)
+
+        // Idempotent like addItem, and the original wins. A second request
+        // carrying no reason must not erase the reason the first one gave.
+        second.reason shouldBe "too violent"
+        second.createdAt shouldBe first.createdAt
+        repository.blockedTitles(userId).size shouldBe 1
+    }
+
+    @Test
+    fun `unblocking removes the block and says whether there was one`() {
+        val userId = givenUser()
+        val titleId = givenTitle()
+        repository.block(userId, titleId, null)
+
+        repository.unblock(userId, titleId) shouldBe true
+        repository.blockedTitleIds(userId).shouldBeEmpty()
+
+        // False rather than true, so the API can tell an undo from a no-op.
+        repository.unblock(userId, titleId) shouldBe false
+    }
+
+    @Test
+    fun `one user's block does not reach another user`() {
+        val mine = givenUser()
+        val theirs = givenUser()
+        val titleId = givenTitle()
+
+        repository.block(theirs, titleId, null)
+
+        // Blocking is a statement about one person's taste. Scoped in the WHERE
+        // clause, as everything else here is.
+        repository.blockedTitleIds(mine).shouldBeEmpty()
+        repository.unblock(mine, titleId) shouldBe false
+        repository.blockedTitleIds(theirs) shouldBe setOf(titleId)
+    }
+
+    @Test
+    fun `blocking a title does not hide it from catalogue search`() {
+        val userId = givenUser()
+        val titleId = givenTitle(name = "Marmalade Verdict")
+        repository.block(userId, titleId, "not for me")
+
+        // Search takes no user id at all, so it *cannot* filter -- and that is
+        // deliberate rather than an oversight. Someone searching for something
+        // they blocked should still find it: hiding it reads as a missing
+        // catalogue entry rather than a preference being honoured, and it would
+        // leave them no way to change their mind. This test exists so that a
+        // later "fix" wiring blocking into search fails here instead of shipping.
+        search.search("Marmalade Verdict", 10, null).map { it.id } shouldBe listOf(titleId)
+    }
+
     // --- helpers -----------------------------------------------------------
 
     /**
@@ -286,14 +368,14 @@ class WatchlistRepositoryIntegrationTest {
         return id
     }
 
-    private fun givenTitle(): UUID {
+    private fun givenTitle(name: String = "A Title"): UUID {
         val id = UUID.randomUUID()
         dsl.insertInto(TITLES)
             .set(TITLES.ID, id)
             .set(TITLES.EXTERNAL_SOURCE, "tmdb")
             .set(TITLES.EXTERNAL_ID, "WATCHLIST-${SEQUENCE.incrementAndGet()}")
             .set(TITLES.MEDIA_TYPE, "movie")
-            .set(TITLES.NAME, "A Title")
+            .set(TITLES.NAME, name)
             .set(TITLES.METADATA_STATUS, "complete")
             .execute()
         return id

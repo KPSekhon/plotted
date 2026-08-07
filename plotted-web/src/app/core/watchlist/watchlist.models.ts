@@ -23,8 +23,39 @@ export interface WatchlistItem {
   readonly completedAt: string | null;
   readonly desiredByDate: string | null;
   readonly notes: string | null;
+  /**
+   * True when this title is also blocked. It keeps its place on the list rather
+   * than being deleted, but neither recommender will offer it while the block
+   * stands — so the row says so instead of being quietly skipped.
+   */
+  readonly blocked: boolean;
   /** Null when the title has been removed from the catalogue since it was added. */
   readonly title: WatchlistTitle | null;
+}
+
+/**
+ * A title the user has asked never to be recommended.
+ *
+ * Blocking suppresses Tonight Mode and the subscription optimiser. It does not
+ * hide the title from catalogue search: hiding it there reads as a missing
+ * catalogue entry rather than a preference being honoured, and it would leave no
+ * way to change your mind.
+ */
+export interface BlockedTitle {
+  readonly titleId: string;
+  readonly reason: string | null;
+  readonly blockedAt: string;
+  /** Null when the title has been removed from the catalogue since it was blocked. */
+  readonly title: WatchlistTitle | null;
+}
+
+export interface BlockedTitles {
+  readonly blocked: readonly BlockedTitle[];
+}
+
+export interface BlockTitleRequest {
+  readonly titleId: string;
+  readonly reason?: string;
 }
 
 export interface Watchlist {

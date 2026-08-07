@@ -114,6 +114,16 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
                   <span>&middot; finished {{ item.completedAt | date: 'mediumDate' }}</span>
                 }
               </p>
+              <!-- A blocked item keeps its place rather than being deleted, so it
+                   has to say why it will never be recommended. Without this the
+                   row is simply skipped forever with nothing on screen to
+                   explain it. -->
+              @if (item.blocked) {
+                <p class="blocked-note">
+                  <mat-icon inline>block</mat-icon>
+                  Blocked — not offered by Tonight Mode or the planner. Undo it on the title page.
+                </p>
+              }
             } @else {
               <!-- The title is gone from the catalogue but the intent is not, so
                    the row stays and says so rather than vanishing. -->
@@ -271,6 +281,15 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
 
     .unknown {
       font-style: italic;
+    }
+
+    .blocked-note {
+      margin: 0.25rem 0 0;
+      font-size: 0.75rem;
+      color: var(--plotted-text-faint);
+      display: flex;
+      gap: 0.3rem;
+      align-items: baseline;
     }
 
     .control {
