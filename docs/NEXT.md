@@ -3,7 +3,9 @@
 What to do next, why, and how to spend the API budgets doing it.
 `PROGRESS.md` records where the project *is*; this records where it goes.
 
-Last updated: 2026-08-06. Watchmode calls spent verifying the facts below: **2**.
+Last updated: 2026-08-07. Watchmode calls spent verifying the facts below: **2**,
+none of them since — the seed enumeration has not been run, so the whole 2500 for
+this month is still available.
 
 ---
 
