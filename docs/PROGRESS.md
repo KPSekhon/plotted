@@ -31,7 +31,7 @@ the world; that one is what to do about it.
 | 8 | LightGBM → ONNX → JVM inference | 2 | **Merged; pipeline proven, model not served** |
 | 9 | Pilot Season, preference profile | 2 | **Done** — persistence, API and screen merged |
 | 10 | Temporal workflows, outbox, Plot Armour detection | 2 | **Relay and Plot Armour merged; no Temporal** |
-| 11 | End Credits analytics, load testing, observability | 2 | |
+| 11 | End Credits analytics, load testing, observability | 2 | **Merged; metrics need users** |
 | 12 | Stretch: removal-risk model, Group Plot, Side Quest | 3 | |
 
 **Phases 1–6 are the hard line.** The spec is explicit that the project is
@@ -40,19 +40,20 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-36 tables · 16 migrations · 124 Kotlin source files · **376 API tests, all
-green in CI** · 26 frontend tests · 28 API paths · 9 ADRs · 107 provider
+36 tables · 17 migrations · 131 Kotlin source files · **405 API tests, all
+green in CI** · 26 frontend tests · 30 API paths · 9 ADRs · 107 provider
 aliases · 17 seeded plan prices · 1 trained model.
 
-**254 of the 376 run on a developer machine; 122 need CI** — the gated classes
+**268 of the 405 run on a developer machine; 137 need CI** — the gated classes
 need Docker or CP-SAT. That third is the one covering the database and the
 optimiser, which is exactly why it is worth knowing which number you are
-quoting. These are from run 31194364704.
+quoting.
 
-The gap has widened rather than closed, and it is worth knowing why: almost
-everything added since phase 9 is persistence, and persistence is exactly what
-cannot be verified without Postgres. **A third of this suite has never run on the
-machine it was written on.**
+The gap keeps widening, and it is worth knowing why: almost everything added
+since phase 9 is persistence or solver work, and both are exactly what cannot be
+verified here. **A third of this suite has never run on the machine it was
+written on** — which is why every bug in the last session was found by CI rather
+than locally, and why each red run cost several round trips.
 
 ---
 
@@ -73,7 +74,8 @@ first, on purpose, so that what remains is finishable.
 | 8 | Model trained on synthetic data; explanations unsolved | Phase 7's data | a week |
 | 10 | No Temporal workflows | Somewhere to run a Temporal server | unknown |
 | 10 | Plot Armour has never seen a real removal | A deployment with the snapshot job on | wait, not work |
-| 11 | Not started | Nothing | — |
+| 11 | Both metrics return null | Users, and time | wait, not work |
+| 11 | No throughput benchmark | A deployed environment | half a day |
 
 **Closed since this table was last written:** `blocked_titles` now has a writer
 (#12), `watchlist_items.completed_at` records when an outcome happened (#11),
@@ -344,22 +346,52 @@ Every path is tested with synthetic events. **Every day this is not deployed is 
 day of history that cannot be recovered** — if you do one thing from this
 document, do that one.
 
-### Phase 11 — End Credits analytics and load testing
+### Phase 11 — End Credits (built; the metrics need users)
 
-**Two metrics carry the product's thesis**: decision latency (does it actually
-save time?) and accepted-and-completed rate (did they watch the thing?).
-Everything else is decoration.
+**The chain is complete.** Request → served → accepted → completed. The middle
+two links did not exist: `completed_at` arrived first, then
+`recommendation_items.accepted_at` with `POST /tonight/{requestId}/accept` and a
+button on the Tonight screen. Acceptance points at a *served item* rather than a
+title, so the position and propensity travel with it — which is what makes it
+usable for off-policy evaluation.
 
-**A load-testing target already exists.** The optimiser's worst case is four
-solves at a five-second cap — a **20-second bound** — even though real instances
-finish in milliseconds. That is the number to aim the section 13.1 budget at, and
-it is written up in the phase 5 section below.
+**Both metrics refuse to flatter, and that is most of the work.**
 
-**And a loose end to close here:** the Redis health contributor is disabled in
-the `prod` profile because nothing uses Redis yet. Re-enable it **in the same
-change that gives Redis its first caller**, which is this phase's rate limiter. A
-disabled health check that outlives its reason is how a dependency silently stops
-being monitored.
+- Decision latency is a **median**, because wall-clock has an unbounded tail.
+  Acceptances more than four hours later are excluded and *counted*, not dropped.
+- The completion rate holds back anything accepted in the last fourteen days.
+  Counting those as failures would make the rate climb on its own as the log
+  aged, which looks exactly like the product improving.
+- Both are **null rather than zero** when there is nothing to compute from. Zero
+  is the best possible latency and the worst possible completion rate, and both
+  would be reached by having no evidence.
+- The completion join tests `completed_at >= accepted_at`, so a title somebody
+  had already watched cannot be credited to a later recommendation, and it is a
+  **left** join, so an accepted pick since removed from the list counts as
+  unfinished rather than disappearing from its own denominator.
+
+**Redis has a caller, so the health contributor is back on** — and deliberately
+*not* in the readiness group. Everything except rate limiting works without
+Redis, and including it would turn a degraded limiter into every instance
+leaving the load balancer. Fail-open and fail-closed are per limit: the optimiser
+fails open (authenticated, one account's blast radius), demo session creation
+fails closed (unauthenticated, it writes, and a filled free-tier database does
+not recover).
+
+**The 20-second bound is pinned as a count, not a stopwatch.** It was never a
+measurement — it is the five-second cap times the most solves one request can
+need. `PlanSolverBoundTest` asserts that count, which is deterministic and fails
+if a fourth probe is ever added; a wall-clock assertion would pass with three
+orders of magnitude to spare and would be flaky besides.
+
+**Not built: a throughput benchmark.** It needs a deployed environment to mean
+anything — run here it would measure the absence of a database — and the question
+was never requests per second but whether one request can block for twenty
+seconds, which is structural and now asserted. Worth doing against the
+deployment, with the measured numbers recorded here.
+
+**What is still missing is users.** Both metrics return null on an empty log, and
+that is the correct answer rather than a gap in the code.
 
 ### Phase 12 — stretch, and only if the earlier ones are genuinely done
 
@@ -379,7 +411,11 @@ all along, plus phase 11.
    `ops/deploy/preflight.sql` against the database before anything else.
 2. **Seed to 500** (phase 2). Every other feature chooses from this list.
 3. **Record the video** (phase 6). Now it has something real to show.
-4. **Phase 11**, which needs nothing and nobody.
+
+Everything that could be built without a person has been. What is left on this
+list is one cloud account and a person's taste, and both of the remaining Tier 2
+gaps — Plot Armour's first real removal, and both End Credits metrics returning a
+number instead of null — are waiting on time rather than on work.
 
 Items 1 and 2 are worth more than everything below them combined, because they
 are what turn honest answers over 119 titles into honest answers over a
