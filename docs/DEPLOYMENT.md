@@ -33,16 +33,41 @@ Three pieces, and the cost argument for each:
 and a document that quotes last year's allowance is worse than one that says to
 go and look.
 
+### Starting from no accounts at all
+
+Nothing above needs to be decided in advance except one thing, and it is the one
+worth deciding on evidence: **provision the database first, run the preflight
+against it, and only then commit to the rest.** The database is the piece with a
+real constraint attached — three extensions the schema cannot do without — and it
+is much cheaper to discover a provider will not grant them before anything else
+is wired to it.
+
+The API host is the reversible choice. Cloud Run is what the `Dockerfile` and
+`application-prod.yml` were written against, but the image is an ordinary Spring
+Boot container and any host that runs one will do. If you would rather not think
+about the scale-to-zero scheduling problem below at all, a host that keeps one
+instance alive removes it entirely — see the note on `@Scheduled`.
+
 ---
 
 ## Before the first deploy
 
 ### 1. The database must have three extensions
 
-`V1__extensions.sql` creates them, so a role with `CREATE EXTENSION` rights makes
-this automatic. Some managed Postgres providers restrict that; on those, enable
-`citext`, `pg_trgm` and `btree_gist` from the provider's console **before** the
-first migration runs.
+**Run the preflight first.** It is the one step that turns the most likely
+first-deploy failure into a five-second answer:
+
+```bash
+psql "$PLOTTED_DB_URL" -v ON_ERROR_STOP=1 -f ops/deploy/preflight.sql
+```
+
+No psql? It is plain SQL with no meta-commands, so it pastes straight into a
+provider's browser console.
+
+`V1__extensions.sql` creates `citext`, `pg_trgm` and `btree_gist`, so a role with
+`CREATE EXTENSION` rights makes this automatic. Some managed Postgres providers
+restrict that; on those, enable the three from the provider's console **before**
+the first migration runs.
 
 This is the most likely first-deploy failure and the least obvious: without
 `btree_gist` the exclusion constraints do not exist, and their absence is the
@@ -50,6 +75,18 @@ thing that makes duplicate availability rows possible — which inflates every
 coverage number the optimiser depends on. It fails loudly at migration time,
 which is the good case. Do not be tempted to fence those constraints out to get
 past it.
+
+**The preflight checks more than the three names**, because "the extension is
+listed" and "the exclusion constraint fires" are different claims. It builds a
+constraint of the same shape `title_availability` uses — a `DATERANGE` keyed by
+two scalar columns, which is exactly the combination that needs `btree_gist` —
+and asserts that an overlapping range is *rejected*. If it is accepted, the
+script raises and says not to deploy. A guard nobody has watched fail is a guard
+nobody knows is there.
+
+It runs on every CI build, against the clean database in the migrations job, at
+the same point in the sequence the real one would. A preflight nobody executes
+is a preflight that has quietly stopped matching the schema.
 
 ### 2. Generate a real JWT secret
 

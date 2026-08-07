@@ -170,12 +170,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The deployment preflight, run here for the same reason it exists: it is
+      # the script someone points at a managed Postgres before the first
+      # migration, and a preflight nobody executes is a preflight that has quietly
+      # stopped matching the schema. This job already has a clean database at
+      # exactly the moment the real one would run, so running it costs seconds
+      # and keeps it honest.
+      - name: Deployment preflight against a clean database
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+          PGPASSWORD=plotted psql -h localhost -U plotted -d plotted -v ON_ERROR_STOP=1 \
+            -f ops/deploy/preflight.sql
+
       # The fenced DDL — extensions, GiST exclusion constraints, generated
       # columns, partial indexes — is invisible to the jOOQ generator, so it is
       # only ever exercised against a real Postgres. This job is that exercise.
       - name: Apply every migration in order
         run: |
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
           # sort -V, not the shell glob. A glob sorts lexicographically, which
           # puts V10 immediately after V1 and applies it before V4 has created
           # the table it references. Flyway orders by version; this loop has to
