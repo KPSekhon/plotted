@@ -2,8 +2,10 @@ package app.plotted.watchlist.persistence
 
 import app.plotted.generated.jooq.tables.references.TITLES
 import app.plotted.generated.jooq.tables.references.USERS
+import app.plotted.generated.jooq.tables.references.WATCHLIST_ITEMS
 import app.plotted.watchlist.domain.Priority
 import app.plotted.watchlist.domain.WatchStatus
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -17,7 +19,11 @@ import org.springframework.test.context.ActiveProfiles
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -193,7 +199,82 @@ class WatchlistRepositoryIntegrationTest {
         }
     }
 
+    @Test
+    fun `completing an item records when it happened`() {
+        val watchlist = repository.findOrCreateDefault(givenUser())
+        val item = repository.addItem(watchlist.id, givenTitle(), Priority(3), null, null)
+
+        repository.findItem(watchlist.id, item.id)!!.completedAt.shouldBeNull()
+
+        at(COMPLETED_ON).updateItem(watchlist.id, item.id, null, WatchStatus.COMPLETED, null, false, null, false)
+
+        repository.findItem(watchlist.id, item.id)!!.completedAt shouldBe COMPLETED_ON
+    }
+
+    @Test
+    fun `re-saving a completed item does not move its completion time`() {
+        val watchlist = repository.findOrCreateDefault(givenUser())
+        val item = repository.addItem(watchlist.id, givenTitle(), Priority(3), null, null)
+        at(COMPLETED_ON).updateItem(watchlist.id, item.id, null, WatchStatus.COMPLETED, null, false, null, false)
+
+        // A later edit that happens to mention the status it already has. The
+        // clock is years ahead, so a `SET completed_at = now()` that failed to
+        // ask whether the row was *already* completed would be unmistakable here
+        // -- which is the point. Against the real system clock the two writes
+        // land milliseconds apart and this assertion could pass without the CASE
+        // expression existing at all.
+        at(MUCH_LATER).updateItem(watchlist.id, item.id, Priority(1), WatchStatus.COMPLETED, null, false, "rewatched", false)
+
+        val updated = repository.findItem(watchlist.id, item.id).shouldNotBeNull()
+        updated.priority shouldBe Priority(1)
+        updated.notes shouldBe "rewatched"
+        // The edit landed; the outcome's date did not move with it.
+        updated.completedAt shouldBe COMPLETED_ON
+    }
+
+    @Test
+    fun `leaving completed clears the time, and completing again records the new one`() {
+        val watchlist = repository.findOrCreateDefault(givenUser())
+        val item = repository.addItem(watchlist.id, givenTitle(), Priority(3), null, null)
+
+        at(COMPLETED_ON).updateItem(watchlist.id, item.id, null, WatchStatus.COMPLETED, null, false, null, false)
+        at(MUCH_LATER).updateItem(watchlist.id, item.id, null, WatchStatus.IN_PROGRESS, null, false, null, false)
+
+        // An item put back in progress is outstanding again, and a completion
+        // time left behind would read to every later query as a finished item
+        // that is somehow still waiting.
+        repository.findItem(watchlist.id, item.id)!!.completedAt.shouldBeNull()
+
+        at(MUCH_LATER).updateItem(watchlist.id, item.id, null, WatchStatus.COMPLETED, null, false, null, false)
+        repository.findItem(watchlist.id, item.id)!!.completedAt shouldBe MUCH_LATER
+    }
+
+    @Test
+    fun `the database refuses a completion time on an item that is not completed`() {
+        val watchlist = repository.findOrCreateDefault(givenUser())
+        val item = repository.addItem(watchlist.id, givenTitle(), Priority(3), null, null)
+
+        // Run against the constraint directly rather than through the repository,
+        // because the repository is the thing being protected. A guard nothing
+        // has ever tried to violate is a guard nobody knows is there.
+        shouldThrow<Exception> {
+            dsl.update(WATCHLIST_ITEMS)
+                .set(WATCHLIST_ITEMS.COMPLETED_AT, OffsetDateTime.now())
+                .where(WATCHLIST_ITEMS.ID.eq(item.id))
+                .execute()
+        }
+    }
+
     // --- helpers -----------------------------------------------------------
+
+    /**
+     * The repository, seeing a fixed instant.
+     *
+     * Built here rather than injected because these tests need two different
+     * "now"s in one scenario, and the autowired instance carries the system
+     * clock. Everything else about it is the bean under test.
+     */
+    private fun at(instant: Instant) = WatchlistRepository(dsl, Clock.fixed(instant, ZoneOffset.UTC))
 
     private fun givenUser(): UUID {
         val id = UUID.randomUUID()
@@ -225,6 +306,11 @@ class WatchlistRepositoryIntegrationTest {
 
     companion object {
         private val SEQUENCE = AtomicInteger(3_000_000)
+
+        private val COMPLETED_ON: Instant = Instant.parse("2026-08-07T21:30:00Z")
+
+        /** Far enough ahead that a timestamp which moved could not be mistaken for one that did not. */
+        private val MUCH_LATER: Instant = Instant.parse("2031-02-14T09:00:00Z")
 
         @Container
         @ServiceConnection

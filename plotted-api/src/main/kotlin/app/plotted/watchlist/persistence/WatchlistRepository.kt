@@ -8,6 +8,7 @@ import app.plotted.watchlist.domain.WatchStatus
 import app.plotted.watchlist.domain.Watchlist
 import app.plotted.watchlist.domain.WatchlistItem
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.stereotype.Repository
 import java.time.Clock
@@ -90,6 +91,7 @@ class WatchlistRepository(
         WATCHLIST_ITEMS.ADDED_AT,
         WATCHLIST_ITEMS.DESIRED_BY_DATE,
         WATCHLIST_ITEMS.NOTES,
+        WATCHLIST_ITEMS.COMPLETED_AT,
     )
         .from(WATCHLIST_ITEMS)
         .where(WATCHLIST_ITEMS.WATCHLIST_ID.eq(watchlistId))
@@ -105,6 +107,7 @@ class WatchlistRepository(
         WATCHLIST_ITEMS.ADDED_AT,
         WATCHLIST_ITEMS.DESIRED_BY_DATE,
         WATCHLIST_ITEMS.NOTES,
+        WATCHLIST_ITEMS.COMPLETED_AT,
     )
         .from(WATCHLIST_ITEMS)
         .where(WATCHLIST_ITEMS.WATCHLIST_ID.eq(watchlistId))
@@ -120,6 +123,7 @@ class WatchlistRepository(
         WATCHLIST_ITEMS.ADDED_AT,
         WATCHLIST_ITEMS.DESIRED_BY_DATE,
         WATCHLIST_ITEMS.NOTES,
+        WATCHLIST_ITEMS.COMPLETED_AT,
     )
         .from(WATCHLIST_ITEMS)
         .where(WATCHLIST_ITEMS.WATCHLIST_ID.eq(watchlistId))
@@ -156,6 +160,7 @@ class WatchlistRepository(
                 addedAt = OffsetDateTime.now(clock).toInstant(),
                 desiredByDate = desiredByDate,
                 notes = notes,
+                completedAt = null,
             )
         } catch (_: DuplicateKeyException) {
             findItemByTitle(watchlistId, titleId)
@@ -183,7 +188,10 @@ class WatchlistRepository(
     ): Boolean {
         val changes = mutableMapOf<org.jooq.Field<*>, Any?>()
         priority?.let { changes[WATCHLIST_ITEMS.PRIORITY] = it.value.toShort() }
-        status?.let { changes[WATCHLIST_ITEMS.STATUS] = it.dbValue }
+        status?.let {
+            changes[WATCHLIST_ITEMS.STATUS] = it.dbValue
+            changes[WATCHLIST_ITEMS.COMPLETED_AT] = completionTimeFor(it)
+        }
         // Clearing a field and not mentioning it are different requests, and a
         // nullable parameter alone cannot tell them apart.
         if (clearDesiredByDate) {
@@ -204,6 +212,36 @@ class WatchlistRepository(
             .where(WATCHLIST_ITEMS.WATCHLIST_ID.eq(watchlistId))
             .and(WATCHLIST_ITEMS.ID.eq(itemId))
             .execute() > 0
+    }
+
+    /**
+     * What `completed_at` becomes when an item moves to [status].
+     *
+     * Expressed as SQL rather than decided in Kotlin because the answer depends
+     * on the row's *current* status, and reading that first would be a race: two
+     * concurrent updates could both observe "not completed yet" and the second
+     * would overwrite the first's timestamp. Every `SET` expression in an
+     * `UPDATE` sees the pre-update row, so the `CASE` below asks "was this
+     * already completed?" of the value being replaced.
+     *
+     * The `ELSE` branch is the whole point. Re-saving an item that is already
+     * completed -- editing its notes, correcting its priority -- has to leave the
+     * original timestamp alone. A version that stamped `now()` on every update
+     * mentioning `status = 'completed'` behaves identically in any test that
+     * completes an item once, and on real traffic would walk the timestamp
+     * forward until the temporal split it exists to serve was splitting on the
+     * date of the last edit.
+     *
+     * Moving to any other status clears it, which is also what keeps the row
+     * satisfying `watchlist_items_completion_time_requires_completion`.
+     */
+    private fun completionTimeFor(status: WatchStatus): Any? = if (status != WatchStatus.COMPLETED) {
+        null
+    } else {
+        DSL.`when`(
+            WATCHLIST_ITEMS.STATUS.ne(WatchStatus.COMPLETED.dbValue),
+            DSL.`val`(OffsetDateTime.now(clock), WATCHLIST_ITEMS.COMPLETED_AT),
+        ).otherwise(WATCHLIST_ITEMS.COMPLETED_AT)
     }
 
     /**
@@ -232,6 +270,7 @@ class WatchlistRepository(
         addedAt = record[WATCHLIST_ITEMS.ADDED_AT]!!.toInstant(),
         desiredByDate = record[WATCHLIST_ITEMS.DESIRED_BY_DATE],
         notes = record[WATCHLIST_ITEMS.NOTES],
+        completedAt = record[WATCHLIST_ITEMS.COMPLETED_AT]?.toInstant(),
     )
 
     private companion object {

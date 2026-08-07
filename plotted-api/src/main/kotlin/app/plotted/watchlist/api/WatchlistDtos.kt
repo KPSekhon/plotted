@@ -20,6 +20,12 @@ data class WatchlistItemResponse(
     val priority: Int,
     val status: String,
     val addedAt: Instant,
+    @Schema(
+        description =
+        "When this item became completed. Null unless status is completed, and also null on a " +
+            "completed item whose transition predates this field -- unknown, rather than zero.",
+    )
+    val completedAt: Instant?,
     val desiredByDate: LocalDate?,
     val notes: String?,
     @Schema(description = "Null when the title has been removed from the catalogue since it was added.")
@@ -32,6 +38,7 @@ data class WatchlistItemResponse(
             priority = entry.item.priority.value,
             status = entry.item.status.dbValue,
             addedAt = entry.item.addedAt,
+            completedAt = entry.item.completedAt,
             desiredByDate = entry.item.desiredByDate,
             notes = entry.item.notes,
             title = entry.title?.let {

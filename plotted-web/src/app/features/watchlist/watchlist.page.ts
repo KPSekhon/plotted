@@ -107,6 +107,12 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
                 } @else {
                   <span class="unknown">&middot; length unknown</span>
                 }
+                <!-- Only when it is known. A finished item completed before the
+                     API recorded completion times has none, and printing the
+                     date it was added instead would be inventing the answer. -->
+                @if (item.completedAt) {
+                  <span>&middot; finished {{ item.completedAt | date: 'mediumDate' }}</span>
+                }
               </p>
             } @else {
               <!-- The title is gone from the catalogue but the intent is not, so

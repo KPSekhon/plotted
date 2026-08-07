@@ -15,6 +15,12 @@ export interface WatchlistItem {
   readonly priority: number;
   readonly status: WatchStatus;
   readonly addedAt: string;
+  /**
+   * When this item became completed. Null unless status is `completed`, and also
+   * null on a completed item finished before the API recorded this — unknown
+   * rather than zero, and the two must not be conflated.
+   */
+  readonly completedAt: string | null;
   readonly desiredByDate: string | null;
   readonly notes: string | null;
   /** Null when the title has been removed from the catalogue since it was added. */
