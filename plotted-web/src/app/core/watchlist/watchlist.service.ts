@@ -5,6 +5,9 @@ import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../api/api.config';
 import {
   AddWatchlistItemRequest,
+  BlockTitleRequest,
+  BlockedTitle,
+  BlockedTitles,
   Coverage,
   UpdateWatchlistItemRequest,
   Watchlist,
@@ -41,5 +44,19 @@ export class WatchlistService {
 
   coverage(): Observable<Coverage> {
     return this.http.get<Coverage>(`${this.baseUrl}/watchlist/coverage`);
+  }
+
+  /** What the user has blocked. Fetching this is what makes blocking reversible. */
+  blocked(): Observable<BlockedTitles> {
+    return this.http.get<BlockedTitles>(`${this.baseUrl}/watchlist/blocked`);
+  }
+
+  /** Idempotent: blocking twice returns the original block, reason and timestamp included. */
+  block(request: BlockTitleRequest): Observable<BlockedTitle> {
+    return this.http.post<BlockedTitle>(`${this.baseUrl}/watchlist/blocked`, request);
+  }
+
+  unblock(titleId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/watchlist/blocked/${titleId}`);
   }
 }

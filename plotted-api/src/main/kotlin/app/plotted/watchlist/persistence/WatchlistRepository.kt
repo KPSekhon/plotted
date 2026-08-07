@@ -3,6 +3,7 @@ package app.plotted.watchlist.persistence
 import app.plotted.generated.jooq.tables.references.BLOCKED_TITLES
 import app.plotted.generated.jooq.tables.references.WATCHLISTS
 import app.plotted.generated.jooq.tables.references.WATCHLIST_ITEMS
+import app.plotted.watchlist.domain.BlockedTitle
 import app.plotted.watchlist.domain.Priority
 import app.plotted.watchlist.domain.WatchStatus
 import app.plotted.watchlist.domain.Watchlist
@@ -256,6 +257,55 @@ class WatchlistRepository(
         .where(BLOCKED_TITLES.USER_ID.eq(userId))
         .fetch()
         .mapNotNullTo(mutableSetOf()) { it.value1() }
+
+    /**
+     * Everything this user has blocked, most recent first.
+     *
+     * Exists so blocking is reversible from the interface. A preference you can
+     * set and never see again is a one-way door, and the person most likely to
+     * want it open again is the one who shut it by accident.
+     */
+    fun blockedTitles(userId: UUID): List<BlockedTitle> = dsl.select(
+        BLOCKED_TITLES.TITLE_ID,
+        BLOCKED_TITLES.REASON,
+        BLOCKED_TITLES.CREATED_AT,
+    )
+        .from(BLOCKED_TITLES)
+        .where(BLOCKED_TITLES.USER_ID.eq(userId))
+        .orderBy(BLOCKED_TITLES.CREATED_AT.desc())
+        .fetch()
+        .map {
+            BlockedTitle(
+                titleId = it[BLOCKED_TITLES.TITLE_ID]!!,
+                reason = it[BLOCKED_TITLES.REASON],
+                createdAt = it[BLOCKED_TITLES.CREATED_AT]!!.toInstant(),
+            )
+        }
+
+    /**
+     * Blocks a title, or returns the existing block if it is already there.
+     *
+     * Idempotent for the same reason [addItem] is: blocking something twice is a
+     * slip rather than an error worth a 409. The original reason and timestamp
+     * win, because the first "no" is the one that was actually meant -- a second
+     * request carrying an empty reason must not erase the first one's.
+     */
+    fun block(userId: UUID, titleId: UUID, reason: String?): BlockedTitle {
+        dsl.insertInto(BLOCKED_TITLES)
+            .set(BLOCKED_TITLES.USER_ID, userId)
+            .set(BLOCKED_TITLES.TITLE_ID, titleId)
+            .set(BLOCKED_TITLES.REASON, reason)
+            .set(BLOCKED_TITLES.CREATED_AT, OffsetDateTime.now(clock))
+            .onConflictDoNothing()
+            .execute()
+
+        return blockedTitles(userId).first { it.titleId == titleId }
+    }
+
+    fun unblock(userId: UUID, titleId: UUID): Boolean = dsl.deleteFrom(BLOCKED_TITLES)
+        .where(BLOCKED_TITLES.USER_ID.eq(userId))
+        .and(BLOCKED_TITLES.TITLE_ID.eq(titleId))
+        .execute() > 0
 
     fun removeItem(watchlistId: UUID, itemId: UUID): Boolean = dsl.deleteFrom(WATCHLIST_ITEMS)
         .where(WATCHLIST_ITEMS.WATCHLIST_ID.eq(watchlistId))

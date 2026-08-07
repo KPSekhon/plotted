@@ -28,6 +28,12 @@ data class WatchlistItemResponse(
     val completedAt: Instant?,
     val desiredByDate: LocalDate?,
     val notes: String?,
+    @Schema(
+        description =
+        "True when this title is also blocked. It keeps its place on the list rather than being " +
+            "deleted, but neither recommender will offer it while the block stands.",
+    )
+    val blocked: Boolean,
     @Schema(description = "Null when the title has been removed from the catalogue since it was added.")
     val title: WatchlistTitleResponse?,
 ) {
@@ -41,6 +47,7 @@ data class WatchlistItemResponse(
             completedAt = entry.item.completedAt,
             desiredByDate = entry.item.desiredByDate,
             notes = entry.item.notes,
+            blocked = entry.blocked,
             title = entry.title?.let {
                 WatchlistTitleResponse(
                     name = it.name,
@@ -76,6 +83,51 @@ data class WatchlistResponse(
         )
     }
 }
+
+@Schema(
+    description =
+    "A title the user has asked never to be recommended. Blocking suppresses Tonight Mode and the " +
+        "subscription optimiser; it does not hide the title from catalogue search.",
+)
+data class BlockedTitleResponse(
+    val titleId: UUID,
+    @Schema(description = "Why they blocked it, if they said. Free text, never interpreted.")
+    val reason: String?,
+    val blockedAt: Instant,
+    @Schema(description = "Null when the title has been removed from the catalogue since it was blocked.")
+    val title: WatchlistTitleResponse?,
+) {
+    companion object {
+        fun from(entry: WatchlistService.BlockedEntry): BlockedTitleResponse = BlockedTitleResponse(
+            titleId = entry.blocked.titleId,
+            reason = entry.blocked.reason,
+            blockedAt = entry.blocked.createdAt,
+            title = entry.title?.let {
+                WatchlistTitleResponse(
+                    name = it.name,
+                    mediaType = it.mediaType,
+                    releaseYear = it.releaseYear,
+                    posterUrl = it.posterUrl,
+                    watchMinutes = it.watchMinutes,
+                )
+            },
+        )
+    }
+}
+
+data class BlockedTitlesResponse(
+    val blocked: List<BlockedTitleResponse>,
+)
+
+data class BlockTitleRequest(
+    @field:NotNull
+    val titleId: UUID?,
+    // Bounded to the column width so an over-long reason is a 400 naming the
+    // field rather than a 500 from the database truncating nothing quietly.
+    @field:Size(max = 64)
+    @Schema(description = "Optional free-text note. Stored, shown back, never interpreted.")
+    val reason: String? = null,
+)
 
 data class AddWatchlistItemRequest(
     @field:NotNull

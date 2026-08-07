@@ -95,4 +95,43 @@ class WatchlistController(
         watchlist.remove(currentUser().userId, itemId)
         return ResponseEntity.noContent().build()
     }
+
+    @GetMapping("/blocked")
+    @Operation(
+        summary = "Titles the signed-in user has asked never to be recommended",
+        description =
+        "Most recently blocked first. This list is what makes blocking reversible: a preference " +
+            "you can set and never see again is a one-way door.",
+    )
+    fun listBlocked(): ResponseEntity<BlockedTitlesResponse> =
+        ResponseEntity.ok(BlockedTitlesResponse(watchlist.listBlocked(currentUser().userId).map(BlockedTitleResponse::from)))
+
+    @PostMapping("/blocked")
+    @Operation(
+        summary = "Block a title from recommendations",
+        description =
+        "Suppresses the title in Tonight Mode and in the subscription optimiser. It does NOT hide " +
+            "the title from catalogue search, and it does not remove it from the watchlist -- a " +
+            "blocked watchlist entry is returned marked rather than deleted, so unblocking restores " +
+            "the priority and notes intact. Idempotent: blocking twice returns the original block, " +
+            "reason and timestamp included.",
+    )
+    fun block(@Valid @RequestBody request: BlockTitleRequest): ResponseEntity<BlockedTitleResponse> {
+        val entry = watchlist.block(
+            userId = currentUser().userId,
+            titleId = requireNotNull(request.titleId),
+            reason = request.reason,
+        )
+        return ResponseEntity.status(HttpStatus.CREATED).body(BlockedTitleResponse.from(entry))
+    }
+
+    @DeleteMapping("/blocked/{titleId}")
+    @Operation(
+        summary = "Stop blocking a title",
+        description = "404 when the title was not blocked, so a client can tell an undo from a no-op.",
+    )
+    fun unblock(@PathVariable titleId: UUID): ResponseEntity<Void> {
+        watchlist.unblock(currentUser().userId, titleId)
+        return ResponseEntity.noContent().build()
+    }
 }

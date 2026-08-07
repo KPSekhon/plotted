@@ -23,8 +23,40 @@ class WatchlistService(
     @Transactional
     fun list(userId: UUID): WatchlistView {
         val watchlist = watchlists.findOrCreateDefault(userId)
-        return WatchlistView(watchlist, hydrate(watchlists.findItems(watchlist.id)))
+        // Blocked ids are fetched here so a blocked item on the list can say so.
+        // Both recommenders already filter these out, which means an unmarked
+        // blocked entry would sit on the list being quietly skipped forever --
+        // the interface would show an item it has no intention of ever offering.
+        val blocked = watchlists.blockedTitleIds(userId)
+        return WatchlistView(watchlist, hydrate(watchlists.findItems(watchlist.id), blocked))
     }
+
+    /**
+     * Blocks a title.
+     *
+     * The watchlist is left alone on purpose. Blocking something already on the
+     * list is a contradiction the user is allowed to hold -- and resolving it by
+     * deleting their row would destroy the priority and notes they wrote, as a
+     * side effect of a different request. The entry stays, marked, and unblocking
+     * restores it fully.
+     */
+    @Transactional
+    fun block(userId: UUID, titleId: UUID, reason: String?): BlockedEntry {
+        if (titles.findSummaries(listOf(titleId)).isEmpty()) {
+            throw NotFoundException("Title")
+        }
+        return hydrateBlocked(listOf(watchlists.block(userId, titleId, reason))).single()
+    }
+
+    @Transactional
+    fun unblock(userId: UUID, titleId: UUID) {
+        if (!watchlists.unblock(userId, titleId)) {
+            throw NotFoundException("Blocked title")
+        }
+    }
+
+    @Transactional
+    fun listBlocked(userId: UUID): List<BlockedEntry> = hydrateBlocked(watchlists.blockedTitles(userId))
 
     @Transactional
     fun add(userId: UUID, titleId: UUID, priority: Int?, desiredByDate: LocalDate?, notes: String?): WatchlistEntry {
@@ -83,10 +115,26 @@ class WatchlistService(
      * silently shorter than the number of things the user added, and "where did
      * it go" is a worse failure than a row that admits it lost its title.
      */
-    private fun hydrate(items: List<WatchlistItem>): List<WatchlistEntry> {
+    private fun hydrate(items: List<WatchlistItem>, blocked: Set<UUID> = emptySet()): List<WatchlistEntry> {
         if (items.isEmpty()) return emptyList()
         val summaries = titles.findSummaries(items.map { it.titleId }).associateBy { it.titleId }
-        return items.map { WatchlistEntry(item = it, title = summaries[it.titleId]) }
+        return items.map {
+            WatchlistEntry(item = it, title = summaries[it.titleId], blocked = it.titleId in blocked)
+        }
+    }
+
+    /**
+     * As [hydrate], for blocked titles.
+     *
+     * A blocked title whose catalogue row has gone keeps its place with a null
+     * summary, exactly as a watchlist entry does. Dropping it would leave a block
+     * that still filters recommendations and that nothing in the interface can
+     * show you or let you lift.
+     */
+    private fun hydrateBlocked(blocked: List<BlockedTitle>): List<BlockedEntry> {
+        if (blocked.isEmpty()) return emptyList()
+        val summaries = titles.findSummaries(blocked.map { it.titleId }).associateBy { it.titleId }
+        return blocked.map { BlockedEntry(blocked = it, title = summaries[it.titleId]) }
     }
 
     data class WatchlistView(
@@ -96,6 +144,13 @@ class WatchlistService(
 
     data class WatchlistEntry(
         val item: WatchlistItem,
+        val title: TitleDirectory.TitleSummary?,
+        /** Blocked titles stay on the list, marked, rather than being deleted or hidden. */
+        val blocked: Boolean = false,
+    )
+
+    data class BlockedEntry(
+        val blocked: BlockedTitle,
         val title: TitleDirectory.TitleSummary?,
     )
 
