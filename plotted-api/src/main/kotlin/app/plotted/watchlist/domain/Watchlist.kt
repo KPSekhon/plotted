@@ -35,6 +35,16 @@ data class WatchlistItem(
     val addedAt: Instant,
     val desiredByDate: LocalDate?,
     val notes: String?,
+    /**
+     * When this item last became [WatchStatus.COMPLETED], or null if it is not
+     * completed.
+     *
+     * Null on a *completed* item means the transition happened before the column
+     * existed, which is a different fact from "not completed" and has to stay
+     * distinguishable: the evaluation harness dates outcomes by this, and an
+     * outcome it cannot date must be excluded rather than dated wrongly.
+     */
+    val completedAt: Instant?,
 )
 
 /**

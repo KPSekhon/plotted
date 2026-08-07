@@ -166,6 +166,9 @@ class CoverageServiceTest {
         addedAt = Instant.EPOCH,
         desiredByDate = null,
         notes = null,
+        // Derived rather than passed in, so the fixture cannot build a row the
+        // schema would reject: only a completed item may carry a completion time.
+        completedAt = if (status == WatchStatus.COMPLETED) Instant.EPOCH else null,
     )
 
     private fun provider(name: String, slug: String) =

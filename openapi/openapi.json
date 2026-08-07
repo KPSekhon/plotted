@@ -793,6 +793,11 @@
             "type" : "string",
             "format" : "date-time"
           },
+          "completedAt" : {
+            "type" : "string",
+            "description" : "When this item became completed. Null unless status is completed, and also null on a completed item whose transition predates this field -- unknown, rather than zero.",
+            "format" : "date-time"
+          },
           "desiredByDate" : {
             "type" : "string",
             "format" : "date"
