@@ -4,6 +4,8 @@ import app.plotted.optimisation.domain.CancelCultureService
 import app.plotted.optimisation.domain.PlanWeights
 import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
+import app.plotted.platform.ratelimit.RateLimitGuard
+import app.plotted.platform.ratelimit.RateLimits
 import app.plotted.platform.security.currentUser
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/plan")
 class PlanController(
     private val cancelCulture: CancelCultureService,
+    private val rateLimit: RateLimitGuard,
 ) {
     @GetMapping
     @Operation(
@@ -42,6 +45,13 @@ class PlanController(
         @Parameter(description = "How much coverage matters, 0 to 1. Cost and churn take the remainder in a 3.5:1 ratio.")
         @RequestParam(required = false) coverageWeight: Double?,
     ): ResponseEntity<PlanResponse> {
+        // Per account, and fails open. The worst case here is four CP-SAT solves
+        // at a five-second cap, so a burst is genuinely expensive -- but the
+        // endpoint is authenticated, so one account is the blast radius, and
+        // losing the headline feature because Redis blinked would cost more than
+        // the CPU does.
+        rateLimit.check(RateLimits.PLAN, currentUser().userId.toString())
+
         val horizon = horizonMonths ?: CancelCultureService.PlanOptions.DEFAULT_HORIZON_MONTHS
         if (horizon < 1 || horizon > CancelCultureService.PlanOptions.MAXIMUM_HORIZON_MONTHS) {
             throw ApiException(

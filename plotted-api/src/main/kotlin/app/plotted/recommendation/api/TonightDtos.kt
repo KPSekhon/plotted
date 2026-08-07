@@ -3,7 +3,14 @@ package app.plotted.recommendation.api
 import app.plotted.recommendation.domain.Pick
 import app.plotted.recommendation.domain.Recommendation
 import io.swagger.v3.oas.annotations.media.Schema
+import jakarta.validation.constraints.NotNull
 import java.util.UUID
+
+@Schema(description = "Which of tonight's picks you are actually watching.")
+data class AcceptPickRequest(
+    @field:NotNull
+    val titleId: UUID?,
+)
 
 @Schema(
     description =
@@ -12,6 +19,12 @@ import java.util.UUID
         "information rather than a failure.",
 )
 data class TonightResponse(
+    @Schema(
+        description =
+        "The decision this answer came from. Pass it back when accepting a pick, so the " +
+            "acceptance attaches to the exact item that was offered rather than merely to a title.",
+    )
+    val requestId: UUID,
     val picks: List<PickResponse>,
     @Schema(description = "Present only when nothing fit.")
     val diagnosis: DiagnosisResponse?,
@@ -21,14 +34,16 @@ data class TonightResponse(
     val eligibleCount: Int,
 ) {
     companion object {
-        fun from(served: Recommendation.Served): TonightResponse = TonightResponse(
+        fun from(requestId: UUID, served: Recommendation.Served): TonightResponse = TonightResponse(
+            requestId = requestId,
             picks = served.picks.mapIndexed { index, pick -> PickResponse.from(pick, index + 1) },
             diagnosis = null,
             candidateCount = served.candidateCount,
             eligibleCount = served.eligibleCount,
         )
 
-        fun from(nothing: Recommendation.NothingFits): TonightResponse = TonightResponse(
+        fun from(requestId: UUID, nothing: Recommendation.NothingFits): TonightResponse = TonightResponse(
+            requestId = requestId,
             picks = emptyList(),
             diagnosis = DiagnosisResponse(
                 headline = headlineFor(nothing),

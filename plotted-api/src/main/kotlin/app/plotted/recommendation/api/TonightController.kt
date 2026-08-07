@@ -2,17 +2,23 @@ package app.plotted.recommendation.api
 
 import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
+import app.plotted.platform.error.NotFoundException
 import app.plotted.platform.security.currentUser
 import app.plotted.recommendation.domain.AccessPolicy
 import app.plotted.recommendation.domain.Recommendation
 import app.plotted.recommendation.domain.TonightService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/tonight")
@@ -54,16 +60,35 @@ class TonightController(
             )
         } ?: AccessPolicy.SUBSCRIBED_ONLY
 
-        val result = tonight.recommend(
+        val outcome = tonight.recommend(
             userId = currentUser().userId,
             request = TonightService.TonightRequest(availableMinutes = availableMinutes, accessPolicy = policy),
         )
 
         return ResponseEntity.ok(
-            when (result) {
-                is Recommendation.Served -> TonightResponse.from(result)
-                is Recommendation.NothingFits -> TonightResponse.from(result)
+            when (val result = outcome.recommendation) {
+                is Recommendation.Served -> TonightResponse.from(outcome.requestId, result)
+                is Recommendation.NothingFits -> TonightResponse.from(outcome.requestId, result)
             },
         )
+    }
+
+    @PostMapping("/{requestId}/accept")
+    @Operation(
+        summary = "Record that you are watching one of tonight's picks",
+        description =
+        "Attaches the choice to the exact item that was offered, which is what makes it usable " +
+            "for evaluation: the position and the propensity travel with it. Accepting a title " +
+            "that was not among the picks, or someone else's recommendation, is a 404. " +
+            "Only the first acceptance counts — the second click is not a second decision.",
+    )
+    fun accept(@PathVariable requestId: UUID, @Valid @RequestBody request: AcceptPickRequest): ResponseEntity<Void> {
+        val accepted = tonight.accept(
+            userId = currentUser().userId,
+            requestId = requestId,
+            titleId = requireNotNull(request.titleId),
+        )
+        if (!accepted) throw NotFoundException("Recommendation pick")
+        return ResponseEntity.noContent().build()
     }
 }

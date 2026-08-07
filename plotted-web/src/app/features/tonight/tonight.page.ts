@@ -186,6 +186,26 @@ import { TonightService } from '../../core/tonight/tonight.service';
                         }
                       </ul>
                     }
+
+                    <!-- The only way an acceptance ever gets recorded. Without
+                         this control the decision log has what Plotted said and
+                         no evidence anyone agreed, which is exactly half of the
+                         two metrics that matter. -->
+                    @if (accepted() === pick.titleId) {
+                      <p class="accepted">
+                        <mat-icon inline>check</mat-icon>
+                        Enjoy it.
+                      </p>
+                    } @else {
+                      <button
+                        mat-stroked-button
+                        class="accept"
+                        [disabled]="accepting() || accepted() !== null"
+                        (click)="accept(data.requestId, pick.titleId)"
+                      >
+                        Watching this
+                      </button>
+                    }
                   </div>
                 </article>
               }
@@ -200,6 +220,19 @@ import { TonightService } from '../../core/tonight/tonight.service';
       max-width: 50rem;
       margin: 0 auto;
       padding: 1.5rem 1rem 3rem;
+    }
+
+    .accept {
+      margin-top: 0.75rem;
+    }
+
+    .accepted {
+      margin: 0.75rem 0 0;
+      font-size: 0.85rem;
+      color: var(--plotted-text-faint);
+      display: flex;
+      gap: 0.3rem;
+      align-items: baseline;
     }
 
     h1 {
@@ -404,6 +437,10 @@ export class TonightPage {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  /** The title accepted from the current answer, or null. One decision per set of picks. */
+  protected readonly accepted = signal<string | null>(null);
+  protected readonly accepting = signal(false);
+
   protected readonly policies: readonly AccessPolicy[] = [
     'active_subscriptions_only',
     'include_free',
@@ -427,6 +464,10 @@ export class TonightPage {
   protected ask(): void {
     this.loading.set(true);
     this.error.set(null);
+    // A new question is a new decision, so the previous answer must not carry
+    // over — otherwise the button would sit disabled on a set of picks nobody
+    // has chosen from.
+    this.accepted.set(null);
     // Blank means no limit, so it must reach the service as null rather than 0 —
     // zero would be a claim of having no time and would filter out everything.
     const budget = this.minutes && this.minutes > 0 ? this.minutes : null;
@@ -438,6 +479,29 @@ export class TonightPage {
       error: (failure: unknown) => {
         this.error.set(messageFrom(failure));
         this.loading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Records which pick the user is actually watching.
+   *
+   * Set from the response rather than optimistically, for the same reason the
+   * add-to-list button is: this is the only evidence the decision log will ever
+   * have that somebody agreed, and marking it locally when the server did not
+   * record it would put a gap in the one measurement that matters.
+   */
+  protected accept(requestId: string, titleId: string): void {
+    this.accepting.set(true);
+    this.error.set(null);
+    this.tonight.accept(requestId, { titleId }).subscribe({
+      next: () => {
+        this.accepted.set(titleId);
+        this.accepting.set(false);
+      },
+      error: (failure: unknown) => {
+        this.error.set(messageFrom(failure));
+        this.accepting.set(false);
       },
     });
   }

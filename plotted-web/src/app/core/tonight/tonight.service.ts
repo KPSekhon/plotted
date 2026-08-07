@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api/api.config';
-import { AccessPolicy, TonightResponse } from './tonight.models';
+import { AcceptPickRequest, AccessPolicy, TonightResponse } from './tonight.models';
 
 @Injectable({ providedIn: 'root' })
 export class TonightService {
@@ -21,5 +21,17 @@ export class TonightService {
       params = params.set('availableMinutes', availableMinutes);
     }
     return this.http.get<TonightResponse>(`${this.baseUrl}/tonight`, { params });
+  }
+
+  /**
+   * Records that the user is watching one of the picks they were offered.
+   *
+   * Takes the `requestId` from the response that produced them, so the choice
+   * attaches to a specific served item. "They watched this title" is a much
+   * weaker fact than "they chose it out of the three offered, from position two"
+   * — and only the second can be evaluated against.
+   */
+  accept(requestId: string, request: AcceptPickRequest): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/tonight/${requestId}/accept`, request);
   }
 }
