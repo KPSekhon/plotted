@@ -98,6 +98,32 @@ class RecommendationLogRepository(
         return requestId
     }
 
+    /**
+     * Marks one served item as the one the user chose.
+     *
+     * The `EXISTS` is what makes ownership a property of the query rather than a
+     * check somebody has to remember: accepting another user's recommendation, or
+     * a title that was not among the picks offered, matches no rows and returns
+     * false. Nothing here trusts the caller to have verified either.
+     *
+     * Only the first acceptance counts. A second one -- a double tap, a retried
+     * request -- leaves the original timestamp alone, because the decision
+     * latency being measured is the time to *decide*, and the second click is not
+     * a second decision.
+     */
+    fun accept(userId: UUID, requestId: UUID, titleId: UUID): Boolean = dsl.update(RECOMMENDATION_ITEMS)
+        .set(RECOMMENDATION_ITEMS.ACCEPTED_AT, OffsetDateTime.now(clock))
+        .where(RECOMMENDATION_ITEMS.REQUEST_ID.eq(requestId))
+        .and(RECOMMENDATION_ITEMS.TITLE_ID.eq(titleId))
+        .and(RECOMMENDATION_ITEMS.ACCEPTED_AT.isNull)
+        .andExists(
+            dsl.selectOne()
+                .from(RECOMMENDATION_REQUESTS)
+                .where(RECOMMENDATION_REQUESTS.ID.eq(requestId))
+                .and(RECOMMENDATION_REQUESTS.USER_ID.eq(userId)),
+        )
+        .execute() > 0
+
     private fun Double.toBigDecimal(scale: Int): BigDecimal = BigDecimal.valueOf(this).setScale(scale, RoundingMode.HALF_UP)
 
     private data class Summary(

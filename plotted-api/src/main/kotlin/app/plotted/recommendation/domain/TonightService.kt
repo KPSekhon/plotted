@@ -36,8 +36,20 @@ class TonightService(
     private val logger = LoggerFactory.getLogger(javaClass)
     private val ranker = Ranker()
 
+    /**
+     * Tonight's answer, and the id of the decision that produced it.
+     *
+     * The id is returned rather than kept internal because acceptance has to
+     * point at a specific served item. "The user watched this title" is a much
+     * weaker fact than "the user chose this title out of the three offered at
+     * 20:14, where it was in position 2 with a propensity of 0.31" -- and only the
+     * second is usable for off-policy evaluation, which is the whole reason the
+     * propensity column exists.
+     */
+    data class Outcome(val requestId: UUID, val recommendation: Recommendation)
+
     @Transactional
-    fun recommend(userId: UUID, request: TonightRequest): Recommendation {
+    fun recommend(userId: UUID, request: TonightRequest): Outcome {
         val startedAt = System.nanoTime()
         val context = TonightContext(
             regionCode = properties.region,
@@ -57,7 +69,7 @@ class TonightService(
 
         if (eligible.isEmpty()) {
             val nothing = Recommendation.NothingFits(candidateCount = candidates.size, reasons = rejections)
-            log.record(userId, context, nothing, elapsedMs(startedAt), RANKER_VERSION)
+            val requestId = log.record(userId, context, nothing, elapsedMs(startedAt), RANKER_VERSION)
             // Logged at info, not warn: an empty answer is a correct outcome of
             // constraints the user set, not a fault. It becomes interesting only
             // in aggregate, which is what the decision log is for.
@@ -67,7 +79,7 @@ class TonightService(
                 candidates.size,
                 rejections,
             )
-            return nothing
+            return Outcome(requestId, nothing)
         }
 
         val today = LocalDate.now(clock)
@@ -81,8 +93,7 @@ class TonightService(
                 candidateCount = candidates.size,
                 reasons = mapOf(Rejection.RUNTIME_UNKNOWN to eligible.size),
             )
-            log.record(userId, context, nothing, elapsedMs(startedAt), RANKER_VERSION)
-            return nothing
+            return Outcome(log.record(userId, context, nothing, elapsedMs(startedAt), RANKER_VERSION), nothing)
         }
 
         val selected = ranker.diversify(scored, SLOTS)
@@ -94,9 +105,19 @@ class TonightService(
             candidateCount = candidates.size,
             eligibleCount = eligible.size,
         )
-        log.record(userId, context, served, elapsedMs(startedAt), RANKER_VERSION)
-        return served
+        return Outcome(log.record(userId, context, served, elapsedMs(startedAt), RANKER_VERSION), served)
     }
+
+    /**
+     * Records that the user chose one of the picks they were offered.
+     *
+     * Delegated to the repository, which scopes the update by user and request so
+     * that accepting somebody else's recommendation, or a title that was not in
+     * this one, matches no rows rather than being rejected by a check somebody
+     * has to remember to write.
+     */
+    @Transactional
+    fun accept(userId: UUID, requestId: UUID, titleId: UUID): Boolean = log.accept(userId, requestId, titleId)
 
     /**
      * Assembles candidates from the watchlist, their titles and their

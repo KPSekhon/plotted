@@ -38,10 +38,20 @@ export interface Diagnosis {
  * error. The constraints were the request; excluding everything is information.
  */
 export interface TonightResponse {
+  /**
+   * The decision this answer came from. Pass it back when accepting a pick, so
+   * the acceptance attaches to the exact item that was offered — carrying its
+   * position and propensity — rather than merely to a title.
+   */
+  readonly requestId: string;
   readonly picks: readonly Pick[];
   readonly diagnosis: Diagnosis | null;
   readonly candidateCount: number;
   readonly eligibleCount: number;
+}
+
+export interface AcceptPickRequest {
+  readonly titleId: string;
 }
 
 export const ACCESS_POLICY_LABELS: Readonly<Record<AccessPolicy, string>> = {
