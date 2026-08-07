@@ -49,16 +49,24 @@ class OutboxRelayRepository(
      * may not assume a total order.
      */
     fun claim(limit: Int, lease: Duration): List<OutboxRecord> = dsl.fetch(
+        // Every bind is cast explicitly. In plain SQL jOOQ has no target column to
+        // infer a type from, so an OffsetDateTime crosses as `character varying`
+        // and Postgres refuses to compare it to a `timestamptz` -- which is
+        // exactly the failure phase 3 recorded, in a test fixture, under the
+        // heading "write fixtures the same way the repository writes". This is
+        // the same bug from the other end: the repository written the way the
+        // fixture was. The typed DSL avoids it everywhere it can be used, and
+        // this statement cannot use it because `SKIP LOCKED` has no DSL form here.
         """
             UPDATE outbox
-               SET next_attempt_at = ?
+               SET next_attempt_at = ?::timestamptz
              WHERE id IN (
                    SELECT id
                      FROM outbox
                     WHERE published_at IS NULL
-                      AND next_attempt_at <= ?
+                      AND next_attempt_at <= ?::timestamptz
                     ORDER BY id
-                    LIMIT ?
+                    LIMIT ?::int
                       FOR UPDATE SKIP LOCKED
                    )
           RETURNING id, aggregate_type, aggregate_id, event_type, payload, created_at, attempts
