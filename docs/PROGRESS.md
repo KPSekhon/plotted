@@ -6,6 +6,11 @@ future me.
 
 Last updated: 2026-08-06.
 
+**The forward plan lives in [NEXT.md](NEXT.md)** — how to spend the Watchmode
+and MDBList budgets, the verified Canadian source IDs, the 500-title seed
+procedure, and how to approach phases 6 onwards. This document is the state of
+the world; that one is what to do about it.
+
 ---
 
 ## Status at a glance
@@ -16,7 +21,7 @@ Last updated: 2026-08-06.
 | 2 | Catalogue — TMDB ingestion, availability, search, screens | 1 | **Verified in CI; seeding still owed** |
 | 3 | Watchlists, subscriptions, coverage dashboard | 1 | **Done** |
 | 4 | **Queue Theory** — tonight's recommendation | 1 | **Done** |
-| 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | |
+| 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | **Done** |
 | 6 | Polish, demo mode, deployment | 1 | ← *résumé-ready line* |
 | 7 | Evaluation harness, MovieLens, baselines | 2 | |
 | 8 | LightGBM → ONNX → JVM inference | 2 | |
@@ -31,9 +36,9 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-35 tables · 12 migrations · 78 Kotlin source files · 205 API tests (8 of them
-ArchUnit rules, 70 needing Docker) · 22 frontend tests · 19 API paths · 8 ADRs ·
-107 provider aliases · 17 seeded plan prices.
+35 tables · 12 migrations · 81 Kotlin source files · 235 API tests (9 of them
+ArchUnit rules, 70 needing Docker, 10 needing CP-SAT) · 25 frontend tests ·
+20 API paths · 8 ADRs · 107 provider aliases · 17 seeded plan prices.
 
 ---
 
@@ -326,7 +331,120 @@ have to stay distinguishable in the logs forever.
 
 ---
 
-## Phase 5 — Cancel Culture (~3 weeks)
+## Phase 5 — Cancel Culture (done)
+
+**Read this before running the tests on Windows.** CP-SAT is a JNI binding and
+it crashes the JVM on the current dev machine. The solve dies with an
+`EXCEPTION_ACCESS_VIOLATION` inside `msvcp140.dll`, preceded by
+`Loading ... jniortools.dll failed, error code 126` (a dependent DLL could not
+be resolved). That is a **process crash, not an exception** — nothing catches
+it, the test JVM disappears taking the Gradle worker with it, and what Gradle
+reports is an unrelated-looking `MessageIOException` about a socket. The real
+diagnosis is only in the `hs_err_pid*.log` the JVM leaves behind.
+
+**The cause is not yet known.** The obvious explanation — an outdated Visual C++
+redistributable — was checked and does not hold: `msvcp140.dll` and
+`vcruntime140_1.dll` are both 14.44.35211.0, current VS 2022 runtimes. Remaining
+candidates, untested: OR-Tools extracts its natives to a random `%TEMP%`
+directory on each run and the first extraction failed to load, which is
+consistent with antivirus interference or a `%TEMP%` permissions problem; or a
+sibling DLL genuinely missing from the packaged set. Anyone picking this up
+should start from the `hs_err` log's module list rather than from this note.
+
+`SolverSupport` gates the solver tests exactly as `DockerSupport` gates the
+database ones, and it has to guess from the OS rather than probe, because
+probing is the thing that crashes. Linux and macOS run them; Windows skips
+unless `PLOTTED_SOLVER_ENABLED=true`. CI is Linux and runs all ten solver tests
+unconditionally, as does production — so this is a developer-machine problem
+rather than a product one, and the whole phase was in fact finished and verified
+through CI regardless.
+
+Everything that is not the solver is plain Kotlin and runs everywhere, which is
+most of the interesting logic: `PlanChecker` and its tests touch no native code.
+
+### The model and the checker
+
+- **`PlanChecker`** — the independent reimplementation, written *before* the
+  solver so its logic could not be shaped by the model it audits. Plain loops,
+  no CP-SAT types. The spec calls this the highest-value test in the project and
+  it is: a solver will optimally solve a model you specified wrong, and the
+  result is indistinguishable from a correct answer.
+- **`PlanSolver`** — `x`/`u`/`d`/`y` with start and stop split, because starting
+  costs money you were not spending and stopping costs access you had; folding
+  them into one "changed" indicator prices a cancellation like a signup. The
+  `u + d ≤ 1` constraint is the one that fails silently — without it the solver
+  satisfies the transition equality by setting both and under-reports churn.
+- **A normalised objective**, every term a fraction of its own maximum before
+  weighting. Scaled by 1,000,000 rather than the spec's 1,000: at ×1000 the
+  rounding on one service's cost coefficient can exceed the real difference
+  between two plans, so the solver goes indifferent for arithmetic reasons.
+  Nothing reported to the user comes from that scale — `PlanChecker` recomputes
+  every displayed number exactly.
+
+### The service, the API and the screen
+
+- **`CancelCultureService`** — gathers from the four SPIs and decides what the
+  model is shown, which decides what it says more completely than the model
+  does. Three kinds of watchlist item are deliberately excluded and *reported*
+  rather than dropped: free to watch (no subscription decision turns on them),
+  never checked (the coverage dashboard's denominator rule, inherited rather
+  than reinvented), and only on a service with no established price (guessing
+  one puts fabricated money in the objective).
+- **An empty demand set returns no advice at all**, not a plan. The optimum over
+  an empty watchlist is "cancel everything you are not locked into", with a
+  dollar figure attached and every appearance of being advice. `NothingToPlan`
+  exists so that answer can never be given.
+- **`GET /api/v1/plan`** and the Cancel Culture screen. The screen leads with
+  the refusals — the infeasible explanation, the sensitivity line, and what the
+  optimiser was never shown — because those are the parts a competitor cannot
+  show.
+- **`PlanSolverAgreementTest`** — the one that matters. For instances small
+  enough to enumerate, *every* possible plan is built, judged feasible and
+  scored by `PlanChecker` alone, and the best compared against CP-SAT's answer.
+  Nothing on that path shares a line with the model builder. Five fixed shapes
+  plus forty seeded random ones.
+
+### What CI found on the first execution
+
+`PlanSolver` had never run. Three things came out of the first real execution,
+and only one of them was in the model.
+
+1. **The model was right.** No feasible plan beat the solver's on any of the 45
+   instances, and the checker rejected none of its answers. That is the claim
+   the whole phase rests on, and it is now tested rather than assumed.
+2. **A failing test whose premise was wrong, not whose subject was.** The
+   sensitivity case assumed a one-service limit had to cost half the coverage.
+   It does not: over two months the solver *rotates* — hold the cheap service
+   this month, switch to the other next month, see the whole list — so relaxing
+   the limit buys no extra coverage and is correctly not reported as binding.
+   The rotation is now pinned as its own test, and the sensitivity case moved to
+   a single month where the limit really does bind. Worth keeping in mind: a
+   constraint on services held *at once* is much weaker than it looks once the
+   model has a time dimension.
+3. **A schema collision the drift check could never have caught.**
+   `optimisation.api` and `watchlist.api` both declared a `CoveredTitleResponse`.
+   springdoc keys `components.schemas` by simple class name, so one silently
+   overwrote the other and the optimiser's covered titles were published with a
+   `priority` and no `month` — the generated Angular client would have been
+   wrong for that endpoint. Nothing threw. The drift check compares the document
+   to the committed copy, and the drifted document was internally consistent and
+   matched itself perfectly. **This is the fifth mechanism in this project that
+   reported success while doing nothing.** `ModuleBoundaryTest.apiClassNamesAreUnique`
+   now fails the build on any API name collision; it was verified to fail on the
+   real one before being trusted, and is scoped to top-level classes because
+   every Kotlin companion object compiles to a nested class called `Companion`.
+
+### Known, and deliberately not changed
+
+A request can in the worst case take four solves — the plan plus one per binding
+constraint — at a 5-second cap each. On instances this size CP-SAT proves
+optimality in milliseconds and nothing has come close, but the *bound* is 20
+seconds, and that is the number phase 11's load testing should be aimed at. The
+alternative, a shorter cap on the sensitivity re-solves, is worse: a re-solve
+that times out returns null and the constraint silently disappears from the
+panel, which turns a latency problem into a correctness one.
+
+### The original plan
 
 The second headline feature, and the most technically distinctive.
 

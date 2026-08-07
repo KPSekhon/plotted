@@ -1,11 +1,15 @@
 package app.plotted.architecture
 
 import com.tngtech.archunit.base.DescribedPredicate.alwaysTrue
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.junit.AnalyzeClasses
 import com.tngtech.archunit.junit.ArchTest
+import com.tngtech.archunit.lang.ArchCondition
 import com.tngtech.archunit.lang.ArchRule
+import com.tngtech.archunit.lang.ConditionEvents
+import com.tngtech.archunit.lang.SimpleConditionEvent
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
@@ -124,4 +128,56 @@ class ModuleBoundaryTest {
             .that().haveSimpleNameEndingWith("Repository")
             .and().resideOutsideOfPackage("app.plotted.generated..")
             .should().resideInAPackage("..persistence..")
+
+    /**
+     * No two API classes share a simple name.
+     *
+     * springdoc keys `components.schemas` by simple class name, so two DTOs
+     * called the same thing in different packages silently overwrite each other
+     * in the generated document. Nothing throws, the document generates, and the
+     * Angular client is then wrong for whichever endpoint lost — it gets fields
+     * that do not exist and misses fields that do.
+     *
+     * Found the hard way in phase 5: `optimisation.api.CoveredTitleResponse` and
+     * `watchlist.api.CoveredTitleResponse` produced a specification in which the
+     * optimiser's covered titles carried a `priority` and no `month`. The drift
+     * check could not catch it, because the drifted document was internally
+     * consistent and matched itself perfectly.
+     *
+     * Restricted to top-level classes for the same reason
+     * [sqlIsConfinedToPersistencePackages] is scoped by package: every Kotlin
+     * companion object compiles to a nested class called `Companion`, and an
+     * inline `sortedBy` compiles to an anonymous one with no name at all.
+     * Neither can ever appear in `components.schemas`, and counting them makes
+     * the rule fail on every file that has a companion — which is all of them.
+     */
+    @ArchTest
+    val apiClassNamesAreUnique: ArchRule =
+        classes()
+            .that().resideInAPackage("..api..")
+            .and().areTopLevelClasses()
+            .should(haveASimpleNameNoOtherApiClassUses())
+
+    private companion object {
+        fun haveASimpleNameNoOtherApiClassUses(): ArchCondition<JavaClass> =
+            object : ArchCondition<JavaClass>("have a simple name no other API class uses") {
+                private var shared: Set<String> = emptySet()
+
+                override fun init(allClasses: MutableCollection<out JavaClass>) {
+                    shared = allClasses.groupBy { it.simpleName }.filterValues { it.size > 1 }.keys
+                }
+
+                override fun check(item: JavaClass, events: ConditionEvents) {
+                    if (item.simpleName in shared) {
+                        events.add(
+                            SimpleConditionEvent.violated(
+                                item,
+                                "${item.fullName} shares the simple name '${item.simpleName}' with another API " +
+                                    "class, so they collide in components.schemas",
+                            ),
+                        )
+                    }
+                }
+            }
+    }
 }

@@ -652,6 +652,72 @@
           }
         }
       }
+    },
+    "/api/v1/plan" : {
+      "get" : {
+        "tags" : [ "plan-controller" ],
+        "summary" : "Which subscriptions to keep, month by month",
+        "description" : "A constraint-optimised subscription plan over the next few months, with the objective recomputed exactly by an independent checker rather than read out of the solver. Returns 200 with an empty plan and a diagnosis when the limits cannot all be met: the limits were the request, so quietly relaxing one would be answering a different question. Titles that are free to watch, never checked, or only on services with no established price are excluded from the model and reported separately.",
+        "operationId" : "plan",
+        "parameters" : [ {
+          "name" : "horizonMonths",
+          "in" : "query",
+          "description" : "Months to plan over, 1 to 12. Defaults to 6.",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "maximumMonthlyCents",
+          "in" : "query",
+          "description" : "Most you are willing to pay in any one month, in cents.",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "maximumActiveServices",
+          "in" : "query",
+          "description" : "Most services to hold at once.",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "maximumMonthlySwitches",
+          "in" : "query",
+          "description" : "Most signups plus cancellations in any one month.",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "coverageWeight",
+          "in" : "query",
+          "description" : "How much coverage matters, 0 to 1. Cost and churn take the remainder in a 3.5:1 ratio.",
+          "required" : false,
+          "schema" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PlanResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -1587,6 +1653,280 @@
           }
         },
         "description" : "A streaming service. No price: the user supplies what they pay."
+      },
+      "ExcludedResponse" : {
+        "required" : [ "freeToWatch", "neverChecked", "unpricedService" ],
+        "type" : "object",
+        "properties" : {
+          "freeToWatch" : {
+            "type" : "array",
+            "description" : "Watchable free or ad-supported, so no subscription decision turns on them.",
+            "items" : {
+              "$ref" : "#/components/schemas/ExcludedTitleResponse"
+            }
+          },
+          "neverChecked" : {
+            "type" : "array",
+            "description" : "Availability has never been checked. Excluded from the denominator, never scored as uncovered.",
+            "items" : {
+              "$ref" : "#/components/schemas/ExcludedTitleResponse"
+            }
+          },
+          "unpricedService" : {
+            "type" : "array",
+            "description" : "Only on services with no established price. Guessing one would put invented money in the objective.",
+            "items" : {
+              "$ref" : "#/components/schemas/ExcludedTitleResponse"
+            }
+          }
+        },
+        "description" : "Watchlist items the optimiser was never shown. Reported rather than dropped: a title missing because Plotted has never checked it is a completely different fact from one no plan could afford."
+      },
+      "ExcludedTitleResponse" : {
+        "required" : [ "name", "providerNames", "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "providerNames" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "description" : "Only on services with no established price. Guessing one would put invented money in the objective."
+      },
+      "MonthResponse" : {
+        "required" : [ "month", "monthlyCents", "started", "stopped", "subscribed" ],
+        "type" : "object",
+        "properties" : {
+          "month" : {
+            "type" : "integer",
+            "description" : "0 is this month.",
+            "format" : "int32"
+          },
+          "monthlyCents" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "subscribed" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ServiceRefResponse"
+            }
+          },
+          "started" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ServiceRefResponse"
+            }
+          },
+          "stopped" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ServiceRefResponse"
+            }
+          }
+        }
+      },
+      "ObjectiveResponse" : {
+        "required" : [ "costFraction", "coverage", "switchFraction", "weighted" ],
+        "type" : "object",
+        "properties" : {
+          "coverage" : {
+            "type" : "number",
+            "description" : "Share of watchlist priority points the plan delivers.",
+            "format" : "double"
+          },
+          "costFraction" : {
+            "type" : "number",
+            "description" : "Spend as a fraction of subscribing to everything for the whole horizon.",
+            "format" : "double"
+          },
+          "switchFraction" : {
+            "type" : "number",
+            "description" : "Switches as a fraction of the maximum possible.",
+            "format" : "double"
+          },
+          "weighted" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        },
+        "description" : "Each component on 0..1, recomputed exactly from the chosen plan rather than read back out of the solver — so these are the numbers, not what the model believed after its coefficients were made integral."
+      },
+      "PlanCoveredTitleResponse" : {
+        "required" : [ "month", "name", "providerId", "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "month" : {
+            "type" : "integer",
+            "description" : "The first month the plan makes it reachable.",
+            "format" : "int32"
+          },
+          "providerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "providerName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PlanDiagnosisResponse" : {
+        "required" : [ "explanation" ],
+        "type" : "object",
+        "properties" : {
+          "explanation" : {
+            "type" : "string"
+          },
+          "bindingConstraint" : {
+            "type" : "string",
+            "description" : "Which limit made it impossible, when one can be identified."
+          }
+        },
+        "description" : "Present only when no plan was produced."
+      },
+      "PlanResponse" : {
+        "required" : [ "covered", "excluded", "horizonMonths", "months", "sensitivity", "status", "uncovered", "violations" ],
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "type" : "string"
+          },
+          "horizonMonths" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "months" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MonthResponse"
+            }
+          },
+          "diagnosis" : {
+            "$ref" : "#/components/schemas/PlanDiagnosisResponse"
+          },
+          "objective" : {
+            "$ref" : "#/components/schemas/ObjectiveResponse"
+          },
+          "totalCents" : {
+            "type" : "integer",
+            "description" : "Total spend across the whole horizon, in cents.",
+            "format" : "int64"
+          },
+          "covered" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PlanCoveredTitleResponse"
+            }
+          },
+          "uncovered" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/UncoveredTitleResponse"
+            }
+          },
+          "sensitivity" : {
+            "type" : "array",
+            "description" : "What relaxing each binding limit by one unit would buy. Empty when nothing is binding.",
+            "items" : {
+              "$ref" : "#/components/schemas/SensitivityResponse"
+            }
+          },
+          "excluded" : {
+            "$ref" : "#/components/schemas/ExcludedResponse"
+          },
+          "violations" : {
+            "type" : "array",
+            "description" : "Problems an independent reimplementation of the rules found in the solver's own answer. Always empty in a healthy system: non-empty means the model and the rules disagree, which is a defect in the model. Surfaced rather than hidden, because a wrong plan you can see beats one you cannot.",
+            "items" : {
+              "type" : "string",
+              "description" : "Problems an independent reimplementation of the rules found in the solver's own answer. Always empty in a healthy system: non-empty means the model and the rules disagree, which is a defect in the model. Surfaced rather than hidden, because a wrong plan you can see beats one you cannot."
+            }
+          },
+          "solveMillis" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "description" : "A subscription plan month by month. `months` is empty with a populated `diagnosis` when no plan satisfies the limits that were set, or when there is nothing on the watchlist to plan against — both are successful responses carrying information, not failures."
+      },
+      "SensitivityResponse" : {
+        "required" : [ "constraint", "coverageDelta", "monthlyCentsDelta", "relaxedBy" ],
+        "type" : "object",
+        "properties" : {
+          "constraint" : {
+            "type" : "string"
+          },
+          "relaxedBy" : {
+            "type" : "string"
+          },
+          "coverageDelta" : {
+            "type" : "number",
+            "description" : "Extra share of the watchlist this would buy, 0..1.",
+            "format" : "double"
+          },
+          "monthlyCentsDelta" : {
+            "type" : "integer",
+            "description" : "Change in peak monthly spend, in cents. Positive means it costs more.",
+            "format" : "int64"
+          }
+        },
+        "description" : "What relaxing each binding limit by one unit would buy. Empty when nothing is binding."
+      },
+      "ServiceRefResponse" : {
+        "required" : [ "name", "providerId" ],
+        "type" : "object",
+        "properties" : {
+          "providerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "UncoveredTitleResponse" : {
+        "required" : [ "availableOn", "name", "priorityPoints", "reason", "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "priorityPoints" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "reason" : {
+            "type" : "string",
+            "description" : "not_carried — no priced service has it. not_chosen — the plan could not fit it."
+          },
+          "availableOn" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
       }
     },
     "securitySchemes" : {

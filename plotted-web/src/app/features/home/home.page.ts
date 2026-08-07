@@ -38,8 +38,7 @@ import { AuthService } from '../../core/auth/auth.service';
         </p>
 
         <p class="secondary muted">
-          Cancel Culture, the subscription optimiser, is not built yet.
-          <a routerLink="/about">See what is coming</a>.
+          Paying for too much? <a routerLink="/plan">Work out what to cancel</a>.
         </p>
       </section>
     }
