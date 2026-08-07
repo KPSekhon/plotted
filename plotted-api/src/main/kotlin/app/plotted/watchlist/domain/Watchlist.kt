@@ -66,6 +66,18 @@ data class BlockedTitle(
 )
 
 /**
+ * Somebody still waiting on a particular title.
+ *
+ * The watchlist read backwards. Plot Armour asks the question from the other
+ * end — a title has been seen leaving a service, and what it needs is who cares
+ * — and that is a different query rather than a filter over an existing one.
+ */
+data class TitleWatcher(
+    val userId: UUID,
+    val priority: Priority,
+)
+
+/**
  * User-assigned importance, 1 to 5.
  *
  * **1 is the highest.** The direction is stated in the column comment, in the

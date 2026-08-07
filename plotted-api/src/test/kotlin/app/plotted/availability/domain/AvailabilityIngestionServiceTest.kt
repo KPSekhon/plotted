@@ -31,6 +31,8 @@ class AvailabilityIngestionServiceTest {
     private val client = mockk<TmdbClient>()
     private val repository = mockk<AvailabilityRepository>(relaxed = true)
     private val providers = mockk<app.plotted.availability.persistence.ProviderRepository>()
+    private val changes = mockk<app.plotted.availability.persistence.AvailabilityChangeRepository>(relaxed = true)
+    private val outbox = mockk<app.plotted.platform.persistence.OutboxRepository>(relaxed = true)
 
     private fun serviceWith(aliases: Map<Int, Provider>): AvailabilityIngestionService {
         every { providers.loadAliasMap() } returns aliases
@@ -39,6 +41,8 @@ class AvailabilityIngestionServiceTest {
             offerMapper = TmdbOfferMapper(),
             resolver = ProviderResolver(providers),
             availability = repository,
+            changes = changes,
+            outbox = outbox,
             properties = TmdbProperties(readAccessToken = "test"),
         )
     }

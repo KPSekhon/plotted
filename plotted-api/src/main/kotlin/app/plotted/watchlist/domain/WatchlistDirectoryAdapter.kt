@@ -33,4 +33,8 @@ class WatchlistDirectoryAdapter(
     }
 
     override fun blockedTitleIds(userId: UUID): Set<UUID> = watchlists.blockedTitleIds(userId)
+
+    override fun watchersOf(titleId: UUID): List<WatchlistDirectory.Watcher> = watchlists.watchersOf(titleId).map {
+        WatchlistDirectory.Watcher(userId = it.userId, priority = it.priority.value)
+    }
 }
