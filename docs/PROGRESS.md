@@ -40,14 +40,19 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-35 tables · 13 migrations · 107 Kotlin source files · **313 API tests, all
-green in CI** · 26 frontend tests · 21 API paths · 8 ADRs · 107 provider
+36 tables · 16 migrations · 124 Kotlin source files · **376 API tests, all
+green in CI** · 26 frontend tests · 28 API paths · 9 ADRs · 107 provider
 aliases · 17 seeded plan prices · 1 trained model.
 
-**219 of the 313 run on a developer machine; 94 need CI** — 10 classes need
-Docker and 2 need CP-SAT. That third is the one covering the database and the
+**254 of the 376 run on a developer machine; 122 need CI** — the gated classes
+need Docker or CP-SAT. That third is the one covering the database and the
 optimiser, which is exactly why it is worth knowing which number you are
-quoting. These are CI's, from run 31145985713.
+quoting. These are from run 31194364704.
+
+The gap has widened rather than closed, and it is worth knowing why: almost
+everything added since phase 9 is persistence, and persistence is exactly what
+cannot be verified without Postgres. **A third of this suite has never run on the
+machine it was written on.**
 
 ---
 
