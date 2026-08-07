@@ -199,35 +199,54 @@ you see it.
 
 ## Part 3 — The phases after, and how to do them well
 
-### Phase 6 — Polish and deploy ← **the résumé line. Stop here if interviews start.**
+### Phase 6 — Polish and deploy (built, not deployed)
 
-Demo mode with no signup, a 90-second video, an architecture diagram,
-near-zero-cost deployment.
+Demo mode, the architecture diagram, the demo script and the deployment plan are
+done — see `PROGRESS.md`. Two things are left and both need a person:
 
-**How to make it excellent:** the demo should show the *refusals*. Tonight Mode
-returning "nothing fits: everything on your list is longer than the time you
-have" is more convincing than any successful recommendation, because every
-competitor can show a list of films and almost none can show a system that knows
-when to say no. Same for the optimiser explaining an infeasible plan. Lead with
-those.
+1. **Actually deploy it.** `docs/DEPLOYMENT.md` is the checklist. The three
+   likeliest first failures are listed there; the worst is a managed Postgres
+   that will not let the migration `CREATE EXTENSION btree_gist`, because
+   without it the exclusion constraints silently do not exist and duplicate
+   availability rows become possible — which inflates every coverage number the
+   optimiser depends on. Do not fence them out to get past it.
+2. **Record the 90 seconds.** `docs/DEMO.md` is the shot list. Seed the
+   catalogue first, then pick the two runtime figures from the demo persona's
+   actual list rather than using the placeholders — getting those wrong is the
+   one thing that makes the best moment in the demo look like a bug.
 
-Two complete headline features with measured results beat five half-built ones.
-The spec is explicit and it is right.
+**Remember to turn the snapshot job on** in the first environment that runs
+continuously, and note that a scale-to-zero host does not run `@Scheduled`
+methods on an idle container. Either pin a minimum instance or drive the jobs
+from an external scheduler. Deploying with neither means the nightly snapshot
+never runs, which looks exactly like it running and finding nothing.
 
-### Phase 7 — Evaluation harness ← highest value per hour in the project
+### Phase 7 — Evaluation harness (built; needs data, not code)
 
-Baselines (random, popularity, watchlist-recency, the linear model), NDCG@3,
-temporal splits, bootstrap confidence intervals, ablations, `EVALUATION.md`.
+The harness is done and tested, and it produced one result it can defend:
+renormalisation is worth 0.0170 NDCG@3. Everything else in `EVALUATION.md` is a
+smoke test, because the simulation's ground truth is the model's own score.
 
-**How to make it excellent:** this is what converts "I built a recommender" into
-"I measured it against baselines and here is where it wins and where it does
-not". The propensity column in `recommendation_items` exists precisely so this
-phase is possible — every off-policy estimator divides by it. Report the
-ablation where renormalisation is removed; it is a concrete, defensible number
-showing a subtle decision mattered.
+**What would make it a real evaluation, in order:**
 
-Be honest about where the linear model *loses* to popularity. A harness that
-only produces flattering numbers is not a harness.
+1. **A timestamp on the outcome.** `watchlist_items.status` already reaches
+   `completed`, which is the closest available label to "the recommendation
+   worked". What is missing is *when* it got there — the temporal split needs
+   it. A column and a write, not a feature.
+2. **Real logged decisions.** `recommendation_items` already carries the score,
+   the feature contributions and the propensity. The propensity is the one that
+   could not have been added retroactively, and it is already there.
+3. **Off-policy estimation.** With propensities logged, inverse-propensity
+   scoring estimates how a *different* ranker would have done on traffic the
+   shipped one served. That is what the exploration slot is for, and why its
+   rate is 10% rather than 0.
+4. **Then a claim about beating popularity**, and not before.
+
+**The finding worth carrying into phase 8:** sorting by watchlist priority alone
+comes within 0.0125 NDCG@3 of the five-feature model and beats it on precision@3.
+Some of that is circularity, but the residue says the other four features buy
+less than their combined 0.65 weight suggests. A learned model should be measured
+against *that* baseline, not against random.
 
 ### Phase 8 — Learned ranking
 
@@ -246,12 +265,18 @@ that carry the product's thesis.
 
 ## The standing lesson
 
-Five of the bugs found so far were mechanisms that reported success while doing
+Six of the bugs found so far were mechanisms that reported success while doing
 nothing: reuse detection whose revocation was rolled back, a drift check that
 could never fail, a build step that had never run, an exploration slot logging a
-propensity of zero, and two DTOs whose shared simple name silently collapsed to
-one schema in the published contract. None of them threw. All of them passed
-their tests.
+propensity of zero, two DTOs whose shared simple name silently collapsed to one
+schema in the published contract, and an evaluation report that claimed in its
+own comments to be seeded and reproducible while its confidence intervals moved
+between runs. None of them threw. All of them passed their tests.
+
+A seventh nearly shipped and is the same shape from the other direction: the
+Redis health contributor was live for a dependency **nothing in the codebase
+uses**, so the first deployment would have failed its readiness probe on a
+component with no callers — a check reporting failure while doing nothing.
 
 The last one is the sharpest example yet, because a check *was* watching and
 still could not see it: the OpenAPI drift check compares the document to the
@@ -264,3 +289,22 @@ guard, make it fail once on the real defect before you trust it —
 `apiClassNamesAreUnique` was run against the live collision, and the first
 version of it also flagged 24 Kotlin companion objects, which is exactly the
 kind of thing you only find by looking.
+
+### And one that was not a code bug at all
+
+When CI stopped running during phases 5–7, the symptoms were diagnosed as an
+exhausted Actions allowance on a private repository and written up that way. They
+were a GitHub platform outage — webhook delivery throttled to 15%, runners stuck
+retrying dead jobs.
+
+Everything checkable with the available token *was* checked first: Actions
+enabled, all actions permitted, workflow `active`. That felt like diligence and
+was still the wrong shape of investigation, because the one source that could
+have settled it in a single unauthenticated request — the status page — was never
+consulted. The hedge ("not confirmed, the billing endpoint needs a scope this
+token lacks") made the write-up honest without making it right.
+
+**When your own tooling misbehaves, check whether the platform is up before
+reasoning about your account.** The same instinct that says "be suspicious of a
+check that has never failed" should also say "be suspicious of a diagnosis whose
+only evidence is that it fits".

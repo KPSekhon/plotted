@@ -1,9 +1,9 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Observable, catchError, of, tap } from 'rxjs';
+import { Observable, catchError, map, of, switchMap, tap } from 'rxjs';
 
 import { API_BASE_URL } from '../api/api.config';
-import { LoginRequest, RegisterRequest, Session, User } from './auth.models';
+import { DemoStart, LoginRequest, RegisterRequest, Session, User } from './auth.models';
 
 /**
  * Session state, held in Angular Signals.
@@ -38,6 +38,21 @@ export class AuthService {
     return this.http
       .post<Session>(`${this.baseUrl}/auth/login`, request, { withCredentials: true })
       .pipe(tap((session) => this.session.set(session)));
+  }
+
+  /**
+   * Starts a demo session: a throwaway account with a watchlist already on it.
+   *
+   * The demo endpoint sets the refresh cookie, and the ordinary refresh path
+   * then turns that into a `Session`. Going through `refresh` rather than
+   * reading the demo response's own token is the point — there is one definition
+   * of what a signed-in session is, and a second one that only demo users take
+   * is a second one that can be wrong without anybody noticing.
+   */
+  startDemo(): Observable<DemoStart> {
+    return this.http
+      .post<DemoStart>(`${this.baseUrl}/demo/session`, {}, { withCredentials: true })
+      .pipe(switchMap((demo) => this.refresh().pipe(map(() => demo))));
   }
 
   /**

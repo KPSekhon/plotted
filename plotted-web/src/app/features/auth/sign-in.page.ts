@@ -68,6 +68,22 @@ import { messageFrom } from '../../core/error/problem-detail';
         <span>New here?</span>
         <a mat-button routerLink="/sign-up">Create an account</a>
       </mat-card-actions>
+
+      <!-- Below the fold of the real form on purpose. Someone who has an
+           account should not have to read past a demo pitch to sign in. -->
+      <div class="demo">
+        <p>Just looking?</p>
+        <button mat-stroked-button type="button" [disabled]="submitting()" (click)="startDemo()">
+          Try it without an account
+        </button>
+        <p class="demo-note">
+          Gives you a throwaway account with a watchlist and two subscriptions
+          already on it. It expires on its own.
+        </p>
+        @if (demoUnavailable()) {
+          <p class="form-error" role="alert">{{ demoUnavailable() }}</p>
+        }
+      </div>
     </mat-card>
   `,
   styleUrl: './auth.scss',
@@ -80,11 +96,39 @@ export class SignInPage {
 
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly demoUnavailable = signal<string | null>(null);
 
   protected readonly form = this.formBuilder.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
   });
+
+  /**
+   * Starts a demo account and goes straight to Tonight rather than home.
+   *
+   * Home is one button that says "find something for tonight", so landing there
+   * would ask the visitor to click again before anything happens. The demo has
+   * about thirty seconds of attention and the first screen should be one that
+   * has already done some work.
+   */
+  protected startDemo(): void {
+    if (this.submitting()) return;
+    this.submitting.set(true);
+    this.demoUnavailable.set(null);
+
+    this.auth.startDemo().subscribe({
+      next: () => void this.router.navigateByUrl('/tonight'),
+      error: (failure: unknown) => {
+        this.submitting.set(false);
+        // 404 when this deployment has demo mode off, 429 when it is at its
+        // account ceiling. Both are real answers rather than faults, so the
+        // message says what happened instead of apologising generically.
+        this.demoUnavailable.set(
+          messageFrom(failure, 'The demo is not available on this deployment.'),
+        );
+      },
+    });
+  }
 
   protected submit(): void {
     if (this.form.invalid || this.submitting()) {

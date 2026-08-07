@@ -2,17 +2,16 @@ package app.plotted.identity.api
 
 import app.plotted.identity.domain.IdentityService
 import app.plotted.identity.domain.RefreshTokenService
-import app.plotted.platform.config.PlottedProperties
 import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
 import app.plotted.platform.security.PlottedAuthentication
+import app.plotted.platform.security.RefreshCookie
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirements
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseCookie
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.CookieValue
@@ -25,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/auth")
 class AuthController(
     private val identityService: IdentityService,
-    private val properties: PlottedProperties,
+    private val refreshCookie: RefreshCookie,
 ) {
     @PostMapping("/register")
     @SecurityRequirements
@@ -68,7 +67,7 @@ class AuthController(
             "the legitimate session.",
     )
     fun refresh(
-        @CookieValue(name = REFRESH_COOKIE, required = false) refreshToken: String?,
+        @CookieValue(name = RefreshCookie.NAME, required = false) refreshToken: String?,
         httpRequest: HttpServletRequest,
     ): ResponseEntity<SessionResponse> {
         if (refreshToken.isNullOrBlank()) {
@@ -80,12 +79,12 @@ class AuthController(
 
     @PostMapping("/logout")
     @Operation(summary = "End the session and revoke its refresh-token family")
-    fun logout(@CookieValue(name = REFRESH_COOKIE, required = false) refreshToken: String?): ResponseEntity<Void> {
+    fun logout(@CookieValue(name = RefreshCookie.NAME, required = false) refreshToken: String?): ResponseEntity<Void> {
         val actor = (SecurityContextHolder.getContext().authentication as? PlottedAuthentication)?.user?.userId
         identityService.logout(refreshToken, actor)
         return ResponseEntity
             .noContent()
-            .header(HttpHeaders.SET_COOKIE, clearedRefreshCookie().toString())
+            .header(HttpHeaders.SET_COOKIE, refreshCookie.cleared().toString())
             .build()
     }
 
@@ -99,40 +98,12 @@ class AuthController(
         )
         return ResponseEntity
             .status(status)
-            .header(HttpHeaders.SET_COOKIE, refreshCookie(session.refreshToken).toString())
+            .header(HttpHeaders.SET_COOKIE, refreshCookie.issue(session.refreshToken).toString())
             .body(body)
     }
-
-    /**
-     * The refresh token is the long-lived credential, so it is kept out of
-     * JavaScript's reach entirely. The access token goes in the body and is
-     * expected to live in memory only.
-     */
-    private fun refreshCookie(token: String): ResponseCookie = ResponseCookie.from(REFRESH_COOKIE, token)
-        .httpOnly(true)
-        .secure(properties.security.jwt.refreshCookieSecure)
-        .sameSite("Lax")
-        .path(REFRESH_COOKIE_PATH)
-        .maxAge(properties.security.jwt.refreshTokenTtl)
-        .build()
-
-    private fun clearedRefreshCookie(): ResponseCookie = ResponseCookie.from(REFRESH_COOKIE, "")
-        .httpOnly(true)
-        .secure(properties.security.jwt.refreshCookieSecure)
-        .sameSite("Lax")
-        .path(REFRESH_COOKIE_PATH)
-        .maxAge(0)
-        .build()
 
     private fun clientContext(request: HttpServletRequest) = RefreshTokenService.ClientContext(
         userAgent = request.getHeader(HttpHeaders.USER_AGENT),
         ipAddress = request.remoteAddr,
     )
-
-    private companion object {
-        const val REFRESH_COOKIE = "plotted_refresh"
-
-        /** Scoped so the cookie is not attached to every API call. */
-        const val REFRESH_COOKIE_PATH = "/api/v1/auth"
-    }
 }

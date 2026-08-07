@@ -70,6 +70,12 @@ class SecurityConfig(
                         // an expired session could not revoke itself, which is
                         // exactly the session most worth revoking.
                         "/api/v1/auth/logout",
+                        // Demo mode. Unauthenticated by definition — the whole
+                        // point is seeing Plotted without an account. It is
+                        // gated at the service instead, on a flag that is off by
+                        // default, and 404s when that flag is off rather than
+                        // advertising that it could be on.
+                        "/api/v1/demo/session",
                     ).permitAll()
                     .requestMatchers(
                         "/actuator/health",

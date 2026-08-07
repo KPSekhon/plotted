@@ -70,3 +70,23 @@ mat-card-actions {
   font-size: 0.875rem;
   color: var(--plotted-text-muted);
 }
+
+/* Demo entry point. Visually separated from the form so it reads as an
+   alternative rather than as another field to fill in. */
+.demo {
+  border-top: 1px solid var(--plotted-border);
+  margin: 0 1rem;
+  padding: 1rem 0 1.25rem;
+  text-align: center;
+
+  p {
+    margin: 0 0 0.6rem;
+    font-size: 0.85rem;
+    color: var(--plotted-text-faint);
+  }
+}
+
+.demo-note {
+  margin: 0.6rem 0 0 !important;
+  font-size: 0.75rem !important;
+}

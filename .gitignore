@@ -49,3 +49,10 @@ secrets/
 data/snapshots/
 *.dump
 *.sql.gz
+
+# The Python training toolchain (phase 8). The model it produces is committed;
+# the several hundred megabytes of wheels that produced it are not. Listed on
+# every branch, not just the one that introduced it: a working tree carries the
+# venv across checkouts, so a branch without this rule will happily stage 18,000
+# files the moment somebody runs `git add -A`.
+.venv-ml/

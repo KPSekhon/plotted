@@ -65,6 +65,7 @@ class ModuleBoundaryTest {
             .should().dependOnClassesThat(
                 resideInAnyPackage(
                     "app.plotted.identity..",
+                    "app.plotted.demo..",
                     "app.plotted.catalogue..",
                     "app.plotted.availability..",
                     "app.plotted.watchlist..",

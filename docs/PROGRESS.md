@@ -22,8 +22,8 @@ the world; that one is what to do about it.
 | 3 | Watchlists, subscriptions, coverage dashboard | 1 | **Done** |
 | 4 | **Queue Theory** — tonight's recommendation | 1 | **Done** |
 | 5 | **Cancel Culture** — CP-SAT subscription optimiser | 1 | **Done** |
-| 6 | Polish, demo mode, deployment | 1 | ← *résumé-ready line* |
-| 7 | Evaluation harness, MovieLens, baselines | 2 | |
+| 6 | Polish, demo mode, deployment | 1 | **Built; not deployed** ← *résumé-ready line* |
+| 7 | Evaluation harness, MovieLens, baselines | 2 | **Harness built; one result** |
 | 8 | LightGBM → ONNX → JVM inference | 2 | |
 | 9 | Pilot Season, preference profile | 2 | |
 | 10 | Temporal workflows, outbox, Plot Armour detection | 2 | |
@@ -36,11 +36,56 @@ than two complete ones. Do not start a Tier 2 item while a Tier 1 item is open.
 
 ### By the numbers
 
-35 tables · 12 migrations · 81 Kotlin source files · 235 API tests (9 of them
-ArchUnit rules, 70 needing Docker, 10 needing CP-SAT) · 25 frontend tests ·
-20 API paths · 8 ADRs · 107 provider aliases · 17 seeded plan prices.
+35 tables · 13 migrations · 98 Kotlin source files · **273 API tests** ·
+26 frontend tests · 21 API paths · 8 ADRs · 107 provider aliases · 17 seeded
+plan prices.
+
+Of the 273, **179 run on this machine and 94 skip** — 10 classes need Docker and
+2 need CP-SAT. That is a third of the suite unverified since CI stopped, and it
+is the third that covers the database. Measured from a local run, not from CI,
+for the reason in the next section.
 
 ---
+
+## CI was down for the whole of phases 5–7 (GitHub incident, 2026-08-06)
+
+Phases 5, 6 and 7 are written, linted and green on everything that runs without
+Docker. **None of the last several commits has been executed by CI**, and the
+cause was a GitHub Actions **major outage** beginning 15:22 UTC — the same minute
+as this repository's last successful run.
+
+Symptoms here, in order, all explained by the incident:
+
+1. A run whose three remaining jobs failed with *"not acquired by Runner of type
+   hosted"*.
+2. No workflow runs created at all for six consecutive pushes, despite the pushes
+   landing and the pull request's head advancing.
+3. A manually triggered re-run accepted, then sitting `queued` indefinitely.
+
+GitHub's status page during the incident: *"Webhook triggers are currently
+throttled to help with recovery and we are processing approximately 15% of
+webhooks"*, and *"runners are stuck retrying jobs that are no longer
+available"*. That is exactly (1), (2) and (3).
+
+**Recorded because the first diagnosis was wrong.** The pattern was read as an
+exhausted Actions allowance on a private repository — which fits the symptoms
+just as well and is the more common cause. Everything checkable with this token
+was checked (Actions enabled, all actions permitted, workflow `active`) and the
+conclusion was then asserted with a hedge rather than confirmed. The billing
+endpoint needs an OAuth scope this token does not have. **The status page needed
+no scope at all and answered it in one request: check the platform before blaming
+the account.**
+
+**So nothing is merged.** What that costs, specifically: the 94 Docker-gated and
+CP-SAT tests only ever run in CI, so `V13`, every query in `DemoRepository` and
+the whole solver suite have never touched a real Postgres or a Linux JVM.
+Everything else — 179 tests, both linters, the Angular production build, the
+evaluation harness — is verified locally.
+
+Once Actions recovers, push and merge in order: phase 5, then 6, then 7. Note
+that PR #7 targets `phase-5-cancel-culture` while the workflow only triggers on
+pull requests into `main`, so it gets no checks until GitHub retargets it when
+#6 merges.
 
 ## Read this before doing anything else
 
@@ -463,20 +508,85 @@ The second headline feature, and the most technically distinctive.
 
 ---
 
-## Phase 6 — Polish and deploy (~1.5 weeks) — the résumé line
+## Phase 6 — Polish and deploy — the résumé line
 
-Demo mode with no signup, a 90-second video, architecture diagram, near-zero-cost
-deployment. **Stop here if interviews start.** Two complete headline features
-with measured results beat five half-built ones.
+**Built.**
+
+- **Demo mode** — `POST /api/v1/demo/session` gives a visitor their own
+  throwaway account with a watchlist and two subscriptions already on it. Own,
+  not shared: a shared demo account means the first thing an evaluator sees is
+  the last visitor's half-finished experiment. The persona is derived from the
+  data rather than hard-coded — the two subscriptions are the service covering
+  most of the list and the one covering least, and the weak one carries a
+  commitment, so Cancel Culture has to hold something it wants to cancel and say
+  why. Off by default; the endpoint is unauthenticated and it writes.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — diagrams of the module graph, both
+  headline pipelines, the data provenance path and the request path, plus the
+  table of what *enforces* each correctness property rather than what documents
+  it.
+- **[DEMO.md](DEMO.md)** — a shot-by-shot 90-second script that leads with the
+  refusals. The video does not exist; recording it needs a person, a seeded
+  database and a deployed environment.
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — the plan, the environment variables, the
+  verification sequence, and an explicit list of what has never been executed.
+
+**One real bug fixed on the way.** Nothing in the codebase uses Redis — it is a
+declared dependency waiting for the phase 11 rate limiter — but its health
+contributor was live, so on any deployment without a Redis instance
+`/actuator/health` would report DOWN and the readiness probe would keep the
+service from ever receiving traffic. Disabled in the `prod` profile, with a note
+to turn it back on in the change that gives Redis its first caller.
+
+**Not done: the deployment itself.** No image has ever been built (no Docker on
+this machine), no migration has run against a managed Postgres, and the
+scheduled jobs have never fired anywhere. `DEPLOYMENT.md` lists the three things
+most likely to break first, of which the extension-permission problem is the
+worst — without `btree_gist` the exclusion constraints silently do not exist.
+
+**Stop here if interviews start.** Two complete headline features with measured
+results beat five half-built ones.
 
 ---
 
-## Phases 7–11 (Tier 2) — what turns "built" into "measured"
+## Phase 7 — Evaluation harness (harness built, one result)
 
-- **7 — Evaluation harness.** Baselines (random, popularity, watchlist recency,
-  the linear model), NDCG@3, temporal splits, bootstrap confidence intervals,
-  ablations, `EVALUATION.md`. The spec calls this the highest value per hour in
-  the whole project, and it is what makes every ML claim defensible.
+**Built.** `NDCG@k`, precision@k, MRR and a percentile bootstrap, all written out
+rather than pulled from a library — each has a detail that is silently wrong in
+some implementations, and a number nobody can defend is worse than no number.
+Four baselines, a paired bootstrap for comparisons, and a temporal split that
+exists now precisely so phase 8 is not the moment somebody decides how to divide
+the data. `./gradlew :plotted-api:evaluate` regenerates
+[EVALUATION.md](EVALUATION.md) with no Spring context and no database.
+
+**The one result that is not circular.** Renormalising over present features is
+worth **0.0170 NDCG@3 (95% CI 0.0145–0.0194, n=2000)** at a 30% metadata
+censoring rate. It matters that this is an ablation of *one* thing: it rescales
+the shipped scorer rather than reimplementing it, and a test asserts the two
+produce identical rankings when nothing is missing.
+
+**Everything else on that table is a smoke test**, because the simulation's
+ground truth is the model's own score — so any comparison against a different
+ranker is circular by construction. `EVALUATION.md` says so at the top rather
+than in a footnote, and also reports where the model *loses*: sorting by
+watchlist priority alone beats it on precision@3, and the ablated model takes the
+best MRR.
+
+**The sixth "reported success while doing nothing" bug.** The first version of
+the report was not reproducible. Every strategy breaks ties on title id and the
+simulation minted those with `UUID.randomUUID()`, so the intervals moved between
+runs while the comments insisted the whole thing was seeded. Nothing failed; the
+numbers were plausible either way, and the document would have stopped matching
+the code within a day. `EvaluationReportTest` now runs the report twice and diffs
+the markdown, and once more with a different seed — because a generator that
+ignored its seed entirely would pass the first check and be just as wrong.
+
+**Still missing, and it is data rather than code:** no user has ever used
+Plotted, so there are no outcomes to evaluate against. The first thing needed is
+a timestamp on the `watchlist_items.status` transition to `completed`, which is a
+column and a write rather than a feature.
+
+## Phases 8–11 (Tier 2) — what turns "built" into "measured"
+
 - **8 — Learned ranking.** LightGBM bootstrapped from MovieLens 32M via TMDB
   ids, exported to ONNX, served in-process. Guard training-serving skew with a
   shared feature schema and a golden-vector equivalence test.

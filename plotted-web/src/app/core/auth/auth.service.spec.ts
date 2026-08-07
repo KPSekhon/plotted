@@ -39,6 +39,31 @@ describe('AuthService', () => {
 
   afterEach(() => http.verify());
 
+  it('turns a demo start into a real session by taking the ordinary refresh path', () => {
+    let started: { displayName: string } | undefined;
+    service.startDemo().subscribe((demo) => (started = demo));
+
+    const start = http.expectOne('/api/v1/demo/session');
+    expect(start.request.method).toBe('POST');
+    // The cookie is the whole payload of that response, so credentials must be
+    // sent and stored or the refresh below has nothing to exchange.
+    expect(start.request.withCredentials).toBe(true);
+    start.flush({
+      displayName: 'Demo visitor',
+      watchlistSize: 12,
+      subscriptions: ['Netflix', 'Crave'],
+      catalogueIsEmpty: false,
+    });
+
+    // Then the ordinary refresh, so there is one definition of a session rather
+    // than a second one only demo users ever take.
+    http.expectOne('/api/v1/auth/refresh').flush(session);
+
+    expect(started?.displayName).toBe('Demo visitor');
+    expect(service.isAuthenticated()).toBe(true);
+    expect(service.user()?.displayName).toBe('Kanwar');
+  });
+
   it('starts signed out', () => {
     expect(service.isAuthenticated()).toBeFalse();
     expect(service.accessToken()).toBeNull();

@@ -49,6 +49,22 @@ export interface LoginRequest {
   password: string;
 }
 
+/**
+ * What starting a demo tells you about the account you were just given.
+ *
+ * No `user` field, deliberately: the demo endpoint sets the refresh cookie and
+ * the client then takes the ordinary refresh path to get a real `Session`. One
+ * extra round trip buys a single definition of what a session is, instead of a
+ * second shape that can drift away from the first.
+ */
+export interface DemoStart {
+  displayName: string;
+  watchlistSize: number;
+  subscriptions: readonly string[];
+  /** True when the catalogue has not been seeded, so the demo has no titles. */
+  catalogueIsEmpty: boolean;
+}
+
 export interface UserSettings {
   maximumMonthlyBudget: number | null;
   maximumActiveServices: number | null;

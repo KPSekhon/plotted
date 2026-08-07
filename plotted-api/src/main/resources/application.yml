@@ -99,6 +99,18 @@ plotted:
     max-attempts: 3
     retry-base-delay: 250ms
     retry-max-delay: 20s
+  demo:
+    # A signed-in Plotted with no signup. Off by default because the endpoint
+    # creates rows for anyone who can reach it: on the demo deployment that is
+    # exactly the point, and anywhere else it is an unauthenticated write.
+    enabled: ${PLOTTED_DEMO_ENABLED:false}
+    account-lifetime: 24h
+    maximum-live-accounts: 500
+    watchlist-size: 12
+    # Hourly, seven minutes past. The account ceiling is what the endpoint
+    # refuses against, so a nightly sweep would let a busy afternoon close the
+    # demo until the following day.
+    sweep-cron: "0 7 * * * *"
   catalogue:
     seed:
       # One-shot: ingests seed/canadian-seed.txt on startup, then the
