@@ -8,6 +8,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.jooq.DSLContext
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIf
 import org.springframework.beans.factory.annotation.Autowired
@@ -41,6 +42,21 @@ class OutboxRelayIntegrationTest {
 
     @Autowired
     private lateinit var dsl: DSLContext
+
+    /**
+     * An empty outbox before each test.
+     *
+     * The container is shared by every test in this class, and three of the
+     * assertions here are about the table as a whole rather than about one row —
+     * ordering, and the pending and stuck counts, which are global by design
+     * because they exist to be reported as metrics. Scoping those assertions to
+     * ids would be testing something weaker than the thing that ships. Clearing
+     * the table is the honest way to make them mean what they say.
+     */
+    @BeforeEach
+    fun emptyTheOutbox() {
+        dsl.deleteFrom(OUTBOX).execute()
+    }
 
     @Test
     fun `a claimed event is not claimed again while its lease holds`() {

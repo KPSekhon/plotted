@@ -506,6 +506,38 @@
         }
       }
     },
+    "/api/v1/alerts/{alertId}" : {
+      "patch" : {
+        "tags" : [ "alert-controller" ],
+        "summary" : "Mark an alert read or dismissed",
+        "description" : "Dismissing also silences repeats about the same title for a while: dismissing is an answer, and re-sending would be the behaviour that gets notifications turned off.",
+        "operationId" : "update_2",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateAlertRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
     "/api/v1/watchlist" : {
       "get" : {
         "tags" : [ "watchlist-controller" ],
@@ -862,6 +894,26 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/PreferenceProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts" : {
+      "get" : {
+        "tags" : [ "alert-controller" ],
+        "summary" : "Unread alerts for the signed-in user",
+        "description" : "Newest first. Read and dismissed alerts are not returned.",
+        "operationId" : "list_3",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertsResponse"
                 }
               }
             }
@@ -1632,6 +1684,16 @@
           }
         }
       },
+      "UpdateAlertRequest" : {
+        "required" : [ "status" ],
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "type" : "string",
+            "enum" : [ "read", "dismissed" ]
+          }
+        }
+      },
       "WatchlistResponse" : {
         "required" : [ "id", "items", "name" ],
         "type" : "object",
@@ -2359,6 +2421,48 @@
           }
         },
         "description" : "A fitted taste profile. Null until at least one question has been answered — a profile fitted from no answers is the population's rather than yours, and reporting it would present the prior back as a discovery."
+      },
+      "AlertResponse" : {
+        "required" : [ "alertType", "createdAt", "id", "message", "severity" ],
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "alertType" : {
+            "type" : "string",
+            "description" : "For example availability.left."
+          },
+          "severity" : {
+            "type" : "string",
+            "enum" : [ "info", "warning", "urgent" ]
+          },
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
+        "description" : "Something Plotted needs to tell you."
+      },
+      "AlertsResponse" : {
+        "required" : [ "alerts" ],
+        "type" : "object",
+        "properties" : {
+          "alerts" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AlertResponse"
+            }
+          }
+        }
       }
     },
     "securitySchemes" : {
