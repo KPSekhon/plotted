@@ -8,6 +8,7 @@ import app.plotted.platform.spi.AvailabilityDirectory
 import app.plotted.platform.spi.SessionIssuer
 import app.plotted.platform.spi.TitleDirectory
 import org.slf4j.LoggerFactory
+import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -120,7 +121,11 @@ class DemoService(
      * thirty seconds someone gave the project.
      */
     private fun chooseTitles(region: String): List<UUID> {
-        val candidates = demo.findCandidateTitleIds(region, properties.watchlistSize * CANDIDATE_OVERFETCH)
+        val candidates = demo.findCandidateTitleIds(
+            region,
+            properties.watchlistSize * CANDIDATE_OVERFETCH,
+            preferredExternalIds(),
+        )
         if (candidates.isEmpty()) return emptyList()
 
         val usable = titles.findSummaries(candidates)
@@ -210,8 +215,34 @@ class DemoService(
         val catalogueIsEmpty: Boolean,
     )
 
+    /**
+     * The curated persona, read from a versioned resource.
+     *
+     * Read on each demo start rather than cached: this is a handful of lines
+     * once per demo account, and a cache would mean editing the file did
+     * nothing until a restart — which is exactly the kind of quiet
+     * no-op this project keeps finding.
+     *
+     * A missing file is not an error. The persona simply falls back to being
+     * entirely data-derived, which is what it was before this existed.
+     */
+    private fun preferredExternalIds(): List<String> {
+        val resource = ClassPathResource(PREFERRED_PATH)
+        if (!resource.exists()) return emptyList()
+
+        return resource.inputStream.bufferedReader().useLines { lines ->
+            lines
+                .map { it.substringBefore('#').trim() }
+                .filter { it.isNotEmpty() }
+                .toList()
+        }
+    }
+
     private companion object {
         const val DEMO_DISPLAY_NAME = "Demo visitor"
+
+        /** Curated by a person. See the file's own header for why it exists. */
+        const val PREFERRED_PATH = "demo/preferred-titles.txt"
         const val PRIORITY_LEVELS = 5
         const val DEADLINE_INDEX = 1
         const val DEADLINE_DAYS = 10L

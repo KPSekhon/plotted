@@ -97,24 +97,47 @@ class DemoRepository(
 
     /**
      * Candidate titles for the demo list: those a subscription service actually
-     * carries here, most-carried first, then by name so the demo is the same
-     * every time.
+     * carries here, curated picks first, then most-carried, then by name so the
+     * demo is the same every time.
      *
-     * Ids only. Whether a title is *usable* — whether its runtime is known —
-     * is decided by the caller through `TitleDirectory`, because the answer
-     * differs between films and series and the catalogue owns that rule.
-     * Over-fetches so the caller has spares to discard.
+     * ### Why there is a curated tier at all
+     *
+     * Ranking by carrier count alone is a fine tie-break and a poor persona. It
+     * returns whatever happens to be on the most platforms, which reads as a
+     * list nobody chose — and the demo's job is to look like a real person's
+     * watchlist, which means having opinions in it. `demo/preferred-titles.txt`
+     * holds those opinions, versioned, for the same reason the curated half of
+     * the seed is.
+     *
+     * It only *reorders*. Every existing rule still applies: a title nothing
+     * carries on a subscription never appears however high it is listed, and
+     * the caller still discards anything whose runtime is unknown. A preference
+     * cannot promote a title past a filter, which is the point — otherwise the
+     * demo would be a place where the product's own rules quietly do not hold.
+     *
+     * Ids only. Whether a title is *usable* is decided by the caller through
+     * `TitleDirectory`, because the answer differs between films and series and
+     * the catalogue owns that rule. Over-fetches so the caller has spares.
      */
-    fun findCandidateTitleIds(regionCode: String, limit: Int): List<UUID> {
+    fun findCandidateTitleIds(
+        regionCode: String,
+        limit: Int,
+        preferredExternalIds: List<String> = emptyList(),
+    ): List<UUID> {
         val carriers = DSL.countDistinct(TITLE_AVAILABILITY.PROVIDER_ID)
-        return dsl.select(TITLES.ID, TITLES.NAME, carriers)
+        // 0 sorts before 1, so the curated tier leads. Built from a bound list
+        // rather than interpolated, so an id from the file cannot reach the
+        // statement as SQL.
+        val curatedFirst = DSL.`when`(TITLES.EXTERNAL_ID.`in`(preferredExternalIds), 0).otherwise(1)
+
+        return dsl.select(TITLES.ID, TITLES.NAME, carriers, curatedFirst)
             .from(TITLES)
             .join(TITLE_AVAILABILITY).on(TITLE_AVAILABILITY.TITLE_ID.eq(TITLES.ID))
             .where(TITLE_AVAILABILITY.REGION_CODE.eq(regionCode))
             .and(TITLE_AVAILABILITY.ACCESS_TYPE.eq("subscription"))
             .and(TITLE_AVAILABILITY.ACTIVE.isTrue)
-            .groupBy(TITLES.ID, TITLES.NAME)
-            .orderBy(carriers.desc(), TITLES.NAME.asc())
+            .groupBy(TITLES.ID, TITLES.NAME, TITLES.EXTERNAL_ID)
+            .orderBy(curatedFirst.asc(), carriers.desc(), TITLES.NAME.asc())
             .limit(limit)
             .fetch(TITLES.ID)
             .filterNotNull()

@@ -172,6 +172,36 @@ class DemoRepositoryIntegrationTest {
     }
 
     @Test
+    fun `curated titles lead, whatever the carrier count says`() {
+        val netflix = providers.findBySlug("netflix")!!
+        val crave = providers.findBySlug("crave")!!
+
+        // Carried by two services, so the default ordering puts it first.
+        val popular = insertTitle("On everything")
+        insertAvailability(popular, netflix.id, "CA", AccessType.SUBSCRIPTION)
+        insertAvailability(popular, crave.id, "CA", AccessType.SUBSCRIPTION)
+
+        // Carried by one, and chosen by a person.
+        val curated = insertTitle("Somebody's actual taste", externalId = "424242")
+        insertAvailability(curated, netflix.id, "CA", AccessType.SUBSCRIPTION)
+
+        val candidates = repository.findCandidateTitleIds("CA", 100, listOf("424242"))
+
+        candidates.first() shouldBe curated
+        candidates shouldContain popular
+    }
+
+    @Test
+    fun `a curated title nothing carries is still not a candidate`() {
+        // The preference reorders; it must never promote a title past a filter.
+        // Otherwise the demo becomes the one place the product's own rules do
+        // not hold, which is the opposite of what a demo is for.
+        val uncarried = insertTitle("In cinemas, not streaming", externalId = "969681")
+
+        repository.findCandidateTitleIds("CA", 100, listOf("969681")) shouldNotContain uncarried
+    }
+
+    @Test
     fun `plan lookup returns the cheapest open price per provider`() {
         val crave = providers.findBySlug("crave")!!
         val dear = subscriptions.findOrCreatePlan(
@@ -240,12 +270,12 @@ class DemoRepositoryIntegrationTest {
         return id
     }
 
-    private fun insertTitle(name: String): UUID {
+    private fun insertTitle(name: String, externalId: String = "demo-${UUID.randomUUID()}"): UUID {
         val id = UUID.randomUUID()
         dsl.insertInto(TITLES)
             .set(TITLES.ID, id)
             .set(TITLES.EXTERNAL_SOURCE, "tmdb")
-            .set(TITLES.EXTERNAL_ID, "demo-${UUID.randomUUID()}")
+            .set(TITLES.EXTERNAL_ID, externalId)
             .set(TITLES.MEDIA_TYPE, "movie")
             .set(TITLES.NAME, name)
             .execute()

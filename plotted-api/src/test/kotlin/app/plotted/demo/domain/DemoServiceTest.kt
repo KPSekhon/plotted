@@ -166,7 +166,7 @@ class DemoServiceTest {
     @Test
     fun `an unseeded catalogue says so rather than pretending`() {
         every { demo.countLiveDemoAccounts() } returns 0
-        every { demo.findCandidateTitleIds(any(), any()) } returns emptyList()
+        every { demo.findCandidateTitleIds(any(), any(), any()) } returns emptyList()
         every { titles.findSummaries(any()) } returns emptyList()
         every { demo.createUser(any(), any(), any()) } returns userId
         every { demo.createWatchlist(any(), any()) } returns watchlistId
@@ -191,7 +191,7 @@ class DemoServiceTest {
         every { demo.countLiveDemoAccounts() } returns 0
         every { demo.createUser(any(), any(), any()) } returns userId
         every { demo.createWatchlist(any(), any()) } returns watchlistId
-        every { demo.findCandidateTitleIds(any(), any()) } returns ids
+        every { demo.findCandidateTitleIds(any(), any(), any()) } returns ids
         every { titles.findSummaries(any()) } returns ids.map { id ->
             TitleDirectory.TitleSummary(
                 titleId = id,

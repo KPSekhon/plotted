@@ -592,3 +592,31 @@ Inside Out
 Arcane
 Avatar: The Last Airbender
 Bluey
+
+# --- Curated by id, added 2026-08-08 ----------------------------------------
+#
+# A third provenance, and it is deliberate. These were chosen by a person, like
+# the rest of the curated half, but they are pinned to tmdb ids rather than
+# written as names because several of them do not resolve unambiguously by
+# search: "One Piece" returns the 2023 live-action series ahead of the 1999
+# anime, and "The Odyssey" returns two different 2026 films plus two 1990s
+# series. A name here would silently ingest the wrong title and nothing
+# downstream would notice.
+#
+# Both One Piece entries are kept on purpose -- the live-action and the anime
+# are different titles with different runtimes and different availability, and
+# the seed should not quietly decide which one somebody meant.
+tmdb:37854:tv        # One Piece (1999 anime)
+tmdb:65930:tv        # My Hero Academia
+tmdb:114410:tv       # Chainsaw Man
+tmdb:85937:tv        # Demon Slayer: Kimetsu no Yaiba
+tmdb:76479:tv        # The Boys
+tmdb:278:movie       # The Shawshank Redemption
+#
+# Both of these reached cinemas within the last month, so they are very likely
+# to have no Canadian streaming availability yet. That is not a mistake: a
+# watchlist item nothing carries is a real state, and it is the one that makes
+# Tonight Mode's "not available in your region" rejection visible rather than
+# theoretical.
+tmdb:969681:movie    # Spider-Man: Brand New Day (2026-07-29)
+tmdb:1368337:movie   # The Odyssey (2026-07-15)

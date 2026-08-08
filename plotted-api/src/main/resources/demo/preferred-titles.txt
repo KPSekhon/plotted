@@ -1,0 +1,40 @@
+# Plotted :: demo persona preferences
+#
+# TMDB ids the demo account's watchlist should reach for first. Everything else
+# about the persona stays derived from the data -- these only reorder the
+# candidate query, and any title that fails the existing rules is still
+# discarded. In particular a title whose runtime is unknown never reaches the
+# list, however high it sits here, because Tonight Mode cannot promise an
+# unmeasured title fits an evening.
+#
+# WHY THIS FILE EXISTS
+#
+# The candidate query ranks by how many services carry a title. That is a fine
+# tie-break and a poor persona: it produces whatever happens to be on the most
+# platforms, which is a list nobody would recognise as somebody's taste. A demo
+# is meant to look like a real person's watchlist, and a real watchlist has
+# opinions in it.
+#
+# So the ids below were chosen by a person, and this file is versioned for the
+# same reason the curated half of the seed is. Nothing here is inferred, and
+# nothing here should be added by inference.
+#
+# Ids rather than names, because several of these do not resolve unambiguously
+# by search -- see the note in seed/canadian-seed.txt.
+#
+# A title listed here that is not in the catalogue is silently ignored, so this
+# file can name something before the seed carries it.
+
+37854      # One Piece (1999 anime)
+65930      # My Hero Academia
+114410     # Chainsaw Man
+85937      # Demon Slayer: Kimetsu no Yaiba
+76479      # The Boys
+111110     # ONE PIECE (2023 live action)
+278        # The Shawshank Redemption
+2316       # The Office
+48891      # Brooklyn Nine-Nine
+106379     # Fallout
+545611     # Everything Everywhere All at Once
+969681     # Spider-Man: Brand New Day
+1368337    # The Odyssey
