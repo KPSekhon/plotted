@@ -158,23 +158,32 @@ import { PilotService } from '../../core/pilot/pilot.service';
           }
 
           <!-- Literally plotted: each axis is a line between its two poles and
-               the point sits where the fit put you. The unstated ones show a
-               question mark at the centre rather than a point, because a dot
-               in the middle would claim "measured, and balanced" — which is a
-               finding, and a different one from never having been asked. -->
+               the point sits where the fit put you.
+
+               Rendered by verdict rather than by "stated", and the difference
+               is the whole point of this feature. NO_PREFERENCE is a *finding*
+               — we asked, and you were balanced — so it gets a real point at
+               its real position, drawn neutral because there is no direction
+               to claim. NOT_ASKED gets a question mark instead, because a dot
+               anywhere would be an absence of evidence wearing the costume of
+               a measurement.
+
+               Lumping the two together under one flag, which is what this did
+               first, throws away the distinction the fitter returns a
+               posterior width specifically to make. -->
           <ul class="axes">
             @for (axis of fitted.axes; track axis.axis) {
-              <li [class.unstated]="!axis.stated">
+              <li [class]="'verdict-' + axis.verdict.toLowerCase()">
                 <span class="poles coordinates">
                   <span>{{ axis.negative }}</span>
                   <span>{{ axis.positive }}</span>
                 </span>
 
                 <span class="axis-track" aria-hidden="true">
-                  @if (axis.stated) {
-                    <span class="axis-point" [style.left.%]="position(axis)"></span>
-                  } @else {
+                  @if (axis.verdict === 'NOT_ASKED') {
                     <span class="axis-unknown">?</span>
+                  } @else {
+                    <span class="axis-point" [style.left.%]="position(axis)"></span>
                   }
                 </span>
 
@@ -391,8 +400,15 @@ import { PilotService } from '../../core/pilot/pilot.service';
 
     /* Dimmed rather than hidden. An axis nobody asked about is part of the
        answer, and the footnote below explains why it looks different. */
-    .axes li.unstated {
+    .axes li.verdict-not_asked {
       opacity: 0.55;
+    }
+
+    /* Measured and balanced. The point is real and sits where the fit put it,
+       but it is grey: orange is a claim, and "no strong feeling" is the
+       explicit absence of one. */
+    .axes li.verdict-no_preference .axis-point {
+      background: var(--plotted-text-faint);
     }
 
     .sentence {

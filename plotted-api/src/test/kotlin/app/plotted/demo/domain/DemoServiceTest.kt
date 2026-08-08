@@ -6,6 +6,7 @@ import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
 import app.plotted.platform.spi.AvailabilityDirectory
 import app.plotted.platform.spi.SessionIssuer
+import app.plotted.platform.spi.TasteFixtures
 import app.plotted.platform.spi.TitleDirectory
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
@@ -37,6 +38,11 @@ class DemoServiceTest {
     private val availability = mockk<AvailabilityDirectory>()
     private val sessions = mockk<SessionIssuer>()
 
+    // Relaxed: seeding the taste fixture is a side effect of starting a demo,
+    // not a property any test here is about. The one thing that does matter --
+    // that a failure to seed does not fail the demo -- has its own test below.
+    private val taste = mockk<TasteFixtures>(relaxed = true)
+
     private val userId = UUID.randomUUID()
     private val watchlistId = UUID.randomUUID()
     private val netflix = UUID.randomUUID()
@@ -52,6 +58,7 @@ class DemoServiceTest {
         demo = demo,
         titles = titles,
         availability = availability,
+        taste = taste,
         sessions = sessions,
         properties = properties,
         platform = platformProperties(),
@@ -180,6 +187,36 @@ class DemoServiceTest {
         result.catalogueIsEmpty shouldBe true
         result.subscriptions shouldBe emptyList()
         verify(exactly = 0) { demo.insertSubscription(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `a taste profile that cannot be seeded does not fail the demo`() {
+        givenCatalogue(titleCount = 4)
+        givenSession()
+        every { taste.seedDemoPersona(any(), any()) } throws IllegalStateException("ladder unavailable")
+
+        val result = service().start(client)
+
+        // The persona is a nicety; the account, the list and the subscriptions
+        // are the demo. Letting a fixture take the whole thing down would mean
+        // an empty taste ladder turning into a visitor seeing an error page
+        // instead of the product.
+        result.watchlistSize shouldBe 4
+        verify { sessions.issueFor(userId, client) }
+    }
+
+    @Test
+    fun `the questionnaire is left partly unanswered on purpose`() {
+        givenCatalogue(titleCount = 4)
+        givenSession()
+
+        service().start(client)
+
+        // Fewer than the fifteen the ladder holds. A demo that arrives finished
+        // hides the fork, and answering every axis would lose the NOT_ASKED
+        // verdict, which is the honest-refusal design being visible rather than
+        // merely tested.
+        verify { taste.seedDemoPersona(userId, 10) }
     }
 
     // --- fixtures -----------------------------------------------------------

@@ -288,6 +288,50 @@ nobody has measured is the same number and a different claim. Once profiles
 exist the mean should be their average. Left until there are users, because an
 average over nobody is still zero.
 
+### Measured 2026-08-08: the ladder cannot reach its own bar
+
+The demo persona is a stated weight vector, and its answers are whatever that
+vector implies — so it is the most consistent respondent Pilot Season will ever
+have. Fitting a **complete fifteen-answer** questionnaire from it:
+
+| Axis | fitted weight | standard error | \|w\|/se | verdict |
+|---|---|---|---|---|
+| Levity | 0.879 | 0.632 | **1.39** | `NO_PREFERENCE` |
+| Pace | 0.876 | 0.633 | **1.38** | `NO_PREFERENCE` |
+| Grounding | −0.879 | 0.632 | **1.39** | `NO_PREFERENCE` |
+| Commitment | 0.741 | 0.673 | **1.10** | `NO_PREFERENCE` |
+| Recency | 0.723 | 0.668 | **1.08** | `NO_PREFERENCE` |
+| Acclaim | 0.767 | 0.671 | **1.14** | `NO_PREFERENCE` |
+
+`CREDIBLE_MULTIPLIER` is 1.96. Nothing gets close, and `isInformative` is
+false. **A perfectly consistent respondent, answering every question, is told
+Plotted has nothing strong enough to act on** — and so, therefore, is every real
+user. The feature is built, correct and well tested, and structurally cannot
+produce its headline output.
+
+The cause is arithmetic rather than a defect: fifteen comparisons over six axes
+is 2.5 observations each, the Gaussian prior deliberately shrinks weights toward
+zero to keep the mode defined, and the posterior stays nearly as wide as the
+prior. A 95% bar is then unreachable.
+
+**The good news is that the fit is right.** It recovered the persona's sign on
+all six axes and its rank order roughly — the estimator works, the *evidence
+budget* does not.
+
+Four levers, and this is a design decision rather than a bug fix, so none has
+been pulled:
+
+1. **More comparisons.** Separating six axes at 95% wants something closer to
+   thirty or forty, not fifteen.
+2. **Fewer axes.** Six was a choice; four would spend the same answers on less.
+3. **A lower credible multiplier.** Cheapest and the most dangerous — the
+   threshold's own comment records that without it a profile "finds" two or
+   three preferences that are noise, indistinguishable from the real ones.
+4. **A weaker prior.** Widens the posterior it is there to constrain.
+
+Worth deciding before Pilot Season is shown to anybody, because at present the
+honest answer it gives is also the only answer it can give.
+
 ---
 
 ## Phases 10 to 12, and how to approach them

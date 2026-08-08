@@ -6,6 +6,7 @@ import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
 import app.plotted.platform.spi.AvailabilityDirectory
 import app.plotted.platform.spi.SessionIssuer
+import app.plotted.platform.spi.TasteFixtures
 import app.plotted.platform.spi.TitleDirectory
 import org.slf4j.LoggerFactory
 import org.springframework.core.io.ClassPathResource
@@ -52,6 +53,7 @@ class DemoService(
     private val demo: DemoRepository,
     private val titles: TitleDirectory,
     private val availability: AvailabilityDirectory,
+    private val taste: TasteFixtures,
     private val sessions: SessionIssuer,
     private val properties: DemoProperties,
     private val platform: PlottedProperties,
@@ -93,9 +95,25 @@ class DemoService(
         }
 
         val subscribed = subscribe(userId, chosen, region)
+
+        // Part of the questionnaire, not all of it. A demo that arrives
+        // finished hides the fork, which is the interaction worth showing, and
+        // answering every axis would lose the demonstration that Plotted says
+        // so when it never asked. Failure here is not worth failing a demo
+        // over: the questionnaire simply starts from the beginning.
+        val answered = runCatching { taste.seedDemoPersona(userId, PILOT_ANSWERS) }
+            .onFailure { logger.warn("Could not seed the demo taste profile for {}: {}", userId, it.message) }
+            .getOrDefault(0)
+
         val session = sessions.issueFor(userId, client)
 
-        logger.info("Started demo account {} with {} titles and {} subscriptions", userId, chosen.size, subscribed.size)
+        logger.info(
+            "Started demo account {} with {} titles, {} subscriptions and {} taste answers",
+            userId,
+            chosen.size,
+            subscribed.size,
+            answered,
+        )
 
         return DemoSession(
             userId = userId,
@@ -243,6 +261,15 @@ class DemoService(
 
         /** Curated by a person. See the file's own header for why it exists. */
         const val PREFERRED_PATH = "demo/preferred-titles.txt"
+
+        /**
+         * Two thirds of the ladder, leaving five to answer.
+         *
+         * Enough for the fit to have something to say on the axes it saw, few
+         * enough that at least one axis stays unasked — which is what puts the
+         * `NOT_ASKED` verdict on screen rather than only in the tests.
+         */
+        const val PILOT_ANSWERS = 10
         const val PRIORITY_LEVELS = 5
         const val DEADLINE_INDEX = 1
         const val DEADLINE_DAYS = 10L
