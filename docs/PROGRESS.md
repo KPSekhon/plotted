@@ -399,11 +399,26 @@ need. `PlanSolverBoundTest` asserts that count, which is deterministic and fails
 if a fourth probe is ever added; a wall-clock assertion would pass with three
 orders of magnitude to spare and would be flaky besides.
 
-**Not built: a throughput benchmark.** It needs a deployed environment to mean
-anything — run here it would measure the absence of a database — and the question
-was never requests per second but whether one request can block for twenty
-seconds, which is structural and now asserted. Worth doing against the
-deployment, with the measured numbers recorded here.
+**Latency measured locally on 2026-08-07; throughput still not.** Against the
+seeded native Postgres, `GET /api/v1/tonight` over 200 warmed requests:
+**median 15.8 ms, p95 26.7 ms, p99 36.4 ms, max 41.6 ms**. That is the whole
+request path — auth, three batched SPI lookups, screen, score, diversify, and
+the decision-log write — and it sits comfortably inside the §13.1 budget.
+
+**The requests-per-second figure from the same run is discarded, and why is the
+useful part.** Eight concurrent PowerShell workers produced 32.6 req/s against
+63 req/s sequential — concurrency made it *slower*, which is impossible for the
+server and obvious once stated: `Start-Job` spawns a process per worker, so the
+harness was measuring PowerShell's startup cost. Quoting it would have been a
+number about the test rig wearing the costume of a number about Plotted. A real
+throughput figure needs a proper load tool against a deployed instance; the
+latency figures above stand on their own because they are sequential and
+warmed.
+
+**The optimiser is deliberately not benchmarked here.** CP-SAT crashes the JVM
+on this machine (phase 5), so `/api/v1/plan` cannot be driven locally at all.
+Its 20-second worst case remains asserted structurally as a solve count rather
+than measured.
 
 **What is still missing is users.** Both metrics return null on an empty log, and
 that is the correct answer rather than a gap in the code.
@@ -537,6 +552,37 @@ the Docker-backed tests pass.
 a test that passes against a mock proves only that a call was made. Read the
 whole job log, and be suspicious of any check that has never had the chance to
 fail.
+
+### The ingest transaction, verified 2026-08-07
+
+`TitleWriter` puts the title write and the `TitleIngested` publish in one
+transaction. It had never been observed working — the seed that succeeded
+earlier that day was carried by `fallbackExecution` on the listener, not by the
+fix.
+
+**The obvious check could not have worked.** With `fallbackExecution = true`
+still on the listener, re-seeding and confirming availability appears is passed
+identically by the fix and by a full revert of it, because the safety net writes
+the same rows. So the check was made to discriminate instead — three runs,
+single ingests through `POST /api/v1/titles`:
+
+| Run | `@Transactional` on `store` | `fallbackExecution` | `availability_snapshots` |
+|---|---|---|---|
+| Negative control | removed | `false` | **0** — HTTP 200, silent drop |
+| The fix alone | restored | `false` | **0 → 1** |
+| Committed code, full seed | as merged | `true` | **1 → 520** |
+
+The middle row is the result: with the safety net off, the transaction alone
+delivered the event. The first row matters as much — it reproduced the original
+bug exactly, returning 200 with no exception and no log line, so this check has
+now been watched fail rather than merely watched pass. The working tree was
+restored between runs and `git diff` against `HEAD` was empty before the seed,
+which reported `519 requested: 0 new, 519 refreshed, 0 unmatched, 0 failed`.
+
+**One correction.** `docs/HANDOFF.md` recorded 504 snapshots in the local
+database. There were none: `pg_stat_user_tables` showed 519 inserted and 519
+deleted, and nothing in the codebase deletes from that table, so it was cleared
+by hand. That happened to make "above zero" a clean signal.
 
 ---
 
