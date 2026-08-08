@@ -11,7 +11,7 @@
   z-index: 100;
   padding: 0.75rem 1rem;
   background: var(--plotted-accent);
-  color: #1a1408;
+  color: var(--plotted-accent-ink);
   font-weight: 600;
   border-radius: 0 0 var(--plotted-radius-sm) 0;
 
@@ -50,25 +50,25 @@
   text-decoration: none;
   margin-right: auto;
 
-  &__mark {
-    width: 0.55rem;
-    height: 1.6rem;
-    border-radius: 999px;
-    /* The one piece of pure brand colour in the chrome. */
-    background: linear-gradient(180deg, var(--plotted-accent), #d98f18);
-    flex-shrink: 0;
-  }
-
   &__text {
     display: flex;
     flex-direction: column;
     line-height: 1.15;
   }
 
+  /* Lowercase, and the full stop is the brand rather than punctuation: it is a
+     plotted point, the smallest possible statement of "here". Keeping the
+     wordmark this plain is what lets the X live on its own elsewhere — the two
+     do not have to appear together for either to read as Plotted. */
   &__name {
     font-weight: 650;
     font-size: 1.05rem;
     letter-spacing: -0.02em;
+    text-transform: lowercase;
+  }
+
+  &__dot {
+    color: var(--plotted-accent);
   }
 
   &__tagline {
@@ -103,12 +103,12 @@
 
   a.cta {
     background: var(--plotted-accent);
-    color: #1a1408;
+    color: var(--plotted-accent-ink);
     font-weight: 600;
 
     &:hover {
-      background: #ffc65c;
-      color: #1a1408;
+      background: var(--plotted-accent-hover);
+      color: var(--plotted-accent-ink);
     }
   }
 }

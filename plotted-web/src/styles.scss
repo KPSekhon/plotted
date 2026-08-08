@@ -1,18 +1,31 @@
 @use '@angular/material' as mat;
 
 /*
- * Plotted's look, in one place.
+ * Plotted's look, in one place: cinematic cartography.
  *
  * Dark by default, and not as a fashion choice: this is a product used in the
  * evening, on a sofa, deciding what to watch. A bright interface is the wrong
- * object in that room. The accent is a warm amber rather than Material's default
- * violet -- it reads as cinema marquee against cool neutrals, and it means the
- * product does not look like every other Material demo.
+ * object in that room.
  *
- * The rule underneath everything here: Plotted exists to reduce the work of
+ * The design language is a map. "Plot" carries three meanings at once here --
+ * the story, the route, and the graph -- and the interface leans on all three:
+ * thin route lines, waypoints, coordinates, and a destination X. Not treasure
+ * maps; closer to a transit diagram or a navigation instrument.
+ *
+ * ### The one rule that governs colour
+ *
+ *   Grey is possibility. Orange is the plotted choice.
+ *
+ * Orange marks the route, the current position and the destination, and nothing
+ * else. The moment it also means "heading" or "button" or "border", it stops
+ * meaning "this is the one" -- which is the single thing Plotted exists to say.
+ * A screen full of accent is a screen that has not chosen, and that is the
+ * product's whole argument inverted. Posters are the only other colour on the
+ * page, which is why they read as destinations.
+ *
+ * The rest follows from the same place: Plotted exists to reduce the work of
  * choosing, so the interface stays quiet. Few borders, almost no elevation,
- * generous space, and one accent used sparingly on the thing you are meant to do
- * next. Anything competing for attention is working against the product.
+ * generous space. Anything competing for attention is working against it.
  */
 
 $plotted-theme: mat.define-theme(
@@ -28,11 +41,13 @@ $plotted-theme: mat.define-theme(
     ),
     typography: (
       plain-family: (
+        Geist,
         Inter,
         system-ui,
         sans-serif,
       ),
       brand-family: (
+        Geist,
         Inter,
         system-ui,
         sans-serif,
@@ -52,24 +67,40 @@ html {
 
 :root {
   /* Neutrals. Deliberately not pure black -- a flat #000 makes every surface
-     above it look like a floating rectangle. */
-  --plotted-bg: #0e0f13;
-  --plotted-surface: #16181f;
-  --plotted-surface-raised: #1c1f28;
-  --plotted-border: #262a35;
-  --plotted-border-strong: #333846;
+     above it look like a floating rectangle, and leaves nowhere to go darker. */
+  --plotted-bg: #090909;
+  --plotted-surface: #111;
+  --plotted-surface-raised: #161616;
+  --plotted-border: #292929;
+  --plotted-border-strong: #3a3a3a;
 
-  --plotted-text: #e9ebf0;
-  --plotted-text-muted: #9aa1b1;
-  --plotted-text-faint: #6b7385;
+  /* Warm off-white rather than #fff. Pure white on near-black is clinical, and
+     this is meant to feel like a room with the lights down. */
+  --plotted-text: #f4f1ea;
+  --plotted-text-muted: #969696;
+  --plotted-text-faint: #6a6a6a;
 
-  --plotted-accent: #f5b544;
-  --plotted-accent-soft: rgb(245 181 68 / 12%);
+  --plotted-accent: #ff641a;
+  --plotted-accent-hover: #ff7b3a;
+  --plotted-accent-soft: rgb(255 100 26 / 10%);
+  /* Ink for text sitting *on* the accent. Near-black rather than white: at this
+     orange, white text fails contrast and black passes comfortably. */
+  --plotted-accent-ink: #1a0d05;
 
   --plotted-danger: #ff6b6b;
 
   --plotted-radius: 0.75rem;
   --plotted-radius-sm: 0.5rem;
+
+  /* Map annotations. Mono is scoped to figures a person reads as measurements --
+     runtimes, scores, provider names in a legend -- and never used for prose,
+     which is what keeps this a navigation instrument rather than a terminal. */
+  --plotted-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  /* Route geometry, shared so a line drawn in one component matches a line
+     drawn in another. */
+  --plotted-route-width: 1.5px;
+  --plotted-route-dash: 4 5;
 
   /* One shadow, used rarely. Depth is expensive attention. */
   --plotted-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 24px rgb(0 0 0 / 24%);
@@ -95,6 +126,15 @@ html {
   --mat-sys-outline-variant: var(--plotted-border);
   --mat-sys-error: var(--plotted-danger);
 
+  /* Material derives its own primary from the orange palette, which lands on a
+     different orange from ours and pairs it with white label text. At this
+     chroma white fails contrast on orange and near-black passes comfortably, so
+     both are pinned rather than left to the palette. */
+  --mat-sys-primary: var(--plotted-accent);
+  --mat-sys-on-primary: var(--plotted-accent-ink);
+  --mat-sys-primary-container: var(--plotted-accent-soft);
+  --mat-sys-on-primary-container: var(--plotted-text);
+
   /* The table keeps its own copies of these rather than reading the sys tokens,
      so they have to be set again or the rows stay sepia. */
   --mat-table-background-color: transparent;
@@ -111,16 +151,18 @@ body {
   margin: 0;
   background: var(--plotted-bg);
   color: var(--plotted-text);
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: Geist, Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 15px;
   line-height: 1.6;
-  /* A little warmth behind the top of the page so the background is not a flat
-     slab. Fixed, so it does not travel with the scroll. */
-  background-image: radial-gradient(
-    120rem 40rem at 50% -22rem,
-    rgb(245 181 68 / 6%),
-    transparent 70%
-  );
+  /* Two layers, both nearly invisible, and that is the intent: a coordinate grid
+     for the instrument feel and a little warmth at the top so the page is not a
+     flat slab. If you can see the grid without looking for it, it is too strong.
+     Fixed, so neither travels with the scroll. */
+  background-image:
+    radial-gradient(120rem 40rem at 50% -22rem, rgb(255 100 26 / 5%), transparent 70%),
+    linear-gradient(rgb(255 255 255 / 1.6%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 1.6%) 1px, transparent 1px);
+  background-size: auto, 100% 6rem, 6rem 100%;
   background-attachment: fixed;
 }
 
@@ -195,6 +237,122 @@ a:hover {
   color: var(--plotted-danger);
   font-size: 0.875rem;
   margin: 0 0 0.75rem;
+}
+
+/* --- the map vocabulary -------------------------------------------------
+
+   These are the recurring pieces of the design language. They are global
+   because their whole value is repetition: a waypoint has to look identical on
+   Tonight, on the watchlist and in an empty state, or it stops being a word in
+   a vocabulary and becomes decoration that happens to be round.
+
+   Meaning, kept honest:
+
+     .plot-point   filled orange   where you are, or the chosen thing
+     .waypoint     hollow grey     a possibility not taken
+     .dead-end     grey with slash unavailable
+     .route        solid line      an established relationship
+     .route--dashed                uncertain or predicted, never confirmed
+
+   The dashed variant is load-bearing rather than stylistic: it is how the
+   interface says "we are not certain" without a sentence, and it must never be
+   used for a fact Plotted actually knows. */
+
+.coordinates {
+  font-family: var(--plotted-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--plotted-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A figure read as a measurement: runtime, score, price. Tabular so a column of
+   them does not jitter as the digits change. */
+.readout {
+  font-family: var(--plotted-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.plot-point,
+.waypoint,
+.dead-end {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.plot-point {
+  background: var(--plotted-accent);
+}
+
+.waypoint {
+  border: 1.5px solid var(--plotted-border-strong);
+  background: transparent;
+}
+
+.dead-end {
+  border: 1.5px solid var(--plotted-text-faint);
+  background: transparent;
+  position: relative;
+}
+
+/* The slash is what makes a dead end read as "blocked" rather than as an
+   ordinary empty waypoint at a glance. */
+.dead-end::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-top: 1.5px solid var(--plotted-text-faint);
+  transform: rotate(45deg);
+  transform-origin: center;
+  top: 50%;
+}
+
+.route {
+  border: 0;
+  border-top: var(--plotted-route-width) solid var(--plotted-border-strong);
+  margin: 0;
+}
+
+.route--live {
+  border-top-color: var(--plotted-accent);
+}
+
+.route--dashed {
+  border-top-style: dashed;
+}
+
+/* --- motion -------------------------------------------------------------
+
+   One rule: things do not appear, they arrive somewhere. Every branded
+   animation is a line being drawn or a marker landing, and all of them are
+   short -- the novelty wears off long before the hundredth visit, and a product
+   about saving you time should not spend it. */
+
+@keyframes plotted-draw {
+  from {
+    stroke-dashoffset: var(--draw-length);
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes plotted-land {
+  from {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* --- Material adjustments ----------------------------------------------- */

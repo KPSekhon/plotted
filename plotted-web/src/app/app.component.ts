@@ -2,13 +2,14 @@ import { Component, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { AuthService } from './core/auth/auth.service';
+import { PlottedXComponent } from './shared/map/plotted-x.component';
 
 @Component({
   selector: 'plotted-root',
   standalone: true,
   // No Material here: the shell is plain markup, so the header is a hairline
   // rather than a toolbar that announces itself on every screen.
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, PlottedXComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
