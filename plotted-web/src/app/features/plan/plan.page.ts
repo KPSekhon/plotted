@@ -14,6 +14,7 @@ import { CONSTRAINT_LABELS, PlanResponse, Sensitivity } from '../../core/plan/pl
 import { PlanService } from '../../core/plan/plan.service';
 import { PlottedIconComponent } from '../../shared/map/plotted-icon.component';
 import { SectionNavComponent } from '../../shared/map/section-nav.component';
+import { PlanTransitMapComponent } from './plan-transit-map.component';
 
 /**
  * Cancel Culture.
@@ -53,6 +54,7 @@ import { SectionNavComponent } from '../../shared/map/section-nav.component';
     MatTooltipModule,
     SectionNavComponent,
     PlottedIconComponent,
+    PlanTransitMapComponent,
   ],
   template: `
     <section class="page">
@@ -67,7 +69,18 @@ import { SectionNavComponent } from '../../shared/map/section-nav.component';
         </p>
       </header>
 
-      <form class="controls" (ngSubmit)="ask()">
+      <!-- Once a plan exists it is the point of the screen, so five controls
+           stop competing with it and collapse to a line stating what was asked.
+           Reopening is one click, and the constraints stay visible as text
+           because a plan read without knowing its limits is a plan misread. -->
+      @if (result() && !editing()) {
+        <div class="asked">
+          <span class="coordinates">{{ constraintSummary() }}</span>
+          <button type="button" class="link" (click)="editing.set(true)">Change constraints</button>
+        </div>
+      }
+
+      <form class="controls" [class.hidden]="result() && !editing()" (ngSubmit)="ask()">
         <mat-form-field appearance="outline" class="narrow">
           <mat-label>Plan over</mat-label>
           <mat-select [(ngModel)]="horizonMonths" name="horizonMonths">
@@ -105,7 +118,9 @@ import { SectionNavComponent } from '../../shared/map/section-nav.component';
           </mat-select>
         </mat-form-field>
 
-        <button mat-flat-button type="submit" [disabled]="loading()">Work it out</button>
+        <button mat-flat-button type="submit" [disabled]="loading()">
+          {{ result() ? 'Replot' : 'Plot my subscriptions' }}
+        </button>
       </form>
 
       @if (loading()) {
@@ -166,55 +181,77 @@ import { SectionNavComponent } from '../../shared/map/section-nav.component';
           </section>
         } @else {
         @if (plan.objective; as objective) {
+          <!-- The numbers first, then the map, then the sentence. Figures make
+               comparison fast and prose makes interpretation fast, and the plan
+               needs both: three stats alone are hard to act on, and a sentence
+               alone hides the shape of the year. -->
+          <p class="route-label coordinates">Your route</p>
           <section class="summary">
+            <!-- Not "saved". A saving needs a counterfactual — what holding
+                 everything would have cost — and the response carries no
+                 per-service price to build one from, only the chosen plan's
+                 total. Inventing the comparison would put a number in the most
+                 quotable position on the screen that nothing computed. -->
             <div class="stat">
-              <span class="value">{{ percent(objective.coverage) }}</span>
-              <span class="label">of your list, priority-weighted</span>
-            </div>
-            <div class="stat">
-              <span class="value">{{ money(plan.totalCents ?? 0) }}</span>
+              <span class="value readout">{{ money(plan.totalCents ?? 0) }}</span>
               <span class="label">over {{ plan.horizonMonths }} months</span>
             </div>
             <div class="stat">
-              <span class="value">{{ switchCount() }}</span>
+              <span class="value readout">{{ percent(objective.coverage) }}</span>
+              <span class="label">of your list, priority-weighted</span>
+            </div>
+            <div class="stat">
+              <span class="value readout">{{ switchCount() }}</span>
               <span class="label">
                 {{ switchCount() === 1 ? 'change' : 'changes' }} to make
               </span>
             </div>
           </section>
 
-          <ol class="months">
-            @for (month of plan.months; track month.month) {
-              <li>
-                <div class="when">
-                  <span class="name">{{ monthLabel(month.month) }}</span>
-                  <span class="cost">{{ money(month.monthlyCents) }}</span>
-                </div>
-                <div class="services">
-                  @if (month.subscribed.length === 0) {
-                    <span class="none">Nothing &mdash; pay for nothing this month</span>
-                  }
-                  @for (service of month.subscribed; track service.providerId) {
-                    <span
-                      class="chip"
-                      [class.starting]="isStarting(month.month, service.providerId)"
-                    >
-                      @if (isStarting(month.month, service.providerId)) {
-                        <mat-icon aria-hidden="true">add</mat-icon>
-                      }
-                      {{ service.name }}
-                    </span>
-                  }
-                  @for (service of month.stopped; track service.providerId) {
-                    <span class="chip stopping">
-                      <mat-icon aria-hidden="true">close</mat-icon>
-                      {{ service.name }}
-                    </span>
-                  }
-                </div>
-              </li>
-            }
-          </ol>
+          <plotted-plan-transit-map [months]="plan.months" [covered]="plan.covered" />
+
+          <p class="verdict">
+            This route holds
+            <strong>{{ servicesHeld() }}</strong>
+            {{ servicesHeld() === 1 ? 'service' : 'services' }} across
+            {{ plan.horizonMonths }} months for
+            <strong>{{ money(plan.totalCents ?? 0) }}</strong>, covering
+            <strong>{{ percent(objective.coverage) }}</strong> of your priority-weighted list.
+          </p>
+
+          <!-- The month-by-month list stays, folded away. The map answers "what
+               is the shape of this plan"; someone about to actually cancel
+               something needs the exact names for a given month, and that is a
+               different question rather than a redundant one. -->
+          <details class="by-month">
+            <summary>Month by month</summary>
+            <ol class="months">
+              @for (month of plan.months; track month.month) {
+                <li>
+                  <div class="when">
+                    <span class="name">{{ monthLabel(month.month) }}</span>
+                    <span class="cost readout">{{ money(month.monthlyCents) }}</span>
+                  </div>
+                  <div class="services">
+                    @if (month.subscribed.length === 0) {
+                      <span class="none">Nothing &mdash; pay for nothing this month</span>
+                    }
+                    @for (service of month.subscribed; track service.providerId) {
+                      <span
+                        class="chip"
+                        [class.starting]="isStarting(month.month, service.providerId)"
+                      >
+                        {{ service.name }}
+                      </span>
+                    }
+                    @for (service of month.stopped; track service.providerId) {
+                      <span class="chip stopping">{{ service.name }}</span>
+                    }
+                  </div>
+                </li>
+              }
+            </ol>
+          </details>
 
           @if (plan.sensitivity.length > 0) {
             <section class="sensitivity">
@@ -381,31 +418,101 @@ import { SectionNavComponent } from '../../shared/map/section-nav.component';
       }
     }
 
+    .route-label {
+      margin: 0 0 0.5rem;
+    }
+
+    .asked {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.5rem 1rem;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid var(--plotted-border);
+      border-radius: var(--plotted-radius-sm);
+      background: var(--plotted-surface);
+      margin-bottom: 1.75rem;
+      font-size: 0.68rem;
+    }
+
+    .link {
+      background: none;
+      border: 0;
+      padding: 0;
+      font: inherit;
+      font-size: 0.72rem;
+      color: var(--plotted-text-muted);
+      text-decoration: underline;
+      text-decoration-color: var(--plotted-border-strong);
+      cursor: pointer;
+      margin-left: auto;
+    }
+
+    .link:hover {
+      color: var(--plotted-text);
+      text-decoration-color: var(--plotted-accent);
+    }
+
+    .controls.hidden {
+      display: none;
+    }
+
     .summary {
       display: flex;
       gap: 2.5rem;
       flex-wrap: wrap;
-      padding: 1.1rem 1.25rem;
-      border: 1px solid var(--plotted-border);
-      border-radius: 12px;
-      background: var(--plotted-surface);
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.5rem;
     }
 
     .stat {
       display: grid;
       gap: 0.15rem;
 
+      /* The figures are neutral, not orange. Orange is the route on the map
+         below; these are measurements of it, and tinting them would spend the
+         accent on three numbers that are not themselves a choice. */
       .value {
-        font-size: 1.5rem;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        color: var(--plotted-accent);
+        font-size: 1.6rem;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        color: var(--plotted-text);
       }
 
       .label {
         font-size: 0.75rem;
         color: var(--plotted-text-faint);
+        max-width: 11rem;
+      }
+    }
+
+    .verdict {
+      font-size: 0.92rem;
+      color: var(--plotted-text-muted);
+      max-width: 42rem;
+      margin: 0 0 1.5rem;
+
+      strong {
+        color: var(--plotted-text);
+        font-weight: 600;
+      }
+    }
+
+    .by-month {
+      margin-bottom: 1.5rem;
+
+      summary {
+        cursor: pointer;
+        font-size: 0.82rem;
+        color: var(--plotted-text-muted);
+        padding: 0.35rem 0;
+      }
+
+      summary:hover {
+        color: var(--plotted-text);
+      }
+
+      .months {
+        margin-top: 0.75rem;
       }
     }
 
@@ -628,6 +735,9 @@ export class PlanPage {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  /** Whether the constraint form is open. Opens itself when there is no plan yet. */
+  protected readonly editing = signal(false);
+
   protected readonly horizons: readonly number[] = [3, 6, 9, 12];
 
   /**
@@ -668,6 +778,42 @@ export class PlanPage {
 
   protected percent(fraction: number): string {
     return `${Math.round(fraction * 100)}%`;
+  }
+
+  /**
+   * Distinct services the plan holds at any point in the horizon.
+   *
+   * Distinct rather than summed across months: a service held for three months
+   * is one subscription somebody manages, not three, and the sentence is about
+   * how many things they end up paying for.
+   */
+  /**
+   * What was asked, in one line, for when the form is folded away.
+   *
+   * Every constraint appears, including the ones left blank — "no budget" is
+   * as much a part of how to read a plan as a figure would be, and omitting it
+   * would let someone assume a limit was in force when it was not.
+   */
+  protected constraintSummary(): string {
+    return [
+      `${this.horizonMonths} months`,
+      this.budget && this.budget > 0 ? `$${this.budget}/mo` : 'no budget',
+      this.maxServices && this.maxServices > 0 ? `${this.maxServices} at once` : 'any number',
+      this.maxSwitches !== null && this.maxSwitches >= 0
+        ? `${this.maxSwitches} ${this.maxSwitches === 1 ? 'change' : 'changes'}/mo`
+        : 'any changes',
+      this.priorities.find((p) => p.value === this.coverageWeight)?.label ?? '',
+    ]
+      .filter(Boolean)
+      .join('  ·  ');
+  }
+
+  protected servicesHeld(): number {
+    const plan = this.result();
+    if (!plan) return 0;
+    return new Set(
+      plan.months.flatMap((month) => month.subscribed.map((service) => service.providerId)),
+    ).size;
   }
 
   protected constraintLabel(constraint: string): string {
@@ -731,6 +877,8 @@ export class PlanPage {
         next: (response) => {
           this.result.set(response);
           this.loading.set(false);
+          // Fold the form away now there is something to look at.
+          this.editing.set(false);
         },
         error: (failure: unknown) => {
           this.error.set(messageFrom(failure));
