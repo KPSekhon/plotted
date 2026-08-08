@@ -143,15 +143,34 @@ class DemoRepository(
             .filterNotNull()
     }
 
-    fun insertWatchlistItem(watchlistId: UUID, titleId: UUID, priority: Int, desiredBy: LocalDate?) {
+    /**
+     * One watchlist row.
+     *
+     * [completedAt] exists so the persona can have finished a few things. That
+     * is not decoration: End Credits' completion rate joins on
+     * `completed_at >= accepted_at`, so without it the demo's rate has an empty
+     * numerator, and the watchlist's own "finished and set aside" group never
+     * appears on screen at all.
+     */
+    fun insertWatchlistItem(
+        watchlistId: UUID,
+        titleId: UUID,
+        priority: Int,
+        desiredBy: LocalDate?,
+        completedAt: OffsetDateTime? = null,
+    ) {
         dsl.insertInto(WATCHLIST_ITEMS)
             .set(WATCHLIST_ITEMS.ID, UUID.randomUUID())
             .set(WATCHLIST_ITEMS.WATCHLIST_ID, watchlistId)
             .set(WATCHLIST_ITEMS.TITLE_ID, titleId)
             .set(WATCHLIST_ITEMS.PRIORITY, priority.toShort())
-            .set(WATCHLIST_ITEMS.STATUS, "pending")
+            // The status and the timestamp are set together. A row saying
+            // "completed" with no completed_at, or the reverse, is a state the
+            // rest of the product has to defend against for no reason.
+            .set(WATCHLIST_ITEMS.STATUS, if (completedAt == null) "pending" else "completed")
             .set(WATCHLIST_ITEMS.ADDED_AT, OffsetDateTime.now(clock))
             .set(WATCHLIST_ITEMS.DESIRED_BY_DATE, desiredBy)
+            .set(WATCHLIST_ITEMS.COMPLETED_AT, completedAt)
             .set(WATCHLIST_ITEMS.SOURCE, "demo")
             .onConflictDoNothing()
             .execute()

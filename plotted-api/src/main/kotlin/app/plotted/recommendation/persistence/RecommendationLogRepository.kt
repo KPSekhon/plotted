@@ -99,6 +99,72 @@ class RecommendationLogRepository(
     }
 
     /**
+     * Writes one manufactured decision at explicit timestamps.
+     *
+     * **Fixture path, demo accounts only.** See `RecommendationFixtures` for
+     * what that forbids. It exists because [record] stamps `requested_at` from
+     * the clock, and a log written entirely at signup can only ever report that
+     * every acceptance is too recent to judge — which is the correct answer and
+     * a useless demonstration.
+     *
+     * Kept beside [record] rather than in a test fixture because it writes the
+     * same two tables and has to keep agreeing with them. A copy living
+     * somewhere else would drift the first time a column was added, and the
+     * failure would show up as a demo screen quietly missing a number.
+     *
+     * The propensity is 1.0 and the score is nominal. Neither is used by End
+     * Credits, and inventing a plausible-looking propensity would put a number
+     * into the column phase 7 divides by — which is precisely the column that
+     * must never contain anything nobody computed.
+     */
+    fun recordFixture(
+        userId: UUID,
+        regionCode: String,
+        availableMinutes: Int?,
+        accessPolicy: String,
+        titleId: UUID?,
+        requestedAt: OffsetDateTime,
+        acceptedAt: OffsetDateTime?,
+    ): UUID {
+        val requestId = UUID.randomUUID()
+        val served = titleId != null
+
+        dsl.insertInto(RECOMMENDATION_REQUESTS)
+            .set(RECOMMENDATION_REQUESTS.ID, requestId)
+            .set(RECOMMENDATION_REQUESTS.USER_ID, userId)
+            .set(RECOMMENDATION_REQUESTS.REQUESTED_AT, requestedAt)
+            .set(RECOMMENDATION_REQUESTS.REGION_CODE, regionCode)
+            .set(RECOMMENDATION_REQUESTS.AVAILABLE_MINUTES, availableMinutes)
+            .set(RECOMMENDATION_REQUESTS.ACCESS_POLICY, accessPolicy)
+            .set(RECOMMENDATION_REQUESTS.CANDIDATE_COUNT, FIXTURE_CANDIDATES)
+            .set(RECOMMENDATION_REQUESTS.ELIGIBLE_COUNT, if (served) FIXTURE_ELIGIBLE else 0)
+            .set(RECOMMENDATION_REQUESTS.OUTCOME, if (served) "served" else "nothing_fit")
+            .set(
+                RECOMMENDATION_REQUESTS.REJECTION_SUMMARY,
+                if (served) null else JSONB.valueOf("""{"TOO_LONG":$FIXTURE_CANDIDATES}"""),
+            )
+            .set(RECOMMENDATION_REQUESTS.RANKER_VERSION, FIXTURE_RANKER_VERSION)
+            .set(RECOMMENDATION_REQUESTS.LATENCY_MS, FIXTURE_LATENCY_MS)
+            .execute()
+
+        if (titleId != null) {
+            dsl.insertInto(RECOMMENDATION_ITEMS)
+                .set(RECOMMENDATION_ITEMS.ID, UUID.randomUUID())
+                .set(RECOMMENDATION_ITEMS.REQUEST_ID, requestId)
+                .set(RECOMMENDATION_ITEMS.TITLE_ID, titleId)
+                .set(RECOMMENDATION_ITEMS.POSITION, 1.toShort())
+                .set(RECOMMENDATION_ITEMS.SCORE, BigDecimal.ZERO.setScale(SCORE_SCALE))
+                .set(RECOMMENDATION_ITEMS.EXPLORATION, false)
+                .set(RECOMMENDATION_ITEMS.PROPENSITY, BigDecimal.ONE.setScale(PROPENSITY_SCALE))
+                .set(RECOMMENDATION_ITEMS.FEATURE_CONTRIBUTIONS, JSONB.valueOf("{}"))
+                .set(RECOMMENDATION_ITEMS.ACCEPTED_AT, acceptedAt)
+                .execute()
+        }
+
+        return requestId
+    }
+
+    /**
      * Marks one served item as the one the user chose.
      *
      * The `EXISTS` is what makes ownership a property of the query rather than a
@@ -136,5 +202,22 @@ class RecommendationLogRepository(
     private companion object {
         const val SCORE_SCALE = 5
         const val PROPENSITY_SCALE = 7
+
+        /**
+         * Shapes for [recordFixture], named so nothing plausible-looking gets
+         * typed inline and later mistaken for something that was computed.
+         */
+        const val FIXTURE_CANDIDATES = 12
+        const val FIXTURE_ELIGIBLE = 9
+        const val FIXTURE_LATENCY_MS = 24
+
+        /**
+         * Deliberately not `linear-v1`. Phase 7 must never pool rows from two
+         * scoring functions, and manufactured rows did not come from a scoring
+         * function at all — so they are stamped with a version no analysis will
+         * match, and an accidental inclusion shows up as an unknown ranker
+         * rather than as quietly worse numbers.
+         */
+        const val FIXTURE_RANKER_VERSION = "demo-fixture"
     }
 }

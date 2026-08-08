@@ -5,6 +5,7 @@ import app.plotted.platform.config.PlottedProperties
 import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
 import app.plotted.platform.spi.AvailabilityDirectory
+import app.plotted.platform.spi.RecommendationFixtures
 import app.plotted.platform.spi.SessionIssuer
 import app.plotted.platform.spi.TasteFixtures
 import app.plotted.platform.spi.TitleDirectory
@@ -42,6 +43,7 @@ class DemoServiceTest {
     // not a property any test here is about. The one thing that does matter --
     // that a failure to seed does not fail the demo -- has its own test below.
     private val taste = mockk<TasteFixtures>(relaxed = true)
+    private val decisions = mockk<RecommendationFixtures>(relaxed = true)
 
     private val userId = UUID.randomUUID()
     private val watchlistId = UUID.randomUUID()
@@ -59,6 +61,7 @@ class DemoServiceTest {
         titles = titles,
         availability = availability,
         taste = taste,
+        decisions = decisions,
         sessions = sessions,
         properties = properties,
         platform = platformProperties(),
@@ -92,7 +95,7 @@ class DemoServiceTest {
         givenCatalogue(titleCount = 12)
 
         val priorities = mutableListOf<Int>()
-        every { demo.insertWatchlistItem(any(), any(), capture(priorities), any()) } returns Unit
+        every { demo.insertWatchlistItem(any(), any(), capture(priorities), any(), any()) } returns Unit
 
         service().start(client)
 
@@ -107,7 +110,7 @@ class DemoServiceTest {
         givenCatalogue(titleCount = 12)
 
         val deadlines = mutableListOf<LocalDate?>()
-        every { demo.insertWatchlistItem(any(), any(), any(), captureNullable(deadlines)) } returns Unit
+        every { demo.insertWatchlistItem(any(), any(), any(), captureNullable(deadlines), any()) } returns Unit
 
         service().start(client)
 
@@ -203,6 +206,38 @@ class DemoServiceTest {
         // instead of the product.
         result.watchlistSize shouldBe 4
         verify { sessions.issueFor(userId, client) }
+    }
+
+    @Test
+    fun `the manufactured history includes a failure and a refusal`() {
+        givenCatalogue(titleCount = 8)
+        givenSession()
+
+        val recorded = mutableListOf<RecommendationFixtures.DemoDecision>()
+        every { decisions.recordDemoDecision(capture(recorded)) } returns Unit
+
+        service().start(client)
+
+        // A history where everything was accepted and finished makes the
+        // completion rate 100% and demonstrates nothing. These two rows are
+        // what stop the demo flattering itself.
+        recorded.any { it.titleId != null && it.acceptedAt == null } shouldBe true
+        recorded.any { it.titleId == null } shouldBe true
+
+        // And one acceptance outside the four-hour latency window, so the
+        // "excluded as stale" count on the screen is not always zero.
+        recorded.any {
+            it.acceptedAt != null && it.requestedAt.plusHours(4).isBefore(it.acceptedAt)
+        } shouldBe true
+    }
+
+    @Test
+    fun `a decision log that cannot be seeded does not fail the demo`() {
+        givenCatalogue(titleCount = 4)
+        givenSession()
+        every { decisions.recordDemoDecision(any()) } throws IllegalStateException("log unavailable")
+
+        service().start(client).watchlistSize shouldBe 4
     }
 
     @Test
