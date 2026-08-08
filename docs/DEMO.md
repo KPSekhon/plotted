@@ -15,10 +15,12 @@ system that knows when to say **no**. So the demo leads with the refusals, and
 the successful recommendation is the thing it comes back to rather than the
 thing it opens with.
 
-That is also the honest order. Plotted's catalogue is a 119-title seed; a demo
-built around "look how good the suggestions are" invites exactly the question
-that seed cannot survive. A demo built around "look at what it refuses to
-claim" is strongest precisely where the project is strongest.
+That is also the honest order. Plotted's catalogue is a ~500-title seed derived
+from what is actually streaming in Canada; a demo built around "look how good the
+suggestions are" invites a comparison with Netflix's own recommender, which has
+your whole viewing history and a thousand times the catalogue. A demo built
+around "look at what it refuses to claim" is strongest precisely where this
+project is strongest, and does not pretend to a scale it does not have.
 
 ---
 
@@ -47,7 +49,9 @@ The demo persona is built from whatever is in the database, so the shots above
 depend on the seed having run. In order:
 
 1. **Seed the catalogue.** `PLOTTED_SEED_ENABLED=true` with a TMDB token. Free
-   quota; takes a few minutes for 119 titles with their seasons.
+   quota; takes several minutes for 519 entries with their seasons. Read the
+   report it prints — the number of titles actually created is what you should
+   quote, not the entry count.
 2. **Check the persona is interesting.** Start a demo session and look at
    `/coverage`. You want the two subscriptions to have visibly different shares
    — that is what makes the "cancel this one" moment land. If both cover roughly
@@ -57,6 +61,24 @@ depend on the seed having run. In order:
    should let two or three titles through, the second none. Getting this wrong
    is the one thing that can make the demo's best moment look like a bug.
 
+### Two screens to stay away from on day one
+
+Both work and both are empty on a fresh deployment, which reads as broken rather
+than as new:
+
+- **End Credits** (`/analytics/end-credits`) returns nulls until somebody has
+  accepted a recommendation, and its completion rate holds back anything accepted
+  in the last fourteen days. That is correct — a latency computed from no
+  observations is not zero — but "we have nothing to show you yet" is not a demo
+  moment.
+- **Pilot Season** (`/pilot`) needs fifteen answers before the profile says
+  anything. If you want it in the video, answer the questionnaire *before*
+  recording and open on the fitted profile, where the interesting part is the
+  axes it marks **not asked** rather than the ones it scores.
+
+Both become demo material once the deployment has been used for a fortnight.
+Neither is worth faking.
+
 ## Rules for the recording
 
 - **No speed-up on the solve.** It takes milliseconds. Showing that honestly is
@@ -64,8 +86,11 @@ depend on the seed having run. In order:
 - **Do not clear the console.** If something logs a warning, it logs a warning.
 - **One take per shot, no cuts inside a shot.** A cut in the middle of the
   "nothing fits" moment reads as a retake that hid something.
-- **Say "seeded catalogue of 119 titles" out loud once.** It costs three seconds
-  and it pre-empts the only question the demo cannot answer.
+- **Say the catalogue size out loud once.** "A seeded catalogue of about five
+  hundred titles, derived from what's actually streaming in Canada." Three
+  seconds, and it pre-empts the only question the demo cannot answer — while
+  making the point that the list came from availability data rather than from
+  someone's guesses.
 
 ---
 
