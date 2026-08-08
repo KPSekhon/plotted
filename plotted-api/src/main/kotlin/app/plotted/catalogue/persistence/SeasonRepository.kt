@@ -82,9 +82,10 @@ class SeasonRepository(
      */
     @Transactional
     fun recalculateTotalRuntime(seriesTitleId: UUID): Int? {
-        val total = dsl.fetchOne(
+        val measured = dsl.fetchOne(
             """
-            SELECT SUM(COALESCE(e.runtime_minutes, s.average_episode_minutes))::int AS total
+            SELECT SUM(COALESCE(e.runtime_minutes, s.average_episode_minutes))::int AS total,
+                   AVG(e.runtime_minutes)::int                                     AS typical
               FROM episodes e
               JOIN seasons se ON se.id = e.season_id
               JOIN series  s  ON s.title_id = se.series_title_id
@@ -92,11 +93,32 @@ class SeasonRepository(
                AND se.season_number > 0
             """.trimIndent(),
             seriesTitleId,
-        )?.get("total", Int::class.javaObjectType)
+        )
 
+        val total = measured?.get("total", Int::class.javaObjectType)
         if (total == null || total <= 0) return null
 
-        dsl.update(SERIES)
+        // The typical episode, from the real episodes.
+        //
+        // This used to come only from TMDB's `episode_run_time`, which is empty
+        // for most shows — 181 of 260 seeded series had a total and no episode
+        // length. That mattered far more than it looks: Tonight Mode measures a
+        // time budget against one sitting, so a series with no episode length
+        // cannot be recommended into an evening at all, and two thirds of the
+        // catalogue's series were in that state.
+        //
+        // Derived here for the same reason the total is: the episodes are
+        // already stored and they are real, so an average over them beats a
+        // field upstream increasingly leaves blank. `AVG` ignores nulls, so
+        // this is the mean of the episodes whose runtime is actually known.
+        //
+        // A mean rather than a median because the column says average and a
+        // median hiding in it would be exactly the quiet mismatch this codebase
+        // keeps finding. Specials are already excluded by `season_number > 0`,
+        // which is what a median would mostly have protected against.
+        val typical = measured.get("typical", Int::class.javaObjectType)
+
+        val update = dsl.update(SERIES)
             .set(SERIES.TOTAL_RUNTIME_MINUTES, total)
             .set(
                 SERIES.EPISODE_COUNT,
@@ -107,8 +129,14 @@ class SeasonRepository(
                     .and(SEASONS.SEASON_NUMBER.gt(0))
                     .asField<Int>(),
             )
-            .where(SERIES.TITLE_ID.eq(seriesTitleId))
-            .execute()
+
+        // Added only when there is something better to say. Setting it to null
+        // would remove the title from every time-constrained recommendation,
+        // which is the failure this whole change exists to undo.
+        val withTypical =
+            if (typical != null && typical > 0) update.set(SERIES.AVERAGE_EPISODE_MINUTES, typical) else update
+
+        withTypical.where(SERIES.TITLE_ID.eq(seriesTitleId)).execute()
 
         return total
     }

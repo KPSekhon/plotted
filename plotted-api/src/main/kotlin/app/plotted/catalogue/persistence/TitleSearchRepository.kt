@@ -55,6 +55,7 @@ class TitleSearchRepository(
                    t.metadata_status,
                    m.runtime_minutes,
                    s.total_runtime_minutes,
+                   s.average_episode_minutes,
                    s.episode_count,
                    GREATEST(
                        ts_rank(t.search_vector, plainto_tsquery('simple', ?)),
@@ -87,6 +88,7 @@ class TitleSearchRepository(
                 metadataStatus = MetadataStatus.fromDb(record.get("metadata_status", String::class.java)),
                 runtimeMinutes = record.get("runtime_minutes", Int::class.javaObjectType),
                 totalRuntimeMinutes = record.get("total_runtime_minutes", Int::class.javaObjectType),
+                averageEpisodeMinutes = record.get("average_episode_minutes", Int::class.javaObjectType),
                 episodeCount = record.get("episode_count", Int::class.javaObjectType),
             )
         }
@@ -96,7 +98,8 @@ class TitleSearchRepository(
         """
             SELECT t.id, t.media_type, t.name, t.original_name, t.overview, t.release_date,
                    t.poster_url, t.popularity_score, t.community_rating, t.metadata_status,
-                   m.runtime_minutes, s.total_runtime_minutes, s.episode_count
+                   m.runtime_minutes, s.total_runtime_minutes, s.average_episode_minutes,
+                   s.episode_count
               FROM titles t
               LEFT JOIN movies m ON m.title_id = t.id
               LEFT JOIN series s ON s.title_id = t.id
@@ -117,6 +120,7 @@ class TitleSearchRepository(
             metadataStatus = MetadataStatus.fromDb(record.get("metadata_status", String::class.java)),
             runtimeMinutes = record.get("runtime_minutes", Int::class.javaObjectType),
             totalRuntimeMinutes = record.get("total_runtime_minutes", Int::class.javaObjectType),
+            averageEpisodeMinutes = record.get("average_episode_minutes", Int::class.javaObjectType),
             episodeCount = record.get("episode_count", Int::class.javaObjectType),
         )
     }.firstOrNull()
@@ -143,7 +147,8 @@ class TitleSearchRepository(
             """
                 SELECT t.id, t.media_type, t.name, t.original_name, t.overview, t.release_date,
                        t.poster_url, t.popularity_score, t.community_rating, t.metadata_status,
-                       m.runtime_minutes, s.total_runtime_minutes, s.episode_count
+                       m.runtime_minutes, s.total_runtime_minutes, s.average_episode_minutes,
+                       s.episode_count
                   FROM titles t
                   LEFT JOIN movies m ON m.title_id = t.id
                   LEFT JOIN series s ON s.title_id = t.id
@@ -164,6 +169,7 @@ class TitleSearchRepository(
                 metadataStatus = MetadataStatus.fromDb(record.get("metadata_status", String::class.java)),
                 runtimeMinutes = record.get("runtime_minutes", Int::class.javaObjectType),
                 totalRuntimeMinutes = record.get("total_runtime_minutes", Int::class.javaObjectType),
+                averageEpisodeMinutes = record.get("average_episode_minutes", Int::class.javaObjectType),
                 episodeCount = record.get("episode_count", Int::class.javaObjectType),
             )
         }

@@ -136,6 +136,7 @@ class RankerTest {
             mediaType = mediaType,
             posterUrl = null,
             watchMinutes = 100,
+            sessionMinutes = 100,
             priority = 3,
             desiredByDate = null,
             communityRating = null,

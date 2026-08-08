@@ -21,7 +21,18 @@ data class Candidate(
     val name: String,
     val mediaType: String,
     val posterUrl: String?,
+    /**
+     * The whole thing, start to finish. Shown so somebody can see what they are
+     * taking on; never filtered against, because a long series is watched in
+     * increments rather than in one go.
+     */
     val watchMinutes: Int?,
+    /**
+     * One sitting — a film, or a typical episode. Everything time-related is
+     * decided from this, because "what can I watch tonight" is a question about
+     * an evening rather than about a box set.
+     */
+    val sessionMinutes: Int?,
     /** 1 is the highest, 5 the lowest. */
     val priority: Int,
     val desiredByDate: LocalDate?,

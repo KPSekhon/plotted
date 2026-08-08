@@ -185,9 +185,22 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
                     <dt>Format</dt>
                     <dd>{{ pick.mediaType === 'movie' ? 'Film' : 'Series' }}</dd>
                   </div>
-                  @if (pick.watchMinutes) {
+                  <!-- Tonight is a question about one evening, so the headline
+                       figure is the sitting. The whole commitment sits beside
+                       it rather than replacing it: "24 min per episode" answers
+                       tonight, and "472 h in total" is what you would want to
+                       know before starting One Piece. Showing only the total
+                       was the bug; showing only the episode would hide what you
+                       are signing up for. -->
+                  @if (pick.sessionMinutes) {
                     <div>
-                      <dt>Runtime</dt>
+                      <dt>{{ pick.perEpisode ? 'Per episode' : 'Runtime' }}</dt>
+                      <dd class="readout">{{ formatMinutes(pick.sessionMinutes) }}</dd>
+                    </div>
+                  }
+                  @if (pick.perEpisode && pick.watchMinutes) {
+                    <div>
+                      <dt>All of it</dt>
                       <dd class="readout">{{ formatMinutes(pick.watchMinutes) }}</dd>
                     </div>
                   }
@@ -263,8 +276,10 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
 
                     <p class="meta coordinates">
                       <span>{{ pick.mediaType === 'movie' ? 'Film' : 'Series' }}</span>
-                      @if (pick.watchMinutes) {
-                        <span class="readout">{{ formatMinutes(pick.watchMinutes) }}</span>
+                      @if (pick.sessionMinutes) {
+                        <span class="readout">
+                          {{ formatMinutes(pick.sessionMinutes) }}{{ pick.perEpisode ? '/ep' : '' }}
+                        </span>
                       }
                       @if (pick.availableOn.length > 0) {
                         <span>{{ pick.availableOn.join(', ') }}</span>

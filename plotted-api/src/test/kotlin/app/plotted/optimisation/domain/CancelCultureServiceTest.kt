@@ -289,6 +289,7 @@ class CancelCultureServiceTest {
                 releaseYear = 2025,
                 posterUrl = null,
                 watchMinutes = 120,
+                sessionMinutes = 120,
                 communityRating = 7.5,
             )
         }

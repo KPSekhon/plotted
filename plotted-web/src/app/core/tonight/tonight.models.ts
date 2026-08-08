@@ -13,7 +13,15 @@ export interface Pick {
   readonly name: string;
   readonly mediaType: 'movie' | 'series';
   readonly posterUrl: string | null;
+  /** The whole commitment: a film, or every episode of a series added up. */
   readonly watchMinutes: number | null;
+  /**
+   * One sitting — a film, or a typical episode. What the time budget was
+   * actually measured against, because a series is watched in increments.
+   */
+  readonly sessionMinutes: number | null;
+  /** True when `sessionMinutes` describes an episode rather than the whole title. */
+  readonly perEpisode: boolean;
   readonly availableOn: readonly string[];
   readonly score: number;
   /** Derived from the scored features, never generated prose. */

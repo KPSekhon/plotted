@@ -59,11 +59,21 @@ interface TitleDirectory {
         val releaseYear: Int?,
         val posterUrl: String?,
         /**
-         * Runtime for a film, summed episode runtime for a series -- already
-         * resolved, because which of the two applies is the catalogue's business
-         * and getting it wrong is how a time filter starts lying.
+         * The whole commitment: a film's runtime, or every episode of a series
+         * added up. Right for "should I take this on"; wrong for "will it fit
+         * tonight".
          */
         val watchMinutes: Int?,
+        /**
+         * One sitting: a film, or a typical episode.
+         *
+         * Both figures cross the boundary because the two questions are
+         * genuinely different and the answer differs by an order of magnitude.
+         * Collapsing them is what made Tonight Mode measure One Piece at 472
+         * hours and refuse it for every evening anyone ever has -- a filter
+         * that lied by answering a question nobody asked.
+         */
+        val sessionMinutes: Int?,
         /**
          * Community rating out of 10, or null when nobody has rated it.
          *

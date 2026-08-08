@@ -139,6 +139,7 @@ class TonightService(
                 mediaType = summary.mediaType,
                 posterUrl = summary.posterUrl,
                 watchMinutes = summary.watchMinutes,
+                sessionMinutes = summary.sessionMinutes,
                 priority = entry.priority,
                 desiredByDate = entry.desiredByDate,
                 communityRating = summary.communityRating,

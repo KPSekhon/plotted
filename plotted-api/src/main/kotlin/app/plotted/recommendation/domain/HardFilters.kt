@@ -89,10 +89,14 @@ fun screen(candidate: Candidate, context: TonightContext, blockedTitleIds: Set<U
     // disqualification. Ranking may use a title with no runtime; a request that
     // says "I have 90 minutes" may not, because "it fits" would be a guess and
     // the promise this product makes is precisely that it is not guessing.
+    // Measured against one sitting, not the whole thing. A series is judged by
+    // a typical episode, because that is what somebody watches this evening --
+    // filtering on the total made One Piece 472 hours long and refused it, and
+    // every other multi-season series with it, for every evening anybody has.
     context.availableMinutes?.let { budget ->
-        val watchMinutes = candidate.watchMinutes
+        val sessionMinutes = candidate.sessionMinutes
             ?: return Screened.Rejected(candidate.titleId, Rejection.RUNTIME_UNKNOWN)
-        if (watchMinutes > budget * (1 + OVERSHOOT_TOLERANCE)) {
+        if (sessionMinutes > budget * (1 + OVERSHOOT_TOLERANCE)) {
             return Screened.Rejected(candidate.titleId, Rejection.TOO_LONG)
         }
     }

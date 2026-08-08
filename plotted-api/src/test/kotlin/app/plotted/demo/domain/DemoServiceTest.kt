@@ -274,6 +274,7 @@ class DemoServiceTest {
                 // The unmeasured ones are the tail, so the caller has to filter
                 // rather than simply truncate.
                 watchMinutes = if (id in measured) 118 else null,
+                sessionMinutes = if (id in measured) 118 else null,
                 communityRating = 7.4,
             )
         }

@@ -151,6 +151,7 @@ class EvaluationHarnessTest {
         val candidates = (0 until 8).map { index ->
             candidate(priority = (index % 5) + 1).copy(
                 watchMinutes = 90 + index * 5,
+                sessionMinutes = 90 + index * 5,
                 desiredByDate = today.plusDays((index + 1).toLong()),
                 communityRating = 5.0 + index * 0.4,
             )
@@ -171,6 +172,7 @@ class EvaluationHarnessTest {
         mediaType = "movie",
         posterUrl = null,
         watchMinutes = 110,
+        sessionMinutes = 110,
         priority = priority,
         desiredByDate = null,
         communityRating = 7.0,

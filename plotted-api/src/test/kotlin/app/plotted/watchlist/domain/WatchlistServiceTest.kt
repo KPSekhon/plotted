@@ -120,6 +120,7 @@ class WatchlistServiceTest {
         releaseYear = 2026,
         posterUrl = null,
         watchMinutes = 100,
+        sessionMinutes = 100,
         communityRating = null,
     )
 }

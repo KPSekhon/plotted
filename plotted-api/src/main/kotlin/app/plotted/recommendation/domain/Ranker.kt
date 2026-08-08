@@ -28,8 +28,12 @@ class Ranker(
             // there is no budget this feature is absent rather than neutral --
             // renormalisation then redistributes its weight instead of handing
             // every candidate the same meaningless 0.5.
+            //
+            // Measured on the sitting, not the whole thing: scoring a series by
+            // its total would rank a 22-minute episode as a terrible use of a
+            // 45-minute evening, which is the opposite of true.
             Feature.RUNTIME_FIT to context.availableMinutes?.let { budget ->
-                candidate.watchMinutes?.let { runtimeFit(it, budget) }
+                candidate.sessionMinutes?.let { runtimeFit(it, budget) }
             },
 
             // Already paid for beats free beats anything else. Under

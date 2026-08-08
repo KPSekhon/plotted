@@ -87,7 +87,20 @@ data class PickResponse(
     val name: String,
     val mediaType: String,
     val posterUrl: String?,
+    @Schema(
+        description =
+        "The whole commitment: a film's runtime, or every episode of a series added up. Shown " +
+            "so somebody can see what they are taking on. Not what the time filter used.",
+    )
     val watchMinutes: Int?,
+    @Schema(
+        description =
+        "One sitting: a film, or a typical episode. This is what the time budget was measured " +
+            "against, because a long series is watched in increments rather than in one go.",
+    )
+    val sessionMinutes: Int?,
+    @Schema(description = "True when sessionMinutes describes an episode rather than the whole title.")
+    val perEpisode: Boolean,
     @Schema(description = "Where it can be watched, under the access policy that was applied.")
     val availableOn: List<String>,
     @Schema(description = "0 to 1, after renormalising over the features this title actually has.")
@@ -113,6 +126,8 @@ data class PickResponse(
             mediaType = pick.candidate.mediaType,
             posterUrl = pick.candidate.posterUrl,
             watchMinutes = pick.candidate.watchMinutes,
+            sessionMinutes = pick.candidate.sessionMinutes,
+            perEpisode = pick.candidate.mediaType != "movie",
             availableOn = pick.candidate.offers.map { it.providerName }.distinct().sorted(),
             score = pick.score,
             // Only contributions that meaningfully moved the score. A reason

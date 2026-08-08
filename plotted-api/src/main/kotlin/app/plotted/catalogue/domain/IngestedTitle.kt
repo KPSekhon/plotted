@@ -135,13 +135,39 @@ data class CatalogueTitle(
     val metadataStatus: MetadataStatus,
     val runtimeMinutes: Int?,
     val totalRuntimeMinutes: Int?,
+    val averageEpisodeMinutes: Int?,
     val episodeCount: Int?,
 ) {
     /**
-     * How long this takes to get through, whichever kind of thing it is.
-     * Tonight Mode's hard time filter reads this and nothing else.
+     * The whole thing, start to finish: a film's runtime, or every episode of a
+     * series added up.
+     *
+     * A **commitment** figure. It belongs where somebody is deciding whether to
+     * take a series on at all — the title page, the watchlist — and it is
+     * emphatically not the answer to "will this fit tonight".
      */
     val watchMinutes: Int? get() = if (mediaType == MediaType.MOVIE) runtimeMinutes else totalRuntimeMinutes
+
+    /**
+     * How long **one sitting** is: a film, or a typical episode.
+     *
+     * What a time-constrained request has to measure against, and getting this
+     * wrong was a real defect rather than a refinement. Tonight Mode filtered on
+     * [watchMinutes], so a series was judged by its total — One Piece is 472
+     * hours and therefore never fitted an evening, and neither did any other
+     * multi-season series. Somebody with a list of half-hour comedies asking for
+     * forty-five minutes was told *everything on your list is longer than the
+     * time you have*: the product failing its one promise, in the commonest case
+     * there is.
+     *
+     * Nobody watches a series in one sitting. They watch an episode.
+     *
+     * The average rather than a specific episode, because Plotted does not know
+     * which episode you are on — `watchlist_items` carries a coarse status and
+     * no position. So the claim is about a *typical* episode, and the interface
+     * says "per episode" rather than quoting a length as though it were exact.
+     */
+    val sessionMinutes: Int? get() = if (mediaType == MediaType.MOVIE) runtimeMinutes else averageEpisodeMinutes
 
     /**
      * Ranking may still use a title without a runtime; a time-constrained

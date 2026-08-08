@@ -185,6 +185,7 @@ class TonightServiceTest {
             mediaType = "movie",
             posterUrl = null,
             watchMinutes = null,
+            sessionMinutes = null,
             priority = 3,
             desiredByDate = null,
             communityRating = null,
@@ -289,6 +290,7 @@ class TonightServiceTest {
         releaseYear = 2024,
         posterUrl = null,
         watchMinutes = watchMinutes,
+        sessionMinutes = watchMinutes,
         communityRating = 7.5,
     )
 

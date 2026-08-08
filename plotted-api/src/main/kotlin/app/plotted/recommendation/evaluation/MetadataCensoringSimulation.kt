@@ -93,30 +93,42 @@ class MetadataCensoringSimulation(
      */
     private fun Random.nextUuid(): UUID = UUID(nextLong(), nextLong())
 
-    private fun completeCandidate(random: Random, provider: UUID): Candidate = Candidate(
-        titleId = random.nextUuid(),
-        name = "Simulated title",
-        mediaType = if (random.nextBoolean()) "movie" else "series",
-        posterUrl = null,
-        watchMinutes = random.nextInt(70, 190),
-        priority = random.nextInt(1, 6),
-        // Inside the ranker's 30-day deadline horizon often enough that the
-        // feature actually varies; beyond it, it contributes nothing and would
-        // be a constant.
-        desiredByDate = today.plusDays(random.nextLong(1, 40)),
-        communityRating = random.nextDouble(4.0, 9.5),
-        offers = listOf(Candidate.Offer(provider, "Simulated service", isFree = false)),
-        // Present for some candidates, absent for others, exactly as it will be
-        // in life: most people have not answered the questionnaire.
-        //
-        // It is deliberately **unrelated to the target**, because the target is
-        // the linear ranker's score and the linear ranker does not read taste.
-        // So the correct thing for the learned model to do with this column is
-        // ignore it, and `DistillationFidelityTest` still holding is the check
-        // that it did. A column that were always absent instead would leave the
-        // feature untested rather than tested and found uninformative.
-        tasteMatch = if (random.nextDouble() < TASTE_PRESENT_RATE) random.nextDouble(0.0, 1.0) else null,
-    )
+    private fun completeCandidate(random: Random, provider: UUID): Candidate {
+        // Drawn once and used for both. In life the two differ — a series'
+        // commitment is its whole run and its sitting is one episode — but this
+        // simulation exists to measure what renormalisation is worth when a
+        // feature is *missing*, and the ranker reads exactly one of them.
+        // Independent draws would quietly change what the phase 7 ablation
+        // measures while leaving its number looking comparable to the old one.
+        val runtime = random.nextInt(70, 190)
+
+        return Candidate(
+            titleId = random.nextUuid(),
+            name = "Simulated title",
+            mediaType = if (random.nextBoolean()) "movie" else "series",
+            posterUrl = null,
+            watchMinutes = runtime,
+            sessionMinutes = runtime,
+            priority = random.nextInt(1, 6),
+            // Inside the ranker's 30-day deadline horizon often enough that the
+            // feature actually varies; beyond it, it contributes nothing and
+            // would be a constant.
+            desiredByDate = today.plusDays(random.nextLong(1, 40)),
+            communityRating = random.nextDouble(4.0, 9.5),
+            offers = listOf(Candidate.Offer(provider, "Simulated service", isFree = false)),
+            // Present for some candidates, absent for others, exactly as it will
+            // be in life: most people have not answered the questionnaire.
+            //
+            // It is deliberately **unrelated to the target**, because the target
+            // is the linear ranker's score and the linear ranker does not read
+            // taste. So the correct thing for the learned model to do with this
+            // column is ignore it, and `DistillationFidelityTest` still holding
+            // is the check that it did. A column that were always absent instead
+            // would leave the feature untested rather than tested and found
+            // uninformative.
+            tasteMatch = if (random.nextDouble() < TASTE_PRESENT_RATE) random.nextDouble(0.0, 1.0) else null,
+        )
+    }
 
     /**
      * Blanks optional fields at random.
@@ -127,12 +139,21 @@ class MetadataCensoringSimulation(
      * candidate scorable, which stops the comparison from quietly becoming one
      * about how many candidates each strategy dropped.
      */
-    private fun censor(candidate: Candidate, random: Random): Candidate = candidate.copy(
-        watchMinutes = candidate.watchMinutes.takeUnless { random.nextDouble() < censorRate },
-        desiredByDate = candidate.desiredByDate.takeUnless { random.nextDouble() < censorRate },
-        communityRating = candidate.communityRating.takeUnless { random.nextDouble() < censorRate },
-        offers = if (random.nextDouble() < censorRate) emptyList() else candidate.offers,
-    )
+    private fun censor(candidate: Candidate, random: Random): Candidate {
+        // One draw, applied to both. The ranker reads `sessionMinutes`, so
+        // censoring only `watchMinutes` would leave the runtime feature always
+        // present and quietly turn the headline ablation into a measurement of
+        // nothing — while still producing a plausible number.
+        val runtime = candidate.watchMinutes.takeUnless { random.nextDouble() < censorRate }
+
+        return candidate.copy(
+            watchMinutes = runtime,
+            sessionMinutes = runtime,
+            desiredByDate = candidate.desiredByDate.takeUnless { random.nextDouble() < censorRate },
+            communityRating = candidate.communityRating.takeUnless { random.nextDouble() < censorRate },
+            offers = if (random.nextDouble() < censorRate) emptyList() else candidate.offers,
+        )
+    }
 
     companion object {
         const val DEFAULT_QUERIES = 2_000

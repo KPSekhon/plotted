@@ -33,11 +33,13 @@ class CatalogueTitleDirectory(
                 name = title.name,
                 releaseYear = title.releaseDate?.year,
                 posterUrl = title.posterUrl,
-                // Resolved on this side of the boundary: whether runtime or
-                // summed episode runtime applies depends on media type, and that
-                // rule belongs to the catalogue. Handing over both fields would
-                // invite the caller to pick, and eventually to pick wrong.
+                // Both resolved on this side of the boundary: which underlying
+                // column applies depends on media type, and that rule belongs to
+                // the catalogue. What the caller gets is two clearly named
+                // questions -- the whole commitment, and one sitting -- rather
+                // than raw columns to pick between and eventually pick wrong.
                 watchMinutes = title.watchMinutes,
+                sessionMinutes = title.sessionMinutes,
                 communityRating = title.communityRating?.toDouble(),
             )
         }

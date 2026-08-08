@@ -228,6 +228,7 @@ class RecommendationLogRepositoryIntegrationTest {
             mediaType = "movie",
             posterUrl = null,
             watchMinutes = 100,
+            sessionMinutes = 100,
             priority = 2,
             desiredByDate = null,
             communityRating = 7.5,
