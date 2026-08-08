@@ -103,6 +103,22 @@ profile, so this is enforced rather than remembered.
 make check-env
 ```
 
+Once the TMDB token is set, it is also worth checking the seed list resolves
+before asking a deployment to ingest it:
+
+```bash
+python tools/seed/validate_seed.py
+```
+
+400 free TMDB requests, no database, a few minutes. It reports ids that do not
+resolve, ids that exist under the *other* media type, and — the one that matters
+most — titles with **no runtime**, which ingest fine and are then invisible to
+Tonight Mode's time filter, because that filter is a hard one. A seed full of
+runtime-less titles produces a recommender that mysteriously refuses to answer.
+
+**This has never been run**: the TMDB token was empty for the whole of
+development, which is what `check-env` found.
+
 Two seconds, and it catches the class of mistake that otherwise surfaces from a
 log after a five-minute image build. The one worth naming: **a missing
 `TMDB_READ_ACCESS_TOKEN` boots perfectly happily** and then serves empty screens,
