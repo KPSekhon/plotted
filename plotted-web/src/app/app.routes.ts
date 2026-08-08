@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { anonymousOnlyGuard, authGuard } from './core/auth/auth.guard';
+import { anonymousOnlyGuard, authGuard, signedOutMatch } from './core/auth/auth.guard';
 
 /**
  * Only routes that are actually implemented. Tonight Mode (Queue Theory) landed
@@ -9,6 +9,15 @@ import { anonymousOnlyGuard, authGuard } from './core/auth/auth.guard';
  * empty page is worse than one with fewer links.
  */
 export const routes: Routes = [
+  // `/` is two pages. Order matters: the signed-out match is declared first so
+  // a visitor with no session never briefly resolves Home and fires its
+  // authenticated data loads before being turned away.
+  {
+    path: '',
+    canMatch: [signedOutMatch],
+    loadComponent: () => import('./features/landing/landing.page').then((m) => m.LandingPage),
+    title: 'Plotted — Stop browsing. Your night\'s plotted.',
+  },
   {
     path: '',
     canActivate: [authGuard],
