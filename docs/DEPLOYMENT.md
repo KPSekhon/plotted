@@ -97,6 +97,19 @@ openssl rand -base64 48
 `SecurityConfig` refuses to start with the development default outside the `dev`
 profile, so this is enforced rather than remembered.
 
+### 2b. Check the environment before building anything
+
+```bash
+make check-env
+```
+
+Two seconds, and it catches the class of mistake that otherwise surfaces from a
+log after a five-minute image build. The one worth naming: **a missing
+`TMDB_READ_ACCESS_TOKEN` boots perfectly happily** and then serves empty screens,
+because nothing on a developer machine without a database ever asks TMDB for
+anything. It was empty in `.env` for the whole of development and nothing
+noticed. A missing JWT secret at least fails loudly; this one does not.
+
 ### 3. Decide what the deployment is for
 
 | Variable | Demo deployment | Anything else |
@@ -125,21 +138,26 @@ runs — which looks exactly like it running and finding nothing.
 ### API
 
 ```bash
-gcloud run deploy plotted-api \
-  --source . \
-  --region northamerica-northeast1 \
-  --allow-unauthenticated \
-  --set-env-vars SPRING_PROFILES_ACTIVE=prod \
-  --set-secrets PLOTTED_JWT_SECRET=plotted-jwt-secret:latest,PLOTTED_DB_PASSWORD=plotted-db-password:latest,TMDB_READ_ACCESS_TOKEN=tmdb-token:latest
+make deploy
 ```
 
-`--source .` uses the repository-root build context the `Dockerfile` expects.
-The region is Canadian because the product is Canada-only and the database
-should be beside it.
+`ops/deploy/deploy.sh` runs `check-env` first so a bad environment fails in two
+seconds rather than after an image build, then deploys and verifies. Region
+defaults to `northamerica-northeast1` because the product is Canada-only and the
+database should be beside it; `--source .` uses the repository-root build context
+the `Dockerfile` expects.
 
-Secrets go through Secret Manager rather than `--set-env-vars`. An environment
-variable set on the command line is in your shell history and in the Cloud Run
-revision description, and both are readable by anyone with view access.
+**Scaling defaults to min 0, max 3.** The maximum matters because Cloud Run's
+default is high and scale-to-zero saves nothing if a crawler scales you to fifty.
+The minimum is the real decision: at zero the nightly snapshot never fires, so
+`PLOTTED_MIN_INSTANCES=1` is what starts Plot Armour's history. The script says
+so rather than leaving it to be discovered.
+
+Once the secrets exist in Secret Manager, prefer `--set-secrets` over the env
+vars the script uses — an environment variable set on the command line is in your
+shell history and in the revision description, and both are readable by anyone
+with view access. The script uses env vars because Secret Manager needs the
+secrets created first, and creating them is a person's job.
 
 ### Web
 
@@ -153,48 +171,61 @@ as the page. The refresh token is an `HttpOnly` `SameSite=Lax` cookie scoped to
 `/api/v1/auth`, and a cross-origin split breaks session persistence in a way
 that looks like random sign-outs rather than a configuration error.
 
+**`plotted-web/public/_redirects` is the Cloudflare Pages half of that**, and it
+ships in the build already. Replace `PLOTTED_API_HOST` in it with the Cloud Run
+URL before uploading — it is a placeholder because the file is committed and the
+host is not known until the API exists. It proxies with a `200` rather than a
+redirect, because a redirect would change the origin in the address bar, which is
+the thing being prevented.
+
 If the static host cannot proxy, set `plotted.cors.allowed-origins` to the web
 origin and expect to revisit the cookie's `SameSite` — that is a real trade-off,
 not a checkbox, and `SameSite=None` requires `Secure` and a reason.
 
 ### Seeding
 
-First boot only, with `PLOTTED_SEED_ENABLED=true`. It resolves 119 titles
-through TMDB search and ingests each with its Canadian availability, which is
-free quota but takes a few minutes. Then **turn it off** — it is idempotent, so
-leaving it on is not destructive, but it re-pulls the whole seed on every cold
-start, and on a scale-to-zero service that is every few minutes.
+First boot only, with `PLOTTED_SEED_ENABLED=true`. It resolves **519 seed entries**
+— 400 by tmdb id, 119 by TMDB search — and ingests each with its Canadian
+availability, which is free quota but takes several minutes. Then **turn it off**:
+it is idempotent, so leaving it on is not destructive, but it re-pulls the whole
+seed on every cold start, and on a scale-to-zero service that is every few
+minutes.
+
+The run reports created, refreshed, unmatched and incomplete. **That report is
+the number to quote for how many titles the catalogue actually has**, because the
+519 entries overlap — the curated names resolve to ids some of which the derived
+half already lists.
 
 ---
 
 ## Verifying it actually works
 
-In this order, because each one tells you something different:
-
 ```bash
-curl -s https://<api-host>/actuator/health
+make verify-deploy HOST=https://your-api-host
 ```
 
-Expect `{"status":"UP"}`. If it is `DOWN`, read the components — the Redis
-contributor is disabled in the `prod` profile precisely because Redis has no
-callers yet and an absent one would fail this check for no reason.
+`make deploy` runs this automatically. It does three checks in a deliberate
+order, because each tells you something the previous cannot — and running them
+out of order means diagnosing the wrong layer.
 
-```bash
-curl -s https://<api-host>/api/v1/providers | head -c 200
-```
+**1. `/actuator/health`.** Expect `{"status":"UP"}`. If it is `DOWN`, read the
+components. **Redis being `DOWN` is expected and harmless**: it has exactly one
+caller, the rate limiter, and it is deliberately excluded from the readiness
+group so a Redis outage degrades limiting rather than removing every instance
+from the load balancer.
 
-Reference data from the migrations. If this is empty the migrations did not run.
+**2. `/api/v1/providers`.** Reference data from the migrations. Empty means
+Flyway did not run — check the startup logs for the extension-permission failure
+before looking anywhere else.
 
-```bash
-curl -sX POST https://<api-host>/api/v1/demo/session | head -c 400
-```
-
-The demo path end to end. Two answers worth telling apart:
+**3. `POST /api/v1/demo/session`.** The demo path end to end. Three answers worth
+telling apart:
 
 - `404` — demo mode is off. Expected on a non-demo deployment.
 - `"catalogueIsEmpty": true` — the account was created but the seed has not run,
   so the demo will show two empty screens. The response says so rather than
   leaving you to guess whether the features are broken.
+- A session against a populated catalogue — done.
 
 ---
 
@@ -222,6 +253,10 @@ Being specific, because "should work" is not a status:
 - **No image has ever been built.** There is no Docker on the development
   machine, so both `Dockerfile`s are unexecuted. `bootJar` itself is built in CI
   and does work.
+- **`deploy.sh` has never been run.** `check-env.sh` and `verify.sh` have —
+  against the local `.env` and against an unreachable host respectively, which is
+  how the empty TMDB token was found and how the failure paths were exercised.
+  The `gcloud` call between them is unexecuted.
 - **No migration has run against a managed Postgres**, only against
   `postgres:16-alpine` in CI. The extension-permission problem above is the
   known risk.
