@@ -17,6 +17,7 @@ import {
 } from '../../core/tonight/tonight.models';
 import { TonightService } from '../../core/tonight/tonight.service';
 import { ContributionPlotComponent } from '../../shared/map/contribution-plot.component';
+import { PlottedIconComponent } from '../../shared/map/plotted-icon.component';
 import { PlottedXComponent } from '../../shared/map/plotted-x.component';
 
 /**
@@ -54,6 +55,7 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
     MatSelectModule,
     MatTooltipModule,
     PlottedXComponent,
+    PlottedIconComponent,
     ContributionPlotComponent,
   ],
   template: `
@@ -110,9 +112,13 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
           <!-- Not an error state. The request was answered; the answer is that
                nothing satisfies the constraints, and the counts say which one
                did the damage so the user knows which lever to pull. -->
+          <!-- A dead end, not a failure. The constraints were the request and
+               excluding everything is a legitimate answer to them; a red banner
+               here would say Plotted broke, which is a different claim and a
+               false one. -->
           <section class="no-route" role="status">
-            <plotted-x class="muted" [size]="30" />
-            <h2>No route found.</h2>
+            <plotted-icon name="dead-end" [size]="30" />
+            <h2>No route fits.</h2>
             <p class="headline muted">{{ diagnosis.headline }}</p>
 
             @if (diagnosis.reasons.length > 0) {

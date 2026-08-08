@@ -16,6 +16,8 @@ import {
   WatchlistItem,
 } from '../../core/watchlist/watchlist.models';
 import { WatchlistService } from '../../core/watchlist/watchlist.service';
+import { EmptyStateComponent } from '../../shared/map/empty-state.component';
+import { PlottedIconComponent } from '../../shared/map/plotted-icon.component';
 
 /**
  * The watchlist.
@@ -38,6 +40,8 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
     MatProgressSpinnerModule,
     MatSelectModule,
     MatTooltipModule,
+    EmptyStateComponent,
+    PlottedIconComponent,
   ],
   template: `
     <section class="page">
@@ -60,15 +64,15 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
       } @else if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       } @else if (items().length === 0) {
-        <div class="empty">
-          <mat-icon>bookmark_border</mat-icon>
-          <h2>Nothing on your list yet</h2>
+        <plotted-empty-state heading="No destinations yet.">
           <p>
             Add a few things you actually intend to watch. Coverage and recommendations both read
             this list, so they stay empty until it does.
           </p>
-          <a mat-flat-button routerLink="/search">Search the catalogue</a>
-        </div>
+          <div class="actions">
+            <a mat-flat-button routerLink="/search">Search the catalogue</a>
+          </div>
+        </plotted-empty-state>
       } @else {
         <div class="groups">
           @if (outstanding().length > 0) {
@@ -118,17 +122,29 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
                    has to say why it will never be recommended. Without this the
                    row is simply skipped forever with nothing on screen to
                    explain it. -->
+              <!-- A dead end: the route stops here because you decided it
+                   should. Never orange -- this is the opposite of a choice
+                   Plotted made. -->
               @if (item.blocked) {
                 <p class="blocked-note">
-                  <mat-icon inline>block</mat-icon>
-                  Blocked — not offered by Tonight Mode or the planner. Undo it on the title page.
+                  <plotted-icon name="dead-end" [size]="16" />
+                  <span class="coordinates">Blocked</span>
+                  Not offered by Tonight Mode or the planner. Undo it on the title page.
                 </p>
               }
             } @else {
-              <!-- The title is gone from the catalogue but the intent is not, so
-                   the row stays and says so rather than vanishing. -->
-              <span class="name missing">Title no longer in the catalogue</span>
-              <p class="meta">Added {{ item.addedAt | date: 'mediumDate' }}</p>
+              <!-- Deliberately *not* the dead-end marker. Blocked is you
+                   choosing not to go somewhere; this is the destination having
+                   disappeared from Plotted's own catalogue, which is our gap
+                   rather than your decision. Same row, different fact. -->
+              <span class="name missing">
+                <span class="glyph" aria-hidden="true">?</span>
+                Location unknown
+              </span>
+              <p class="meta">
+                This title is no longer in the catalogue. Your place on the list is kept.
+                &middot; Added {{ item.addedAt | date: 'mediumDate' }}
+              </p>
             }
           </div>
 
@@ -266,8 +282,14 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
 
     .name.missing {
       color: var(--plotted-text-faint);
-      font-style: italic;
       font-weight: 500;
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.4rem;
+
+      .glyph {
+        font-family: var(--plotted-mono);
+      }
     }
 
     .meta {
@@ -288,8 +310,21 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
       font-size: 0.75rem;
       color: var(--plotted-text-faint);
       display: flex;
-      gap: 0.3rem;
-      align-items: baseline;
+      gap: 0.4rem;
+      align-items: center;
+      flex-wrap: wrap;
+
+      .coordinates {
+        font-size: 0.62rem;
+      }
+    }
+
+    /* A blocked row reads as stopped rather than merely annotated: the poster
+       desaturates so the whole row steps back, which is what "we will not be
+       going here" should look like at a glance. */
+    .item:has(.blocked-note) img {
+      filter: saturate(0.25);
+      opacity: 0.7;
     }
 
     .control {

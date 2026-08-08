@@ -20,6 +20,8 @@ import {
   SubscriptionStatus,
 } from '../../core/subscriptions/subscriptions.models';
 import { SubscriptionsService } from '../../core/subscriptions/subscriptions.service';
+import { EmptyStateComponent } from '../../shared/map/empty-state.component';
+import { SectionNavComponent } from '../../shared/map/section-nav.component';
 
 /**
  * What the user pays for.
@@ -44,9 +46,13 @@ import { SubscriptionsService } from '../../core/subscriptions/subscriptions.ser
     MatProgressSpinnerModule,
     MatSelectModule,
     MatTooltipModule,
+    SectionNavComponent,
+    EmptyStateComponent,
   ],
   template: `
     <section class="page">
+      <plotted-section-nav />
+
       <header class="head">
         <div>
           <h1>Subscriptions</h1>
@@ -140,11 +146,9 @@ import { SubscriptionsService } from '../../core/subscriptions/subscriptions.ser
             }
           </div>
         } @else {
-          <div class="empty">
-            <mat-icon>credit_card</mat-icon>
-            <h2>No subscriptions recorded</h2>
+          <plotted-empty-state heading="Nothing recorded yet.">
             <p>Add what you pay for and Plotted can start telling you what it is worth.</p>
-          </div>
+          </plotted-empty-state>
         }
 
         <form class="add" (ngSubmit)="add()">

@@ -66,12 +66,16 @@ import { AlertsService } from '../../core/alerts/alerts.service';
       border-left: 3px solid var(--plotted-text-faint);
     }
 
+    /* Status, not brand. This used the accent, which meant orange said both
+       "Plotted chose this" and "something needs attention" on the same screen
+       -- and the accent has to keep meaning exactly one thing. The gold sits
+       far enough from #ff641a in hue that the two never read as one signal. */
     .alert.warning {
-      border-left-color: var(--plotted-accent, #ffb300);
+      border-left-color: var(--plotted-warning);
     }
 
     .alert.urgent {
-      border-left-color: var(--mat-sys-error, #b3261e);
+      border-left-color: var(--plotted-critical);
     }
 
     .message {

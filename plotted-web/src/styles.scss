@@ -87,7 +87,21 @@ html {
      orange, white text fails contrast and black passes comfortably. */
   --plotted-accent-ink: #1a0d05;
 
-  --plotted-danger: #ff6b6b;
+  /* --- semantic status, deliberately not the brand ---------------------
+     Orange is a claim about a decision, not about health, so status needs
+     its own small palette or the two meanings collide. They are muted on
+     purpose: this is a dark, quiet interface and a saturated alert colour
+     would outshout the accent, which is the one thing that must always win.
+
+     The warning gold is chosen to sit far enough from #ff641a in hue that
+     the two never read as the same signal at a glance. Nothing here is
+     ever used for a route, a waypoint or a destination. */
+  --plotted-critical: #e5484d;
+  --plotted-warning: #c9a227;
+  --plotted-info: var(--plotted-text-muted);
+
+  /* Kept as the form-error colour it always was. */
+  --plotted-danger: var(--plotted-critical);
 
   --plotted-radius: 0.75rem;
   --plotted-radius-sm: 0.5rem;
@@ -322,8 +336,21 @@ a:hover {
   border-top-color: var(--plotted-accent);
 }
 
+/* Three confidence states, and they are a rendering of a real database
+   column rather than a mood. `title_availability.confidence` and the stale
+   flag already carry exactly this, which is what makes the line honest.
+
+   Never used alone. Every one of these is paired with a word -- CONFIRMED,
+   PROBABLE, STALE -- because nobody should have to infer certainty from the
+   length of a dash, and because a dashed line means nothing to a screen
+   reader. The line makes it scannable; the word makes it accessible. */
 .route--dashed {
   border-top-style: dashed;
+}
+
+.route--dotted {
+  border-top-style: dotted;
+  opacity: 0.7;
 }
 
 /* --- motion -------------------------------------------------------------

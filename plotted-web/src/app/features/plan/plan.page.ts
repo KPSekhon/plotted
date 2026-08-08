@@ -12,6 +12,8 @@ import { RouterLink } from '@angular/router';
 import { messageFrom } from '../../core/error/problem-detail';
 import { CONSTRAINT_LABELS, PlanResponse, Sensitivity } from '../../core/plan/plan.models';
 import { PlanService } from '../../core/plan/plan.service';
+import { PlottedIconComponent } from '../../shared/map/plotted-icon.component';
+import { SectionNavComponent } from '../../shared/map/section-nav.component';
 
 /**
  * Cancel Culture.
@@ -49,9 +51,13 @@ import { PlanService } from '../../core/plan/plan.service';
     MatProgressSpinnerModule,
     MatSelectModule,
     MatTooltipModule,
+    SectionNavComponent,
+    PlottedIconComponent,
   ],
   template: `
     <section class="page">
+      <plotted-section-nav />
+
       <header>
         <h1>Cancel Culture</h1>
         <p class="sub">
@@ -129,14 +135,17 @@ import { PlanService } from '../../core/plan/plan.service';
         }
 
         @if (plan.diagnosis; as diagnosis) {
+          <!-- A dead end, and deliberately calm. An infeasible plan is the
+               optimiser working correctly: the limits were the request and no
+               plan satisfies them. The red banner above is for the other
+               thing — Plotted producing a plan that fails its own check — and
+               the two must never look alike. -->
           <section class="diagnosis" role="status">
-            <mat-icon>{{
-              plan.status === 'infeasible' ? 'block' : 'inbox'
-            }}</mat-icon>
+            <plotted-icon [name]="plan.status === 'infeasible' ? 'dead-end' : 'waypoint'" [size]="30" />
             <h2>
               {{
                 plan.status === 'infeasible'
-                  ? 'No plan fits those limits'
+                  ? 'No route fits.'
                   : 'Nothing to plan against'
               }}
             </h2>
@@ -530,16 +539,15 @@ import { PlanService } from '../../core/plan/plan.service';
     }
 
     .diagnosis {
-      border: 1px dashed var(--plotted-border);
+      border: 1px dashed var(--plotted-border-strong);
       border-radius: 12px;
       padding: 2rem 1.5rem;
       text-align: center;
       margin-bottom: 1.25rem;
+      display: grid;
+      justify-items: center;
 
-      mat-icon {
-        font-size: 2.2rem;
-        width: 2.2rem;
-        height: 2.2rem;
+      plotted-icon {
         color: var(--plotted-text-faint);
       }
 
@@ -556,8 +564,13 @@ import { PlanService } from '../../core/plan/plan.service';
       font-size: 0.9rem;
     }
 
+    /* Loud, and staying loud. This is Plotted disagreeing with itself, not a
+       constraint that could not be met -- turning it into map language would
+       dress a genuine defect up as product personality. Solid red border,
+       filled tint, no cartography. */
     .violations {
-      border: 1px solid var(--plotted-danger);
+      border: 1px solid var(--plotted-critical);
+      background: rgb(229 72 77 / 8%);
       border-radius: 12px;
       padding: 1rem 1.25rem;
       margin-bottom: 1.25rem;
