@@ -268,7 +268,7 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
     }
 
     .form-error {
-      color: var(--mat-sys-error, #b3261e);
+      color: var(--plotted-critical);
     }
 
     .list-actions {
@@ -281,7 +281,7 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
 
     .list-error {
       font-size: 0.85rem;
-      color: var(--mat-sys-error, #b3261e);
+      color: var(--plotted-critical);
     }
 
     .blocked-note {

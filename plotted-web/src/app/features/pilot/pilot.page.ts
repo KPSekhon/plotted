@@ -315,7 +315,7 @@ import { PilotService } from '../../core/pilot/pilot.service';
     .poster-fallback {
       display: grid;
       place-items: center;
-      background: rgba(255, 255, 255, 0.06);
+      background: var(--plotted-surface-raised);
     }
 
     .name {
@@ -418,7 +418,7 @@ import { PilotService } from '../../core/pilot/pilot.service';
     }
 
     .form-error {
-      color: var(--mat-sys-error, #b3261e);
+      color: var(--plotted-critical);
     }
 
   `,
