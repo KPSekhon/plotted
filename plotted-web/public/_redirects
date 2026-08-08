@@ -1,0 +1,25 @@
+# Cloudflare Pages routing for Plotted.
+#
+# THE ONE LINE THAT MATTERS
+#
+# `/api/*` has to reach the API on the **same origin as the page**. The refresh
+# token is an HttpOnly, SameSite=Lax cookie scoped to /api/v1/auth, and a
+# cross-origin split does not fail cleanly -- the browser simply declines to send
+# the cookie, so sessions stop persisting and it presents as random sign-outs
+# rather than as a configuration error. That is the single most likely thing to
+# be subtly wrong on a first deploy.
+#
+# Replace PLOTTED_API_HOST below with the Cloud Run URL before uploading. It is
+# a placeholder rather than a real host because this file is committed and the
+# host is not known until the API is deployed.
+#
+# 200 rather than 301/302: a redirect would change the origin in the address
+# bar, which is exactly what this exists to prevent.
+
+/api/*  https://PLOTTED_API_HOST/api/:splat  200
+
+# Angular is a single-page app: every non-asset path has to serve index.html or a
+# refresh on /watchlist returns 404 from the static host. Last rule, so it does
+# not shadow the proxy above.
+
+/*  /index.html  200

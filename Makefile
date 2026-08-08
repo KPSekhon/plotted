@@ -101,6 +101,19 @@ premise-check: ## Appendix A day one: does TMDB have usable Canadian availabilit
 		(echo "Set TMDB_READ_ACCESS_TOKEN first. See docs/data-sources.md."; exit 2)
 	$(GRADLE) :plotted-api:premiseCheck
 
+.PHONY: check-env
+check-env: ## Would a deploy boot, and would it do anything useful?
+	@ops/deploy/check-env.sh
+
+.PHONY: deploy
+deploy: ## Deploy the API to Cloud Run. Run the database preflight first.
+	@ops/deploy/deploy.sh
+
+.PHONY: verify-deploy
+verify-deploy: ## Check a deployed API. Usage: make verify-deploy HOST=https://...
+	@test -n "$(HOST)" || (echo "Usage: make verify-deploy HOST=https://your-api-host"; exit 2)
+	@ops/deploy/verify.sh "$(HOST)"
+
 .PHONY: openapi
 openapi: ## Regenerate the committed OpenAPI document (needs Docker)
 	$(GRADLE) :plotted-api:test --tests '*OpenApiContractTest*' -Dplotted.openapi.write=true
