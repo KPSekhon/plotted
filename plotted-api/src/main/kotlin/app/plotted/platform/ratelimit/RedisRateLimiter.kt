@@ -2,6 +2,7 @@ package app.plotted.platform.ratelimit
 
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Component
@@ -30,7 +31,15 @@ import java.time.Duration
  * not worth that, and writing it down is better than implying a precision this
  * does not have.
  */
+/*
+ * Only when asked for. The default is [InMemoryRateLimiter], because failing
+ * closed against a Redis that was never provisioned refuses every request to a
+ * fail-closed endpoint forever -- which is what happened the first time this ran
+ * on a machine without Docker. Set `plotted.ratelimit.backend: redis` where a
+ * Redis actually exists and the counter needs to be shared between instances.
+ */
 @Component
+@ConditionalOnProperty(prefix = "plotted.ratelimit", name = ["backend"], havingValue = "redis")
 class RedisRateLimiter(
     private val redis: StringRedisTemplate,
     private val meters: MeterRegistry,

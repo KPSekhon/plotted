@@ -337,18 +337,39 @@ import { PlanService } from '../../core/plan/plan.service';
 
     .controls {
       display: flex;
-      gap: 0.9rem;
+      gap: 1rem 0.9rem;
       align-items: flex-start;
       flex-wrap: wrap;
       margin-bottom: 1.5rem;
     }
 
+    /* Sized from their contents rather than to a fixed number.
+       The labels here are whole phrases -- "Services at once", "Changes a
+       month" -- and the hints are sentences, so a fixed 9.5rem clipped the
+       labels and wrapped the hints onto two cramped lines. flex-basis sets the
+       comfortable size, min-width stops them being squeezed below legibility
+       when several share a row, and max-width keeps a number input from
+       sprawling on a wide screen. */
     .narrow {
-      width: 9.5rem;
+      flex: 1 1 13rem;
+      min-width: 13rem;
+      max-width: 15rem;
     }
 
     .wide {
-      width: 16rem;
+      flex: 1 1 18rem;
+      min-width: 18rem;
+      max-width: 22rem;
+    }
+
+    /* Below this they stop sharing rows entirely, which reads better than
+       several half-width boxes each too narrow for its own label. */
+    @media (max-width: 32rem) {
+      .narrow,
+      .wide {
+        flex-basis: 100%;
+        max-width: none;
+      }
     }
 
     .summary {
