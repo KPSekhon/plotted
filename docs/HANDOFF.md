@@ -54,12 +54,18 @@ Paste the block below into a new session. Everything after it is detail.
 ### Marked **agent** — do these
 
 1. **Nothing is blocking.** Every remaining code task is small or optional.
-2. **`TitleIngestionService.ingest` is not `@Transactional`.** The event bug it
-   caused is fixed at the listener, but the title-plus-genres write is still not
-   atomic: a failure between them leaves a title with partial genres. Fixing it
-   properly needs care — `ingestWithSeasons` self-invokes `ingest`, so a naive
-   annotation will not proxy, and wrapping the season loop would hold a database
-   connection across a dozen HTTP calls.
+2. **Verify the ingest transaction end to end.** `TitleWriter` now wraps the
+   write and the `TitleIngested` publish in one transaction, which is the proper
+   fix for the availability bug. Unit tests pass and it compiles, but **it has
+   not been observed working**: proving it needs a restart plus a re-seed, and
+   the previous run's success came from the `fallbackExecution` safety net rather
+   than from the transaction. Re-seed, then check `availability_snapshots` is
+   non-zero.
+
+   An earlier note here claimed the title-plus-genres write was not atomic. That
+   was wrong — `TitleRepository.upsert` is itself `@Transactional`. The bug was
+   only ever that the *event* was published after that transaction had already
+   committed, so the listener saw none.
 3. **Nothing tests `TonightService.recommend`.** The stages are covered
    individually; the orchestration is not. Noticed when a signature change to it
    broke no test.
