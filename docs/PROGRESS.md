@@ -861,6 +861,20 @@ consistent with antivirus interference or a `%TEMP%` permissions problem; or a
 sibling DLL genuinely missing from the packaged set. Anyone picking this up
 should start from the `hs_err` log's module list rather than from this note.
 
+**Confirmed at runtime on 2026-08-08, which is worse than it sounds.** This note
+previously described a *test* problem. One request to `GET /api/v1/plan` from
+the running application killed the whole API — same `EXCEPTION_ACCESS_VIOLATION`,
+a fresh `hs_err_pid*.log`, and the process gone, taking every other endpoint
+with it. So on a Windows development machine Cancel Culture is not merely
+unverifiable, it is a denial of service against the local server: anything else
+being tested at the time dies too, and the failure looks like the API crashing
+rather than like the solver failing.
+
+Two consequences worth carrying: the Cancel Culture screen cannot be seen
+against real solver output here at all, so anything built for it needs
+component-level tests rather than a look (`plan-transit-map.component.spec.ts`
+is that); and CI, being Linux, remains the only place the feature has ever run.
+
 `SolverSupport` gates the solver tests exactly as `DockerSupport` gates the
 database ones, and it has to guess from the OS rather than probe, because
 probing is the thing that crashes. Linux and macOS run them; Windows skips
