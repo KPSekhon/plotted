@@ -249,18 +249,35 @@ import { TonightService } from '../../core/tonight/tonight.service';
 
     .controls {
       display: flex;
-      gap: 0.9rem;
+      gap: 1rem 0.9rem;
       align-items: flex-start;
       flex-wrap: wrap;
       margin-bottom: 1.5rem;
     }
 
+    /* Wide enough for what is actually in them. At 10rem the hint "Leave blank
+       for no limit." wrapped under a field that also carries a "min" suffix,
+       and at 14rem the longest option -- "Only what I pay for" -- crowded the
+       select's dropdown arrow. Sized to the content, bounded so neither
+       sprawls. */
     .minutes {
-      width: 10rem;
+      flex: 1 1 13rem;
+      min-width: 13rem;
+      max-width: 16rem;
     }
 
     .policy {
-      width: 14rem;
+      flex: 1 1 17rem;
+      min-width: 17rem;
+      max-width: 22rem;
+    }
+
+    @media (max-width: 32rem) {
+      .minutes,
+      .policy {
+        flex-basis: 100%;
+        max-width: none;
+      }
     }
 
     .basis {

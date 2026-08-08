@@ -53,8 +53,27 @@ class AvailabilityIngestionService(
      * well must not be rolled back because TMDB's provider endpoint was having a
      * bad minute. The two concerns fail independently, so they commit
      * independently.
+     *
+     * ### `fallbackExecution` is not optional here
+     *
+     * A `@TransactionalEventListener` with the default `fallbackExecution =
+     * false` is **silently discarded** when the event is published outside a
+     * transaction. `TitleIngestionService.ingest` is not annotated
+     * `@Transactional`, so that was every single ingest: the title stored, the
+     * event was dropped, and availability was never fetched. No exception, no
+     * warning, and a catalogue of 503 titles with zero availability rows —
+     * which presents as Tonight Mode rejecting everything for being unavailable
+     * rather than as anything being broken.
+     *
+     * It survived because it is only reachable with a real database and a real
+     * TMDB token, and the first time both existed at once was the first seed run.
+     *
+     * With this true the listener runs either way: inside a transaction it still
+     * waits for the commit, and outside one it runs immediately — which is
+     * correct, because the repository write has already committed on its own by
+     * then.
      */
-    @TransactionalEventListener
+    @TransactionalEventListener(fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun onTitleIngested(event: TitleIngested) {
         val mediaType = if (event.mediaType == "movie") TmdbMediaType.MOVIE else TmdbMediaType.TV
