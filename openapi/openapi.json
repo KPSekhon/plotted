@@ -1885,7 +1885,7 @@
         "description" : "Present only when nothing fit."
       },
       "PickResponse" : {
-        "required" : [ "availableOn", "exploration", "mediaType", "name", "position", "reasons", "score", "titleId" ],
+        "required" : [ "availableOn", "exploration", "mediaType", "name", "perEpisode", "position", "reasons", "score", "titleId" ],
         "type" : "object",
         "properties" : {
           "position" : {
@@ -1908,7 +1908,17 @@
           },
           "watchMinutes" : {
             "type" : "integer",
+            "description" : "The whole commitment: a film's runtime, or every episode of a series added up. Shown so somebody can see what they are taking on. Not what the time filter used.",
             "format" : "int32"
+          },
+          "sessionMinutes" : {
+            "type" : "integer",
+            "description" : "One sitting: a film, or a typical episode. This is what the time budget was measured against, because a long series is watched in increments rather than in one go.",
+            "format" : "int32"
+          },
+          "perEpisode" : {
+            "type" : "boolean",
+            "description" : "True when sessionMinutes describes an episode rather than the whole title."
           },
           "availableOn" : {
             "type" : "array",
