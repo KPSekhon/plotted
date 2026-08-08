@@ -324,6 +324,22 @@ left in the enum.
 that already happened. Predicting one needs the removal-risk model and months of
 snapshot history, which is phase 12 and cannot start until the snapshot job runs.
 
+**Which is why the alert list has no boundary marker**, and that is worth
+recording because the boundary is the obvious design for this feature. A dated
+line the route crosses — *leaves Crave on 19 August* — needs a future date, and
+an `Alert` carries none: `alertType`, `severity`, `titleId`, `message`,
+`createdAt`. Drawing one would mean inventing both a date and a tense, on the
+single feature whose whole value is being trusted about availability. The list
+uses a **dead end** instead, which is true of a departure that has happened, and
+the boundary waits for the removal-risk model that could honestly produce one.
+
+**Designed against fixtures rather than production content**, since nothing has
+ever fired: `alert-list.component.spec.ts` carries a development story set —
+both event kinds, all three severities, a long message, and one alert with no
+title to link to — plus the two states that matter most, rendering nothing at
+all when there is nothing to say, and surviving a failed load without breaking
+the home page it sits on.
+
 **`ModuleBoundaryTest` could not catch a real violation here.** Plot Armour first
 read its event-type constant from `availability.domain`, straight across a
 feature boundary, and `featureModulesAreIndependent` passed — a Kotlin
