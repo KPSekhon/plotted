@@ -480,8 +480,27 @@ on this machine (phase 5), so `/api/v1/plan` cannot be driven locally at all.
 Its 20-second worst case remains asserted structurally as a solve count rather
 than measured.
 
-**What is still missing is users.** Both metrics return null on an empty log, and
-that is the correct answer rather than a gap in the code.
+**Built 2026-08-08: the screen.** `GET /api/v1/analytics/end-credits` had no
+interface at all, so the two numbers the product's thesis rests on were
+reachable only with a bearer token. `/analytics` renders them, and the two
+exclusion counts — acceptances left out as stale, acceptances held back as too
+recent — are given the same weight as the headlines rather than tucked into a
+footnote. They are the rules that stop both figures drifting upward on their
+own, and a reader who cannot see them is taking the headline on trust, which is
+the one thing this screen exists not to ask for.
+
+A null metric renders as a sentence naming the condition that was not met,
+never as a dash or a zero. Both would read as "nothing happened"; the true
+meaning is "not enough evidence to say", which is a claim about the log rather
+than about the product.
+
+`Analytics` is in the main navigation now that there is something behind it.
+
+**What is still missing is users.** Both metrics return null on an empty log,
+and that is the correct answer rather than a gap in the code. The demo account
+carries a manufactured history so the screen can be evaluated before then —
+fixture rows, stamped `demo-fixture` rather than `linear-v1` so no later
+analysis can pool them with anything real.
 
 ### Phase 12 — stretch, and only if the earlier ones are genuinely done
 

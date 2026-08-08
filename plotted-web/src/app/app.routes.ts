@@ -76,6 +76,13 @@ export const routes: Routes = [
     title: 'Subscriptions · Plotted',
   },
   {
+    path: 'analytics',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/analytics/end-credits.page').then((m) => m.EndCreditsPage),
+    title: 'End Credits · Plotted',
+  },
+  {
     path: 'settings',
     canActivate: [authGuard],
     loadComponent: () => import('./features/settings/settings.page').then((m) => m.SettingsPage),
