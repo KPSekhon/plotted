@@ -4,22 +4,6 @@
 # genuinely needs the first. Running the API against a native Postgres with no
 # Redis at all is a supported setup -- and the common one on a machine without
 # Docker.
-management:
-  health:
-    # Off here, unlike prod, and the asymmetry is the point.
-    #
-    # In production Redis exists and should be watched, so the contributor is on
-    # and merely kept out of the readiness group. In development it frequently
-    # does not exist, and its absence changes nothing: the rate limiter is its
-    # only caller and fails open or closed by policy either way.
-    #
-    # Left enabled, `/actuator/health` returns 503 with `redis: DOWN` on a
-    # perfectly working local setup, which teaches whoever sees it that the
-    # health endpoint is noise. A check that is red when nothing is wrong is
-    # worse than no check.
-    redis:
-      enabled: false
-
 plotted:
   security:
     jwt:
@@ -51,3 +35,17 @@ management:
   endpoint:
     health:
       show-details: always
+  health:
+    # Off here, unlike prod, and the asymmetry is the point.
+    #
+    # In production Redis exists and should be watched, so the contributor stays
+    # enabled and is merely kept out of the readiness group. In development it
+    # frequently does not exist at all, and its absence changes nothing: the rate
+    # limiter is its only caller and fails open or closed by policy either way.
+    #
+    # Left enabled, `/actuator/health` returns 503 with `redis: DOWN` on a
+    # perfectly working local setup, which teaches whoever sees it that the
+    # health endpoint is noise. A check that is red when nothing is wrong is
+    # worse than no check.
+    redis:
+      enabled: false
