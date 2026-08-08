@@ -879,6 +879,57 @@ The six things the plan below warned about, and where each one lives:
 - **Propensity logging from day one** — `V12__recommendations.sql`. It is one
   numeric column and phase 7 cannot be built without it.
 
+### The runtime filter was measuring the wrong thing (fixed 2026-08-08)
+
+The worst defect found in this project so far, and it was never a crash.
+
+Tonight Mode's time filter read `watchMinutes`, which for a series is **every
+episode added up**. One Piece is 472 hours, so it never fitted an evening — and
+neither did any other multi-season series. Asked *"I have 45 minutes"* against a
+list of half-hour comedies and anime, Plotted answered *"nothing fits:
+everything on your list is longer than the time you have."*
+
+| Ask | Before | After |
+|---|---|---|
+| 45 min | nothing fits | Chainsaw Man, Demon Slayer, Beyblade X |
+| 90 min | nothing fits | The Boys, ONE PIECE, Chainsaw Man |
+
+Nobody watches a series in one sitting; they watch an episode. There are two
+figures now, named for the questions they answer — `watchMinutes` is the whole
+**commitment**, and `sessionMinutes` is one **sitting**. The filter and the
+runtime-fit feature read the second. Tonight shows the episode length with the
+total beside it: showing only the total was the bug, and showing only the
+episode would hide what somebody is signing up for.
+
+The filter is still a filter. A 75-minute episode is still refused for a
+45-minute evening, and a series with no known episode length is
+`RUNTIME_UNKNOWN` rather than being handed a total divided by an episode count.
+
+**The half that mattered more.** Only **77 of 260** seeded series had an episode
+length at all; the other 181 had a total and nothing else, because that field
+came from TMDB's `episode_run_time`, which upstream leaves empty for most shows.
+Two thirds of the series catalogue would have stayed unrecommendable even after
+the filter was corrected. `recalculateTotalRuntime` now derives the typical
+episode from the episodes it is already summing — the same principle the total
+follows, that real stored rows beat a field upstream is abandoning. After a
+re-seed it is **260 of 260**, and The Boys and Demon Slayer stopped being
+`partial` metadata.
+
+**How it hid.** Every test passed throughout. `HardFiltersTest` only ever built
+film-shaped candidates, so the one case that mattered — a long series with short
+episodes — was never constructed. The filter was correct about the number it was
+given and the number was the wrong one, which no unit test asserting "180
+minutes does not fit 90" can catch. It surfaced only by asking the running
+product the question it exists to answer, with a watchlist somebody had actually
+chosen.
+
+**One knock-on worth knowing.** `MetadataCensoringSimulation` ties both figures
+to a single draw. The ranker reads only `sessionMinutes`, so censoring
+`watchMinutes` alone would have left the runtime feature permanently present and
+turned the phase 7 ablation into a measurement of nothing — while still printing
+a plausible number. `EVALUATION.md` is byte-identical after the change, which is
+the check that it worked.
+
 **One bug found while writing this**, worth keeping in mind for the rest of the
 phase: with a single pick and a nonzero exploration rate, the last slot was
 discounted by the chance it was replaced even though exploration can only fire
