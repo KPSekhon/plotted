@@ -74,6 +74,18 @@ data class UserAccount(
     val preferredCurrency: String,
     val onboardingStatus: OnboardingStatus,
     val createdAt: Instant,
+    /**
+     * Whether this account's watchlist, subscriptions, taste profile and viewing
+     * history were manufactured rather than lived.
+     *
+     * Read from `users.is_demo`, which has existed since V13, and carried with
+     * the session so the interface can say so. It has to come from the server: a
+     * flag the client remembers from the moment it started a demo survives
+     * exactly until a reload, and a label that can quietly stop being true is
+     * worse than no label. A demo is not dishonest for containing fixtures — it
+     * is dishonest only if the screens imply they were measured.
+     */
+    val isDemo: Boolean,
 )
 
 /**

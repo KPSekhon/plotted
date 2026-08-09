@@ -1525,7 +1525,7 @@
         "description" : "The access token is short-lived and belongs in memory. The refresh token is returned as an HttpOnly cookie and never appears in this body."
       },
       "UserResponse" : {
-        "required" : [ "createdAt", "displayName", "email", "id", "onboardingStatus", "preferredCurrency", "regionCode", "timezone" ],
+        "required" : [ "createdAt", "displayName", "email", "id", "isDemo", "onboardingStatus", "preferredCurrency", "regionCode", "timezone" ],
         "type" : "object",
         "properties" : {
           "id" : {
@@ -1553,6 +1553,10 @@
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "isDemo" : {
+            "type" : "boolean",
+            "description" : "True when this account's watchlist, subscriptions, taste profile and viewing history were generated for the demo rather than recorded from use. The interface says so where it would otherwise imply those figures were measured."
           }
         }
       },

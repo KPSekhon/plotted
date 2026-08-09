@@ -26,7 +26,7 @@ class UserRepository(
      */
     fun findByEmail(email: String): StoredUser? =
         dsl.select(USERS.ID, USERS.EMAIL, USERS.PASSWORD_HASH, USERS.DISPLAY_NAME, USERS.REGION_CODE, USERS.TIMEZONE)
-            .select(USERS.PREFERRED_CURRENCY, USERS.ONBOARDING_STATUS, USERS.CREATED_AT)
+            .select(USERS.PREFERRED_CURRENCY, USERS.ONBOARDING_STATUS, USERS.CREATED_AT, USERS.IS_DEMO)
             .from(USERS)
             .where(USERS.EMAIL.eq(email))
             .and(USERS.DELETED_AT.isNull)
@@ -34,7 +34,7 @@ class UserRepository(
             ?.let { StoredUser(toAccount(it), it[USERS.PASSWORD_HASH]) }
 
     fun findById(userId: UUID): UserAccount? = dsl.select(USERS.ID, USERS.EMAIL, USERS.DISPLAY_NAME, USERS.REGION_CODE, USERS.TIMEZONE)
-        .select(USERS.PREFERRED_CURRENCY, USERS.ONBOARDING_STATUS, USERS.CREATED_AT)
+        .select(USERS.PREFERRED_CURRENCY, USERS.ONBOARDING_STATUS, USERS.CREATED_AT, USERS.IS_DEMO)
         .from(USERS)
         .where(USERS.ID.eq(userId))
         .and(USERS.DELETED_AT.isNull)
@@ -87,6 +87,10 @@ class UserRepository(
             preferredCurrency = currency,
             onboardingStatus = OnboardingStatus.REGISTERED,
             createdAt = now.toInstant(),
+            // Registration never makes a demo account. The demo module sets the
+            // flag itself, on the row it creates, so the two paths cannot
+            // disagree about which accounts are manufactured.
+            isDemo = false,
         )
     }
 
@@ -147,6 +151,7 @@ class UserRepository(
         preferredCurrency = record[USERS.PREFERRED_CURRENCY]!!.trim(),
         onboardingStatus = OnboardingStatus.fromDb(record[USERS.ONBOARDING_STATUS]!!),
         createdAt = record[USERS.CREATED_AT]!!.toInstant(),
+        isDemo = record[USERS.IS_DEMO]!!,
     )
 
     /** Carries the password hash, which never leaves this module. */

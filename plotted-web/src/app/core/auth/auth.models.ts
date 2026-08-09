@@ -26,6 +26,15 @@ export interface User {
   preferredCurrency: string;
   onboardingStatus: OnboardingStatus;
   createdAt: string;
+  /**
+   * True when this account's watchlist, subscriptions, taste profile and viewing
+   * history were generated for the demo rather than recorded from use.
+   *
+   * From the server on every session, not remembered from the moment a demo was
+   * started -- a client-side flag survives until the first reload, and a label
+   * that can quietly stop being true is worse than no label at all.
+   */
+  isDemo: boolean;
 }
 
 export interface Session {

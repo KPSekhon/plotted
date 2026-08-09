@@ -137,6 +137,23 @@
   flex-shrink: 0;
 }
 
+// Reads as a label on the session rather than a warning about it. Muted, not
+// accented: orange means the plotted choice everywhere else in this interface,
+// and a badge that shouts turns an honest disclosure into an apology.
+.demo-badge {
+  flex: none;
+  margin-right: 0.15rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--plotted-border);
+  border-radius: 2px;
+  font-family: var(--plotted-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--plotted-text-muted);
+  cursor: help;
+}
+
 .icon-button {
   display: grid;
   place-items: center;

@@ -30,6 +30,19 @@
       </nav>
 
       <div class="app-bar__tools">
+        <!-- Persistent, quiet, and shown only to a demo account. The screens
+             that make behavioural claims carry their own note beside the figure
+             they qualify; this is the standing answer to "whose data am I
+             looking at", which otherwise has to be inferred from the fact that
+             the watchlist is suspiciously well curated. -->
+        @if (auth.user()?.isDemo) {
+          <span
+            class="demo-badge"
+            title="This sample account contains generated watchlist, subscription, taste and viewing data so you can explore Plotted immediately. Anything you change from here is really yours."
+            >Demo</span
+          >
+        }
+
         <!-- Search is an action available everywhere rather than a destination
              competing with the four above. The slash shortcut is bound on the
              document; the button is what makes it discoverable. -->

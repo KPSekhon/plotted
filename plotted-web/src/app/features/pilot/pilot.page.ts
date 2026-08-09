@@ -7,6 +7,7 @@ import { RouterLink } from '@angular/router';
 
 import { messageFrom } from '../../core/error/problem-detail';
 import { AxisOpinion, PilotState, PreferenceProfile } from '../../core/pilot/pilot.models';
+import { DemoNoteComponent } from '../../shared/map/demo-note.component';
 import { PilotService } from '../../core/pilot/pilot.service';
 
 /**
@@ -36,6 +37,7 @@ import { PilotService } from '../../core/pilot/pilot.service';
     MatIconModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
+    DemoNoteComponent,
   ],
   template: `
     <section class="page">
@@ -191,6 +193,13 @@ import { PilotService } from '../../core/pilot/pilot.service';
               </li>
             }
           </ul>
+
+          <!-- The demo's answers were seeded from a stated persona rather than
+               chosen by anybody, so the profile is a correct fit to invented
+               evidence. The fit is real; what it was fitted to is not. -->
+          <plotted-demo-note>
+            Fitted from answers generated for this demo account, not from comparisons you made.
+          </plotted-demo-note>
 
           <p class="footnote">
             Fitted from {{ fitted.observations }}

@@ -21,6 +21,7 @@ import {
 } from '../../core/subscriptions/subscriptions.models';
 import { SubscriptionsService } from '../../core/subscriptions/subscriptions.service';
 import { EmptyStateComponent } from '../../shared/map/empty-state.component';
+import { DemoNoteComponent } from '../../shared/map/demo-note.component';
 import { SectionNavComponent } from '../../shared/map/section-nav.component';
 
 /**
@@ -48,6 +49,7 @@ import { SectionNavComponent } from '../../shared/map/section-nav.component';
     MatTooltipModule,
     SectionNavComponent,
     EmptyStateComponent,
+    DemoNoteComponent,
   ],
   template: `
     <section class="page">
@@ -78,6 +80,15 @@ import { SectionNavComponent } from '../../shared/map/section-nav.component';
               {{ counted() === 1 ? 'service' : 'services' }}
             </span>
           </div>
+
+          <!-- These are the prices Cancel Culture optimises against, so an
+               unlabelled figure here is money the demo is implying somebody
+               actually pays. Stamped once, at the total, rather than against
+               every row: the claim being qualified is "this is your bill". -->
+          <plotted-demo-note>
+            Subscriptions and prices were generated for this demo account. Editing one replaces it
+            with a figure you entered.
+          </plotted-demo-note>
 
           <div class="list">
             @for (item of subscriptions(); track item.id) {

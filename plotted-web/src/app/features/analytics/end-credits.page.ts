@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { EndCredits } from '../../core/analytics/analytics.models';
 import { AnalyticsService } from '../../core/analytics/analytics.service';
 import { messageFrom } from '../../core/error/problem-detail';
+import { DemoNoteComponent } from '../../shared/map/demo-note.component';
 import { EmptyStateComponent } from '../../shared/map/empty-state.component';
 
 /**
@@ -33,7 +34,7 @@ import { EmptyStateComponent } from '../../shared/map/empty-state.component';
 @Component({
   selector: 'plotted-end-credits',
   standalone: true,
-  imports: [RouterLink, MatProgressSpinnerModule, EmptyStateComponent],
+  imports: [RouterLink, MatProgressSpinnerModule, EmptyStateComponent, DemoNoteComponent],
   template: `
     <section class="page">
       <header>
@@ -167,6 +168,16 @@ import { EmptyStateComponent } from '../../shared/map/empty-state.component';
               started quietly relaxing your constraints.
             </p>
           </section>
+
+          <!-- Both figures above are computed exactly as they would be for a
+               real account; the log they read is the manufactured one. Saying
+               so here rather than in the chrome alone, because this is the
+               screen where an unlabelled number would be a measurement claim
+               about a product nobody has used. -->
+          <plotted-demo-note>
+            Both figures are computed from generated demo activity, not from decisions anyone
+            made. The rules behind them are the real ones.
+          </plotted-demo-note>
         }
         }
       }
