@@ -17,7 +17,10 @@ class WatchlistDirectoryAdapter(
     private val watchlists: WatchlistRepository,
 ) : WatchlistDirectory {
     override fun outstandingItems(userId: UUID): List<WatchlistDirectory.WatchlistEntry> {
-        val watchlist = watchlists.findOrCreateDefault(userId)
+        // A recommender asking what is on the list must not bring the list into
+        // existence. Somebody with no watchlist has nothing outstanding, which is
+        // an answer both recommenders already know how to render.
+        val watchlist = watchlists.findDefault(userId) ?: return emptyList()
         return watchlists.findItems(watchlist.id)
             // Filtered here rather than by the caller: "outstanding" is a
             // watchlist concept, and letting another module re-derive it from

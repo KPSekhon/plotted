@@ -81,7 +81,10 @@ class WatchlistService(
 
     @Transactional
     fun update(userId: UUID, itemId: UUID, patch: WatchlistItemPatch): WatchlistEntry {
-        val watchlist = watchlists.findOrCreateDefault(userId)
+        // No list means no item to change, so this ends in a 404 either way.
+        // Creating one on the way there would leave a row behind as the side
+        // effect of a request that failed.
+        val watchlist = watchlists.findDefault(userId) ?: throw NotFoundException("Watchlist item")
         val changed = watchlists.updateItem(
             watchlistId = watchlist.id,
             itemId = itemId,
@@ -101,7 +104,7 @@ class WatchlistService(
 
     @Transactional
     fun remove(userId: UUID, itemId: UUID) {
-        val watchlist = watchlists.findOrCreateDefault(userId)
+        val watchlist = watchlists.findDefault(userId) ?: throw NotFoundException("Watchlist item")
         if (!watchlists.removeItem(watchlist.id, itemId)) {
             throw NotFoundException("Watchlist item")
         }

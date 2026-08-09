@@ -39,6 +39,13 @@ class WatchlistRepository(
      * first requests cannot both succeed. The loser catches the violation and
      * re-reads rather than failing the request: the row it wanted exists, which
      * is all it actually cared about.
+     *
+     * **Only the watchlist's own read-write endpoints may call this.** Everything
+     * that merely reads the list goes through [findDefault] and treats an absent
+     * one as empty. A reader that provisions is a `GET` that writes, and inside a
+     * `readOnly` transaction Postgres refuses the insert outright — which is how
+     * the coverage dashboard came to fail with a 500 for every account that
+     * opened it before its watchlist existed.
      */
     fun findOrCreateDefault(userId: UUID): Watchlist {
         findDefault(userId)?.let { return it }
@@ -59,7 +66,8 @@ class WatchlistRepository(
         }
     }
 
-    private fun findDefault(userId: UUID): Watchlist? = dsl.select(
+    /** The user's default watchlist, or null if they have not got one yet. */
+    fun findDefault(userId: UUID): Watchlist? = dsl.select(
         WATCHLISTS.ID,
         WATCHLISTS.NAME,
         WATCHLISTS.IS_DEFAULT,
