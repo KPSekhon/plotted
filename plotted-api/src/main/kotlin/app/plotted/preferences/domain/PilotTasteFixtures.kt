@@ -28,8 +28,7 @@ class PilotTasteFixtures(
     private val pilot: PilotService,
 ) : TasteFixtures {
 
-    override fun seedDemoPersona(userId: UUID, questions: Int): Int =
-        pilot.seedPersona(userId, DEMO_PERSONA, questions)
+    override fun seedDemoPersona(userId: UUID, questions: Int): Int = pilot.seedPersona(userId, DEMO_PERSONA, questions)
 
     private companion object {
         /**

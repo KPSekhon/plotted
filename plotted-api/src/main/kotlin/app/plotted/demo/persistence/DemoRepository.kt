@@ -119,11 +119,7 @@ class DemoRepository(
      * `TitleDirectory`, because the answer differs between films and series and
      * the catalogue owns that rule. Over-fetches so the caller has spares.
      */
-    fun findCandidateTitleIds(
-        regionCode: String,
-        limit: Int,
-        preferredExternalIds: List<String> = emptyList(),
-    ): List<UUID> {
+    fun findCandidateTitleIds(regionCode: String, limit: Int, preferredExternalIds: List<String> = emptyList()): List<UUID> {
         val carriers = DSL.countDistinct(TITLE_AVAILABILITY.PROVIDER_ID)
         // 0 sorts before 1, so the curated tier leads. Built from a bound list
         // rather than interpolated, so an id from the file cannot reach the
@@ -152,13 +148,7 @@ class DemoRepository(
      * numerator, and the watchlist's own "finished and set aside" group never
      * appears on screen at all.
      */
-    fun insertWatchlistItem(
-        watchlistId: UUID,
-        titleId: UUID,
-        priority: Int,
-        desiredBy: LocalDate?,
-        completedAt: OffsetDateTime? = null,
-    ) {
+    fun insertWatchlistItem(watchlistId: UUID, titleId: UUID, priority: Int, desiredBy: LocalDate?, completedAt: OffsetDateTime? = null) {
         dsl.insertInto(WATCHLIST_ITEMS)
             .set(WATCHLIST_ITEMS.ID, UUID.randomUUID())
             .set(WATCHLIST_ITEMS.WATCHLIST_ID, watchlistId)
