@@ -43,6 +43,19 @@ class UserRepository(
 
     fun emailExists(email: String): Boolean = dsl.fetchExists(dsl.selectFrom(USERS).where(USERS.EMAIL.eq(email)))
 
+    /**
+     * Whether an account is still live. Runs on every authenticated request, so
+     * it selects nothing at all — the primary key index answers it.
+     *
+     * The `deleted_at` predicate matches [findById] deliberately. A soft-deleted
+     * account is one identity already declines to resolve, and letting it keep
+     * authenticating would make "deleted" mean two different things depending on
+     * which door you came through.
+     */
+    fun exists(userId: UUID): Boolean = dsl.fetchExists(
+        dsl.selectFrom(USERS).where(USERS.ID.eq(userId)).and(USERS.DELETED_AT.isNull),
+    )
+
     fun insert(
         id: UUID,
         email: String,
