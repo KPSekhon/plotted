@@ -3,9 +3,108 @@
 What to do next, why, and how to spend the API budgets doing it.
 `PROGRESS.md` records where the project *is*; this records where it goes.
 
-Last updated: 2026-08-07. Watchmode calls spent verifying the facts below: **2**,
+Last updated: 2026-08-08. Watchmode calls spent verifying the facts below: **2**,
 none of them since — the seed enumeration has not been run, so the whole 2500 for
 this month is still available.
+
+---
+
+## Part 0 — The product definition changed on 2026-08-08
+
+Read this before the rest of the file, because it reorders it.
+
+Plotted is no longer *"order what you already chose"*. It is:
+
+> **Learn what I enjoy, search my watchlist and the wider catalogue, then find
+> the best thing for the night I actually have.**
+
+The reasoning and the architecture are in
+[ADR 0009](adr/0009-discovery-and-taste-as-product-inputs.md). The short version:
+candidate generation separates from ranking, discovery becomes a real subsystem,
+taste feeds candidate *generation* before it ever touches the score, and the
+linear ranker is versioned rather than mutated.
+
+### The five open questions, answered
+
+Kanwar's decisions, recorded so they are not re-litigated:
+
+1. **Pilot Season** — a product feature, not a portfolio flourish. Keep the
+   Bradley–Terry fitter; cut mandatory onboarding to 5–7 comparisons and call
+   the result a weak prior honestly; wire it into taste-based candidate
+   retrieval; log `tasteMatch` in shadow before it ever moves a ranking.
+2. **The demo's fabricated data** — label it. Quietly. *Done 2026-08-08:* a
+   `Demo` badge in the chrome plus a caption on the three screens making
+   behavioural claims.
+3. **Per-episode progress** — minimal now, events later. A `user_series_progress`
+   row carrying the last completed episode unlocks "next episode", remaining
+   runtime, the "you are here" marker, and feasibility before a removal date.
+   **Do not claim viewing *pace*** — position is not pace, and pace needs
+   completion events over time. Plot Armour says "at your configured 3 hours a
+   week", never "at your current pace".
+4. **Discovery** — in scope, and core. But Plotted never becomes a browsing
+   feed: it searches widely so the user does not have to, and still returns one
+   pick and two alternates.
+5. **An unreleased title in the demo** — yes, exactly one. The "no verified
+   route in your region" refusal is otherwise invisible, and it is one of the
+   things a competitor cannot show. More than one starts to read as broken.
+
+### The order to work in
+
+**P0 — truth and stability.** These protect the only thing the product is
+selling.
+
+1. ~~Label the demo's fixture data.~~ *Done 2026-08-08.*
+2. Stop unverified prices reaching Cancel Culture. Three provenance states —
+   user-entered, verified-current, reference — and only the first two may enter
+   the objective. A reference-only price becomes `UNKNOWN` for optimisation and
+   is reported as an exclusion with its reason, beside the three that already
+   are. **Not started.**
+3. ~~Fix the auth 500.~~ *Done 2026-08-08, and it was not where it was thought
+   to be — see `PROGRESS.md`.*
+4. Isolate CP-SAT from the API JVM. A native solver crash currently takes every
+   endpoint with it. **Not started** — design notes below.
+5. Turn on `PLOTTED_SNAPSHOT_ENABLED`. Still the only clock that cannot be
+   rewound, and still blocked on an environment that runs continuously.
+6. ~~Fix or remove `verify:api`.~~ *Done 2026-08-08.*
+
+**P1 — make the core promise true.** Minimal series progress; resolve a series
+recommendation to an actual episode; introduce candidate source; wider-catalogue
+candidate generation; populate `tasteMatch` in production; connect Pilot Season
+to discovery; specific no-route explanations.
+
+**P2 — validate the personalisation.** Shorten Pilot onboarding; run taste in
+shadow; gather acceptance and completion by source; build ranker v2; fresh
+ablation including taste; *only then* let taste move the live score.
+
+**P3 — data quality.** Replace one blunt `metadata_status` with per-capability
+eligibility (`SEARCHABLE`, `TONIGHT_ELIGIBLE`, `CANCEL_CULTURE_ELIGIBLE`, …), so
+"192 incomplete" becomes "31 missing runtime and block Tonight, 9 missing a
+provider mapping, 152 missing display metadata only". Seed the intentional demo
+edge cases. Split the test suites by contract — unit, integration, solver, e2e —
+so local output reads "integration suite: not executed in this environment"
+rather than "138 skipped".
+
+### Isolating CP-SAT (P0 #4), in outline
+
+The solver is a JNI binding and a bad native environment kills the process, not
+the request. On Windows one `GET /api/v1/plan` takes the whole API down. That is
+a blast-radius problem rather than a developer-machine annoyance, and Temporal
+was already chosen for durable execution:
+
+```
+Angular → Spring API → create optimisation run → Temporal workflow
+                                                      ↓
+                                          optimiser worker (own JVM)
+                                                      ↓
+                                                 OR-Tools CP-SAT
+                                                      ↓
+                                          PostgreSQL result → API → screen
+```
+
+A solver crash then kills the worker, and Temporal reports or retries. Until
+that exists, Windows stays marked as not supporting live optimisation and CI
+remains the only place the feature has ever run — which should be said plainly
+rather than implied.
 
 ---
 

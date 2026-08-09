@@ -57,6 +57,121 @@ than locally, and why each red run cost several round trips.
 
 ---
 
+## 2026-08-08 — the product definition changed, and two bugs came out of asking about it
+
+**The definition.** Plotted is now *"learn what I enjoy, search my watchlist and
+the wider catalogue, then find the best thing for the night I actually have"*.
+Discovery is in scope; taste is a real input; the linear ranker gets versioned
+rather than edited. [ADR 0009](adr/0009-discovery-and-taste-as-product-inputs.md)
+has the architecture, `NEXT.md` Part 0 has the working order and the five
+decisions that were open.
+
+### The coverage dashboard 500'd for every new account, and healed itself
+
+`CoverageService.forUser` is `@Transactional(readOnly = true)` and called
+`findOrCreateDefault`. Postgres refuses an `INSERT` in a read-only transaction,
+so the screen answered 500 — for every account that opened Coverage before its
+watchlist existed, which is every account that follows the navigation in the
+order it is written.
+
+**It heals on the next request.** By then some read-write endpoint has created
+the row, and the dashboard works forever after. That is why it survived: it
+cannot be reproduced by retrying, and no developer or demo account has been
+without a watchlist by the time anybody looked at Coverage.
+
+Reproduced against a fresh registration: 500, then 200, then 200. Only `add` and
+`list` provision now; everything that reads goes through `findDefault` and treats
+an absent list as empty. `update` and `remove` were creating a list on the way to
+a 404, which left a row behind as the side effect of a failed request.
+
+### One deleted account, four different answers, one of them a 500
+
+The demo sweep deletes expired accounts hourly, so a visitor's open tab keeps
+presenting a signed, unexpired token for an account that is gone. Every endpoint
+met that condition on its own terms:
+
+| Endpoint | Before | After |
+|---|---|---|
+| `/alerts` | 200, empty list | 401 |
+| `/watchlist` | **500** (foreign key violation) | 401 |
+| `/watchlist/coverage` | **500** | 401 |
+| `/users/me/settings` | 404 | 401 |
+| `/pilot/profile` | 204 | 401 |
+| `/analytics/end-credits` | 200 | 401 |
+
+A verified signature proves the token was issued here and has not expired. It
+says nothing about whether the account still exists, and this product deletes
+accounts on a schedule. `JwtAuthenticationFilter` resolves it once, through an
+`AccountDirectory` SPI, and leaves the context empty — so the existing entry
+point renders the 401 and nothing new throws inside a filter, where the
+controller advice cannot reach it.
+
+**The prior note said `/alerts` was returning 500 on auth transitions.** It was
+not; `/alerts` was one of the endpoints that quietly answered 200. Every plain
+auth path — no token, malformed token, expired token, garbage refresh cookie,
+replayed refresh token — was already correct and was checked one at a time. The
+defect was one step further in, at *authenticated but no longer anybody*.
+
+**Cost, measured rather than asserted.** One primary-key `EXISTS` per
+authenticated request, and only when a token verifies. Taking the line out and
+putting it back, 200 warmed sequential requests against `GET /api/v1/tonight`:
+with the check, medians of 21.0, 22.3 and 21.3 ms; without it, 23.5 and 21.4 ms.
+The arms overlap. The honest claim is that the check is under this rig's
+run-to-run spread, not that it is free — and these runs are not comparable to the
+15.8 ms recorded below, because they were against `bootRun` with devtools and
+jOOQ debug logging on.
+
+### Two checks that were not checks
+
+- **`verify:api` pointed at a script that never existed.** Writing it surfaced
+  that ADR 0005's central promise has never held: the generated client is wired
+  up and nothing imports it, so every model in `plotted-web/src/app/core` is
+  hand-written and only the *server* half of the contract was guarded. The script
+  now checks that every endpoint the application calls exists in the committed
+  document with the method it is called with — paths and methods, not shapes,
+  which it says about itself — and CI runs it. Watched fail on a renamed path
+  before being trusted.
+- **`ktlintCheck` was already failing on this branch**, on two signatures from
+  the demo-fixture commits. It is the *first* step of the API job, so nothing
+  after it had run on `cinematic-cartography` at all.
+
+### Regenerating the OpenAPI document without Docker
+
+`tools/openapi/regenerate.mjs`, and `make openapi-local`. The contract test is
+Docker-gated, so every added field previously cost a full round trip through CI
+to recover `build/openapi-actual.json`.
+
+Two traps, neither of which is `JSON.stringify`. Jackson's pretty printer writes
+`"key" : value` and keeps arrays on one line. And `OpenApiContractTest` reads the
+response through `readTree` before writing it, which turns springdoc's
+`"maximum" : 10000.00` into `10000.0` — so copying the server's bytes verbatim
+produces a document CI rejects while looking more faithful than the thing it
+disagreed with.
+
+`--verify` re-renders the committed document from its own contents and refuses if
+anything moved. It caught the first trap on its first run. **CI is still the
+authority**; this only shortens the loop.
+
+### The demo says which of its numbers were made up
+
+`users.is_demo` has existed since V13 and nothing read it. It travels with the
+session now, so the label comes from the server rather than from something the
+client remembers about how it signed in — that version survives until the first
+reload and then quietly stops being true.
+
+A quiet `Demo` badge in the chrome, and one caption under each of the three
+screens that make behavioural claims: the fitted taste profile, both End Credits
+figures, and the subscription total Cancel Culture optimises against. Muted
+rather than accented, because orange means the plotted choice everywhere else
+and a disclosure that shouts reads as an apology for the demo.
+`demo-note.component.spec.ts` asserts it renders **nothing** on a real account,
+which is the direction nobody developing against a demo would notice was broken.
+
+**296 API tests and 47 frontend tests pass locally** after this work, up from 290
+and 44.
+
+---
+
 ## What is still open, and how to finish it
 
 Read this first if you are picking the project up. Every item below is either
