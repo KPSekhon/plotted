@@ -118,6 +118,15 @@ verify-deploy: ## Check a deployed API. Usage: make verify-deploy HOST=https://.
 openapi: ## Regenerate the committed OpenAPI document (needs Docker)
 	$(GRADLE) :plotted-api:test --tests '*OpenApiContractTest*' -Dplotted.openapi.write=true
 
+# The same document, taken from an API you already have running, for machines
+# with no Docker. `--verify` runs first: it re-renders the committed file from
+# its own contents and refuses if the result differs, so a formatter that has
+# drifted cannot quietly rewrite the document into a shape CI rejects.
+.PHONY: openapi-local
+openapi-local: ## Regenerate the OpenAPI document from a running API (no Docker)
+	node tools/openapi/regenerate.mjs --verify
+	node tools/openapi/regenerate.mjs
+
 .PHONY: api-client
 api-client: openapi ## Regenerate the Angular client from the OpenAPI document
 	cd plotted-web && npm run generate:api
