@@ -44,6 +44,33 @@ The specification is only as good as the annotations, so DTOs need real
 creates it and passes with a warning rather than failing on a file that has never
 existed.
 
+## Correction, 2026-08-08: half of this was never actually done
+
+The consequence recorded above — *"the client types are derived from the server
+rather than restated by hand, so they cannot be subtly wrong"* — has not been true
+at any point. `npm run generate:api` is wired up and writes to `src/app/core/api`,
+and nothing in the application imports what it produces: every request and
+response model under `src/app/core` is hand-written. The only file in that
+directory is `api.config.ts`, which was written by hand too.
+
+So `OpenApiContractTest` guards one half of the seam. The server cannot drift from
+the document. The *caller* could, freely, and the failure mode is a rename landing
+green and surfacing later as a 404 on whichever screen nobody happened to open.
+
+`npm run verify:api` now closes the part of that gap which can be closed cheaply:
+it checks that every endpoint the application calls exists in the committed
+document, with the method it is called with, and CI runs it. **Paths and methods
+only.** A field that changed type, or a response property that quietly
+disappeared, still passes — that limit is stated in the script's own header so the
+name cannot be read as a larger promise than it keeps.
+
+Two things worth being explicit about. The script was watched fail against a
+deliberately renamed path before being trusted, per the standing rule that a check
+nobody has seen fail is not a check. And this is not a reversal of the decision
+above: the generated client is still the right answer and adopting it is still
+owed. Until then, read this ADR as describing the destination rather than the
+current state.
+
 ## Also deliberately not built
 
 Recorded here because being able to explain what was *not* built is worth as much

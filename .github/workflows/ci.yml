@@ -113,6 +113,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Checks that every endpoint the application calls exists in the committed
+      # OpenAPI document. `OpenApiContractTest` guards the server's half of that
+      # seam; nothing guarded the caller's, so a rename landed green and surfaced
+      # at runtime on whichever screen nobody happened to open. Paths and methods
+      # only -- request and response shapes are not verified.
+      - name: Verify API calls against the OpenAPI document
+        run: npm run verify:api
+
       - name: Test
         run: npm run test:ci
 
