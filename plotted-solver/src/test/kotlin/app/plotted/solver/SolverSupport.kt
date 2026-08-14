@@ -1,4 +1,4 @@
-package app.plotted.support
+package app.plotted.solver
 
 /**
  * Whether it is safe to run CP-SAT in this JVM.

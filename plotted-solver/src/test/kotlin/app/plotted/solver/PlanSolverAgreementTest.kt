@@ -1,4 +1,4 @@
-package app.plotted.optimisation.domain
+package app.plotted.solver
 
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -26,12 +26,12 @@ import kotlin.random.Random
  * shares a line of code with the model builder. If the two disagree, either the
  * model is wrong or the rules are — and either way it is worth a failing build.
  *
- * Gated on [app.plotted.support.SolverSupport] like every other solver test:
+ * Gated on [app.plotted.solver.SolverSupport] like every other solver test:
  * CP-SAT kills the JVM on the Windows dev machine, so these run in CI.
  */
-@EnabledIf("app.plotted.support.SolverSupport#isSolverAvailable")
+@EnabledIf("app.plotted.solver.SolverSupport#isSolverAvailable")
 class PlanSolverAgreementTest {
-    private val solver = PlanSolver()
+    private val solver = PlanModel()
 
     private val netflix = UUID.randomUUID()
     private val crave = UUID.randomUUID()

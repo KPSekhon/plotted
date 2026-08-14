@@ -2,6 +2,7 @@ package app.plotted.watchlist.api
 
 import app.plotted.watchlist.domain.CoverageService
 import app.plotted.watchlist.domain.Priority
+import app.plotted.watchlist.domain.SeriesView
 import app.plotted.watchlist.domain.WatchlistService
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.Max
@@ -212,4 +213,81 @@ data class CoveredTitleResponse(
     val titleId: UUID,
     val name: String?,
     val priority: Int,
+)
+
+@Schema(
+    description =
+    "Where you are in a series and what comes next. Position only: this records which episode " +
+        "you finished, never how quickly you got there, so nothing built on it may claim a " +
+        "viewing pace.",
+)
+data class SeriesProgressResponse(
+    val titleId: UUID,
+    @Schema(description = "Null until you have finished something. Absent history, not episode zero.")
+    val lastCompleted: EpisodeRefResponse?,
+    @Schema(
+        description =
+        "The first aired episode you have not finished, or episode one when nothing is recorded. " +
+            "Null only when there is nothing left to watch.",
+    )
+    val next: NextEpisodeResponse?,
+    @Schema(description = "Aired episodes still ahead of you, and how long they run.")
+    val remaining: RemainingResponse,
+    @Schema(description = "True when nothing aired is left. Different from not having started.")
+    val caughtUp: Boolean,
+    val updatedAt: Instant?,
+) {
+    companion object {
+        fun from(view: SeriesView) = SeriesProgressResponse(
+            titleId = view.seriesTitleId,
+            lastCompleted = view.progress?.let {
+                EpisodeRefResponse(it.lastCompletedSeasonNumber, it.lastCompletedEpisodeNumber)
+            },
+            next = view.next?.let {
+                NextEpisodeResponse(
+                    episodeId = it.episodeId,
+                    seasonNumber = it.seasonNumber,
+                    episodeNumber = it.episodeNumber,
+                    name = it.name,
+                    runtimeMinutes = it.runtimeMinutes,
+                )
+            },
+            remaining = RemainingResponse(view.remaining.episodes, view.remaining.minutes),
+            caughtUp = view.caughtUp,
+            updatedAt = view.progress?.updatedAt,
+        )
+    }
+}
+
+data class EpisodeRefResponse(val seasonNumber: Int, val episodeNumber: Int)
+
+data class NextEpisodeResponse(
+    val episodeId: UUID,
+    val seasonNumber: Int,
+    val episodeNumber: Int,
+    val name: String?,
+    @Schema(
+        description =
+        "This episode's own runtime, or null when upstream never gave one. Not filled in from the " +
+            "series average: a fallback presented as a measurement is how a time filter becomes " +
+            "precise about something nobody measured.",
+    )
+    val runtimeMinutes: Int?,
+)
+
+@Schema(
+    description =
+    "The count includes episodes with no known runtime; the minutes do not. So nine episodes and " +
+        "three hours can mean nine episodes of which seven are measured, which is the honest pair.",
+)
+data class RemainingResponse(val episodes: Int, val minutes: Int?)
+
+data class RecordProgressRequest(
+    @field:NotNull
+    @field:Min(1)
+    @Schema(description = "Specials (season 0) are not a place in the story and are refused.")
+    val seasonNumber: Int?,
+    @field:NotNull
+    @field:Min(1)
+    val episodeNumber: Int?,
 )

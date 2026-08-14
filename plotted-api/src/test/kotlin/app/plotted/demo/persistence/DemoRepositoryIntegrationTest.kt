@@ -172,6 +172,36 @@ class DemoRepositoryIntegrationTest {
     }
 
     @Test
+    fun `curated titles lead, whatever the carrier count says`() {
+        val netflix = providers.findBySlug("netflix")!!
+        val crave = providers.findBySlug("crave")!!
+
+        // Carried by two services, so the default ordering puts it first.
+        val popular = insertTitle("On everything")
+        insertAvailability(popular, netflix.id, "CA", AccessType.SUBSCRIPTION)
+        insertAvailability(popular, crave.id, "CA", AccessType.SUBSCRIPTION)
+
+        // Carried by one, and chosen by a person.
+        val curated = insertTitle("Somebody's actual taste", externalId = "424242")
+        insertAvailability(curated, netflix.id, "CA", AccessType.SUBSCRIPTION)
+
+        val candidates = repository.findCandidateTitleIds("CA", 100, listOf("424242"))
+
+        candidates.first() shouldBe curated
+        candidates shouldContain popular
+    }
+
+    @Test
+    fun `a curated title nothing carries is still not a candidate`() {
+        // The preference reorders; it must never promote a title past a filter.
+        // Otherwise the demo becomes the one place the product's own rules do
+        // not hold, which is the opposite of what a demo is for.
+        val uncarried = insertTitle("In cinemas, not streaming", externalId = "969681")
+
+        repository.findCandidateTitleIds("CA", 100, listOf("969681")) shouldNotContain uncarried
+    }
+
+    @Test
     fun `plan lookup returns the cheapest open price per provider`() {
         val crave = providers.findBySlug("crave")!!
         val dear = subscriptions.findOrCreatePlan(
@@ -223,7 +253,19 @@ class DemoRepositoryIntegrationTest {
         // A flag that disagrees with the date beside it is a bug the demo would
         // be demonstrating rather than avoiding.
         row.cannotCancel shouldBe true
-        row.actualPrice shouldBe null
+        // Asserted `null` until V18, so the persona paid the plan's cited figure
+        // rather than a made-up personal rate. Right while every price was
+        // equally trusted; wrong afterwards, because the optimiser now spends
+        // only prices somebody confirmed, and a null here leaves the demo's
+        // services priced REFERENCE and Cancel Culture with nothing to say on
+        // the one account that exists to demonstrate it.
+        //
+        // Still not an invented number — it is the same researched figure,
+        // copied off the plan. What changed is the claim attached to it, and on
+        // an account whose subscriptions screen says the data was generated, the
+        // persona confirming a fixture price is as legitimate as its fixture
+        // watchlist. Compared by value: the column's scale is not the literal's.
+        row.actualPrice.shouldNotBeNull().compareTo(BigDecimal("18.99")) shouldBe 0
         // Renewal has to be in the future even though the start date is not.
         (row.renewsOn!!.isAfter(LocalDate.now())) shouldBe true
     }
@@ -240,12 +282,12 @@ class DemoRepositoryIntegrationTest {
         return id
     }
 
-    private fun insertTitle(name: String): UUID {
+    private fun insertTitle(name: String, externalId: String = "demo-${UUID.randomUUID()}"): UUID {
         val id = UUID.randomUUID()
         dsl.insertInto(TITLES)
             .set(TITLES.ID, id)
             .set(TITLES.EXTERNAL_SOURCE, "tmdb")
-            .set(TITLES.EXTERNAL_ID, "demo-${UUID.randomUUID()}")
+            .set(TITLES.EXTERNAL_ID, externalId)
             .set(TITLES.MEDIA_TYPE, "movie")
             .set(TITLES.NAME, name)
             .execute()

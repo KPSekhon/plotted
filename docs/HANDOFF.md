@@ -10,7 +10,7 @@ Paste the block below into a new session. Everything after it is detail.
 > file. Phases 1–11 are built and merged; `main` is green.
 >
 > **The catalogue is live locally.** A native PostgreSQL 16 on `localhost:5432`
-> holds 503 titles, 2530 availability rows and 504 snapshots, seeded on
+> holds 503 titles, ~2600 availability rows and 520 snapshots, re-seeded on
 > 2026-08-07. There is no Docker on this machine, so 137 of 405 API tests skip
 > locally and only run in CI — assume anything touching Postgres, CP-SAT or a
 > Spring profile is unverified until CI says otherwise, and budget several round
@@ -54,17 +54,32 @@ Paste the block below into a new session. Everything after it is detail.
 ### Marked **agent** — do these
 
 1. **Nothing is blocking.** Every remaining code task is small or optional.
-2. **`TitleIngestionService.ingest` is not `@Transactional`.** The event bug it
-   caused is fixed at the listener, but the title-plus-genres write is still not
-   atomic: a failure between them leaves a title with partial genres. Fixing it
-   properly needs care — `ingestWithSeasons` self-invokes `ingest`, so a naive
-   annotation will not proxy, and wrapping the season loop would hold a database
-   connection across a dozen HTTP calls.
-3. **Nothing tests `TonightService.recommend`.** The stages are covered
-   individually; the orchestration is not. Noticed when a signature change to it
-   broke no test.
-4. **A throughput benchmark**, once something is deployed. The structural
-   20-second bound is asserted; requests-per-second is not.
+2. **Verify the ingest transaction end to end.** *Done 2026-08-07.* The
+   transaction carries the event on its own: with `fallbackExecution` turned off
+   it still delivered, and with the `@Transactional` removed it dropped silently,
+   exactly as the original bug did. The three-run table is in
+   `docs/PROGRESS.md`. `availability_snapshots` went 0 → 520.
+
+   An earlier note here claimed the title-plus-genres write was not atomic. That
+   was wrong — `TitleRepository.upsert` is itself `@Transactional`. The bug was
+   only ever that the *event* was published after that transaction had already
+   committed, so the listener saw none.
+
+   Also corrected: this file used to say the local database held 504 snapshots.
+   It held none.
+3. **Nothing tests `TonightService.recommend`.** *Done.* `TonightServiceTest`
+   covers the orchestration — both empty answers staying distinct, every outcome
+   reaching the log once, the returned request id being the log's own, and a
+   deleted title being dropped rather than throwing. Runs without Docker. It
+   also pinned two things nothing recorded: `Pick` carries no position, so list
+   order *is* the position in two places independently; and the
+   `scored.isEmpty()` branch is unreachable, because `PRIORITY` is always
+   present.
+4. **A throughput benchmark.** *Partly done.* Latency is measured locally —
+   median 15.8 ms, p95 26.7 ms on `GET /api/v1/tonight`, in `docs/PROGRESS.md`.
+   Requests per second still needs a real load tool against a deployed instance:
+   the local attempt measured PowerShell's process startup rather than the
+   server, and was discarded rather than quoted.
 5. **Population prior for Pilot Season** is zero-mean, which is a placeholder.
    Once profiles exist it should be their average. Needs users first.
 6. **`docs/EVALUATION.md` claims are still simulation-only.** Real outcomes need

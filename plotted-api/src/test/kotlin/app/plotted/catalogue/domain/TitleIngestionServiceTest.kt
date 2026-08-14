@@ -30,12 +30,21 @@ class TitleIngestionServiceTest {
     private val seasons = mockk<app.plotted.catalogue.persistence.SeasonRepository>(relaxed = true)
     private val events = mockk<ApplicationEventPublisher>(relaxed = true)
 
+    /**
+     * The real writer over the same mocks, rather than a mocked writer.
+     *
+     * It keeps every assertion below meaningful -- "upsert was called", "an event
+     * was published" -- while exercising the composition that carries the
+     * transaction in production. A mocked writer would let the service pass these
+     * tests while storing nothing.
+     */
+    private val writer = TitleWriter(titles = titles, events = events)
+
     private val service = TitleIngestionService(
         client = client,
         mapper = TmdbTitleMapper(TmdbProperties()),
-        titles = titles,
+        writer = writer,
         seasons = seasons,
-        events = events,
     )
 
     private val titleId = UUID.randomUUID()

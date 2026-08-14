@@ -13,7 +13,24 @@ export interface Pick {
   readonly name: string;
   readonly mediaType: 'movie' | 'series';
   readonly posterUrl: string | null;
+  /** The whole commitment: a film, or every episode of a series added up. */
   readonly watchMinutes: number | null;
+  /**
+   * One sitting — a film, or a typical episode. What the time budget was
+   * actually measured against, because a series is watched in increments.
+   */
+  readonly sessionMinutes: number | null;
+  /** True when `sessionMinutes` describes an episode rather than the whole title. */
+  readonly perEpisode: boolean;
+  /**
+   * Which episode this actually is.
+   *
+   * Null for a film, and for a series whose episodes the catalogue does not
+   * hold. `runtimeMinutes` here is that episode's own and can differ from
+   * `sessionMinutes`, which is the typical episode the time budget was measured
+   * against.
+   */
+  readonly nextEpisode: NextEpisodeRef | null;
   readonly availableOn: readonly string[];
   readonly score: number;
   /** Derived from the scored features, never generated prose. */
@@ -59,3 +76,16 @@ export const ACCESS_POLICY_LABELS: Readonly<Record<AccessPolicy, string>> = {
   include_free: 'Include free services',
   any_subscription: 'Anything streaming',
 };
+
+/** The episode to put on, rather than an average to reason about. */
+export interface NextEpisodeRef {
+  readonly seasonNumber: number;
+  readonly episodeNumber: number;
+  readonly name: string | null;
+  /** This episode's own runtime, or null when upstream never gave one. Never an average. */
+  readonly runtimeMinutes: number | null;
+  /** False when nothing has been finished, so this is episode one rather than a resumption. */
+  readonly started: boolean;
+  /** Aired episodes still ahead, including this one. */
+  readonly remainingEpisodes: number;
+}

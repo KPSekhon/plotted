@@ -26,7 +26,7 @@ class UserRepository(
      */
     fun findByEmail(email: String): StoredUser? =
         dsl.select(USERS.ID, USERS.EMAIL, USERS.PASSWORD_HASH, USERS.DISPLAY_NAME, USERS.REGION_CODE, USERS.TIMEZONE)
-            .select(USERS.PREFERRED_CURRENCY, USERS.ONBOARDING_STATUS, USERS.CREATED_AT)
+            .select(USERS.PREFERRED_CURRENCY, USERS.ONBOARDING_STATUS, USERS.CREATED_AT, USERS.IS_DEMO)
             .from(USERS)
             .where(USERS.EMAIL.eq(email))
             .and(USERS.DELETED_AT.isNull)
@@ -34,7 +34,7 @@ class UserRepository(
             ?.let { StoredUser(toAccount(it), it[USERS.PASSWORD_HASH]) }
 
     fun findById(userId: UUID): UserAccount? = dsl.select(USERS.ID, USERS.EMAIL, USERS.DISPLAY_NAME, USERS.REGION_CODE, USERS.TIMEZONE)
-        .select(USERS.PREFERRED_CURRENCY, USERS.ONBOARDING_STATUS, USERS.CREATED_AT)
+        .select(USERS.PREFERRED_CURRENCY, USERS.ONBOARDING_STATUS, USERS.CREATED_AT, USERS.IS_DEMO)
         .from(USERS)
         .where(USERS.ID.eq(userId))
         .and(USERS.DELETED_AT.isNull)
@@ -42,6 +42,19 @@ class UserRepository(
         ?.let(::toAccount)
 
     fun emailExists(email: String): Boolean = dsl.fetchExists(dsl.selectFrom(USERS).where(USERS.EMAIL.eq(email)))
+
+    /**
+     * Whether an account is still live. Runs on every authenticated request, so
+     * it selects nothing at all — the primary key index answers it.
+     *
+     * The `deleted_at` predicate matches [findById] deliberately. A soft-deleted
+     * account is one identity already declines to resolve, and letting it keep
+     * authenticating would make "deleted" mean two different things depending on
+     * which door you came through.
+     */
+    fun exists(userId: UUID): Boolean = dsl.fetchExists(
+        dsl.selectFrom(USERS).where(USERS.ID.eq(userId)).and(USERS.DELETED_AT.isNull),
+    )
 
     fun insert(
         id: UUID,
@@ -74,6 +87,10 @@ class UserRepository(
             preferredCurrency = currency,
             onboardingStatus = OnboardingStatus.REGISTERED,
             createdAt = now.toInstant(),
+            // Registration never makes a demo account. The demo module sets the
+            // flag itself, on the row it creates, so the two paths cannot
+            // disagree about which accounts are manufactured.
+            isDemo = false,
         )
     }
 
@@ -134,6 +151,7 @@ class UserRepository(
         preferredCurrency = record[USERS.PREFERRED_CURRENCY]!!.trim(),
         onboardingStatus = OnboardingStatus.fromDb(record[USERS.ONBOARDING_STATUS]!!),
         createdAt = record[USERS.CREATED_AT]!!.toInstant(),
+        isDemo = record[USERS.IS_DEMO]!!,
     )
 
     /** Carries the password hash, which never leaves this module. */

@@ -5,7 +5,9 @@ import app.plotted.platform.config.PlottedProperties
 import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
 import app.plotted.platform.spi.AvailabilityDirectory
+import app.plotted.platform.spi.RecommendationFixtures
 import app.plotted.platform.spi.SessionIssuer
+import app.plotted.platform.spi.TasteFixtures
 import app.plotted.platform.spi.TitleDirectory
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
@@ -37,6 +39,12 @@ class DemoServiceTest {
     private val availability = mockk<AvailabilityDirectory>()
     private val sessions = mockk<SessionIssuer>()
 
+    // Relaxed: seeding the taste fixture is a side effect of starting a demo,
+    // not a property any test here is about. The one thing that does matter --
+    // that a failure to seed does not fail the demo -- has its own test below.
+    private val taste = mockk<TasteFixtures>(relaxed = true)
+    private val decisions = mockk<RecommendationFixtures>(relaxed = true)
+
     private val userId = UUID.randomUUID()
     private val watchlistId = UUID.randomUUID()
     private val netflix = UUID.randomUUID()
@@ -52,6 +60,8 @@ class DemoServiceTest {
         demo = demo,
         titles = titles,
         availability = availability,
+        taste = taste,
+        decisions = decisions,
         sessions = sessions,
         properties = properties,
         platform = platformProperties(),
@@ -85,7 +95,7 @@ class DemoServiceTest {
         givenCatalogue(titleCount = 12)
 
         val priorities = mutableListOf<Int>()
-        every { demo.insertWatchlistItem(any(), any(), capture(priorities), any()) } returns Unit
+        every { demo.insertWatchlistItem(any(), any(), capture(priorities), any(), any()) } returns Unit
 
         service().start(client)
 
@@ -100,7 +110,7 @@ class DemoServiceTest {
         givenCatalogue(titleCount = 12)
 
         val deadlines = mutableListOf<LocalDate?>()
-        every { demo.insertWatchlistItem(any(), any(), any(), captureNullable(deadlines)) } returns Unit
+        every { demo.insertWatchlistItem(any(), any(), any(), captureNullable(deadlines), any()) } returns Unit
 
         service().start(client)
 
@@ -166,7 +176,7 @@ class DemoServiceTest {
     @Test
     fun `an unseeded catalogue says so rather than pretending`() {
         every { demo.countLiveDemoAccounts() } returns 0
-        every { demo.findCandidateTitleIds(any(), any()) } returns emptyList()
+        every { demo.findCandidateTitleIds(any(), any(), any()) } returns emptyList()
         every { titles.findSummaries(any()) } returns emptyList()
         every { demo.createUser(any(), any(), any()) } returns userId
         every { demo.createWatchlist(any(), any()) } returns watchlistId
@@ -182,6 +192,68 @@ class DemoServiceTest {
         verify(exactly = 0) { demo.insertSubscription(any(), any(), any(), any()) }
     }
 
+    @Test
+    fun `a taste profile that cannot be seeded does not fail the demo`() {
+        givenCatalogue(titleCount = 4)
+        givenSession()
+        every { taste.seedDemoPersona(any(), any()) } throws IllegalStateException("ladder unavailable")
+
+        val result = service().start(client)
+
+        // The persona is a nicety; the account, the list and the subscriptions
+        // are the demo. Letting a fixture take the whole thing down would mean
+        // an empty taste ladder turning into a visitor seeing an error page
+        // instead of the product.
+        result.watchlistSize shouldBe 4
+        verify { sessions.issueFor(userId, client) }
+    }
+
+    @Test
+    fun `the manufactured history includes a failure and a refusal`() {
+        givenCatalogue(titleCount = 8)
+        givenSession()
+
+        val recorded = mutableListOf<RecommendationFixtures.DemoDecision>()
+        every { decisions.recordDemoDecision(capture(recorded)) } returns Unit
+
+        service().start(client)
+
+        // A history where everything was accepted and finished makes the
+        // completion rate 100% and demonstrates nothing. These two rows are
+        // what stop the demo flattering itself.
+        recorded.any { it.titleId != null && it.acceptedAt == null } shouldBe true
+        recorded.any { it.titleId == null } shouldBe true
+
+        // And one acceptance outside the four-hour latency window, so the
+        // "excluded as stale" count on the screen is not always zero.
+        recorded.any {
+            it.acceptedAt != null && it.requestedAt.plusHours(4).isBefore(it.acceptedAt)
+        } shouldBe true
+    }
+
+    @Test
+    fun `a decision log that cannot be seeded does not fail the demo`() {
+        givenCatalogue(titleCount = 4)
+        givenSession()
+        every { decisions.recordDemoDecision(any()) } throws IllegalStateException("log unavailable")
+
+        service().start(client).watchlistSize shouldBe 4
+    }
+
+    @Test
+    fun `the questionnaire is left partly unanswered on purpose`() {
+        givenCatalogue(titleCount = 4)
+        givenSession()
+
+        service().start(client)
+
+        // Fewer than the fifteen the ladder holds. A demo that arrives finished
+        // hides the fork, and answering every axis would lose the NOT_ASKED
+        // verdict, which is the honest-refusal design being visible rather than
+        // merely tested.
+        verify { taste.seedDemoPersona(userId, 10) }
+    }
+
     // --- fixtures -----------------------------------------------------------
 
     private fun givenCatalogue(titleCount: Int, unmeasuredTitles: Int = 0, includeFreeProvider: Boolean = false) {
@@ -191,7 +263,7 @@ class DemoServiceTest {
         every { demo.countLiveDemoAccounts() } returns 0
         every { demo.createUser(any(), any(), any()) } returns userId
         every { demo.createWatchlist(any(), any()) } returns watchlistId
-        every { demo.findCandidateTitleIds(any(), any()) } returns ids
+        every { demo.findCandidateTitleIds(any(), any(), any()) } returns ids
         every { titles.findSummaries(any()) } returns ids.map { id ->
             TitleDirectory.TitleSummary(
                 titleId = id,
@@ -202,6 +274,7 @@ class DemoServiceTest {
                 // The unmeasured ones are the tail, so the caller has to filter
                 // rather than simply truncate.
                 watchMinutes = if (id in measured) 118 else null,
+                sessionMinutes = if (id in measured) 118 else null,
                 communityRating = 7.4,
             )
         }

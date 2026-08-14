@@ -121,3 +121,47 @@ export const STATUS_LABELS: Readonly<Record<WatchStatus, string>> = {
   abandoned: 'Gave up',
   unavailable: 'Not available',
 };
+
+/**
+ * Where you are in a series, and what comes next.
+ *
+ * Position only. This records which episode you finished, never how quickly you
+ * got there, so nothing built on it may claim a viewing pace -- that needs
+ * completion events over time, which Plotted does not store.
+ */
+export interface SeriesProgress {
+  readonly titleId: string;
+  /** Null until you have finished something. Absent history, not episode zero. */
+  readonly lastCompleted: EpisodeRef | null;
+  /**
+   * The first aired episode you have not finished, or episode one when nothing
+   * is recorded. Null only when there is genuinely nothing left to watch.
+   */
+  readonly next: NextEpisode | null;
+  readonly remaining: RemainingEpisodes;
+  /** True when nothing aired is left. Different from not having started. */
+  readonly caughtUp: boolean;
+  readonly updatedAt: string | null;
+}
+
+export interface EpisodeRef {
+  readonly seasonNumber: number;
+  readonly episodeNumber: number;
+}
+
+export interface NextEpisode extends EpisodeRef {
+  readonly episodeId: string;
+  readonly name: string | null;
+  /** This episode's own runtime, or null when upstream never gave one. Never an average. */
+  readonly runtimeMinutes: number | null;
+}
+
+/**
+ * The count includes episodes with no known runtime; the minutes do not. So
+ * nine episodes and three hours can mean nine episodes of which seven are
+ * measured, which is the honest pair.
+ */
+export interface RemainingEpisodes {
+  readonly episodes: number;
+  readonly minutes: number | null;
+}

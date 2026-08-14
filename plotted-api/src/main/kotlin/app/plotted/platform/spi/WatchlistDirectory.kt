@@ -26,6 +26,20 @@ interface WatchlistDirectory {
     fun blockedTitleIds(userId: UUID): Set<UUID>
 
     /**
+     * Where the user is in each of these series, and what is next.
+     *
+     * Keyed by title id; a series with no entry has nothing to say -- either it
+     * is not a series, or it has no episodes the catalogue knows about.
+     *
+     * Called with a handful of ids rather than a whole watchlist, deliberately.
+     * Resolving "what is next" costs a query per series, and doing it for every
+     * candidate before filtering would put an N+1 on the endpoint with the
+     * tightest latency budget in the product. Tonight asks only about the titles
+     * it is actually going to show.
+     */
+    fun seriesProgress(userId: UUID, titleIds: Collection<UUID>): Map<UUID, NextUp>
+
+    /**
      * Everyone still waiting on a title.
      *
      * The reverse of [outstandingItems], and it exists because Plot Armour asks
@@ -50,5 +64,30 @@ interface WatchlistDirectory {
         /** 1 is the highest, 5 the lowest. Restated because getting it backwards is silent. */
         val priority: Int,
         val desiredByDate: LocalDate?,
+    )
+
+    /**
+     * The next episode of a series, and how much of it is left.
+     *
+     * A flat shape rather than a nested episode object, because it crosses a
+     * module boundary and the recommender should depend on primitives rather
+     * than on watchlist's model. See ADR 0008.
+     */
+    data class NextUp(
+        val episodeId: UUID,
+        val seasonNumber: Int,
+        val episodeNumber: Int,
+        val name: String?,
+        /**
+         * This episode's own runtime, or null when upstream never gave one.
+         *
+         * Never filled in from the series average. The caller already has the
+         * typical episode and can decide to fall back; substituting one here
+         * would make a specific episode's length look measured when it is not.
+         */
+        val runtimeMinutes: Int?,
+        /** Whether anything has been finished. False means this is episode one. */
+        val started: Boolean,
+        val remainingEpisodes: Int,
     )
 }

@@ -7,6 +7,7 @@ import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.util.UUID
@@ -120,7 +121,7 @@ class CoverageServiceTest {
 
     @Test
     fun `an empty watchlist reports nothing rather than dividing by zero`() {
-        every { watchlists.findOrCreateDefault(userId) } returns watchlist()
+        every { watchlists.findDefault(userId) } returns watchlist()
         every { watchlists.findItems(watchlistId) } returns emptyList()
 
         val report = service.forUser(userId, "CA")
@@ -144,10 +145,34 @@ class CoverageServiceTest {
         report.providers shouldBe emptyList()
     }
 
+    /**
+     * The dashboard used to provision the list it was about to read. `forUser` is
+     * `readOnly`, so Postgres refused the insert and the whole screen answered
+     * 500 — for every account whose first visit to Coverage came before its first
+     * visit to the watchlist, which is every account that follows the navigation
+     * in the order it is written.
+     *
+     * It healed on the next request, once some read-write endpoint had created
+     * the row, so it never survived long enough to be reproduced by hand. The
+     * `verify` is the real assertion here: an empty report is the right answer,
+     * but it is also the answer the broken version gave on the second attempt.
+     */
+    @Test
+    fun `an account with no watchlist yet gets an empty report without one being created`() {
+        every { watchlists.findDefault(userId) } returns null
+
+        val report = service.forUser(userId, "CA")
+
+        report.consideredTitles shouldBe 0
+        report.totalWeight shouldBe 0.0
+        report.providers shouldBe emptyList()
+        verify(exactly = 0) { watchlists.findOrCreateDefault(any()) }
+    }
+
     // --- helpers -----------------------------------------------------------
 
     private fun givenItems(vararg items: WatchlistItem) {
-        every { watchlists.findOrCreateDefault(userId) } returns watchlist()
+        every { watchlists.findDefault(userId) } returns watchlist()
         every { watchlists.findItems(watchlistId) } returns items.toList()
     }
 

@@ -3,6 +3,7 @@ package app.plotted.watchlist.api
 import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
 import app.plotted.platform.security.currentUser
+import app.plotted.watchlist.domain.SeriesProgressService
 import app.plotted.watchlist.domain.WatchStatus
 import app.plotted.watchlist.domain.WatchlistService
 import io.swagger.v3.oas.annotations.Operation
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -29,6 +31,7 @@ import java.util.UUID
 @RequestMapping("/api/v1/watchlist")
 class WatchlistController(
     private val watchlist: WatchlistService,
+    private val seriesProgress: SeriesProgressService,
 ) {
     @GetMapping
     @Operation(
@@ -134,4 +137,49 @@ class WatchlistController(
         watchlist.unblock(currentUser().userId, titleId)
         return ResponseEntity.noContent().build()
     }
+
+    @GetMapping("/progress/{titleId}")
+    @Operation(
+        summary = "Where you are in a series, and what is next",
+        description =
+        "`next` is the first aired episode you have not finished. With nothing recorded that is " +
+            "episode one, because not having started is different from having nothing left. " +
+            "`next` is null only when there is genuinely nothing to watch: the series is finished, " +
+            "or everything remaining has not aired.",
+    )
+    fun progress(@PathVariable titleId: UUID): ResponseEntity<SeriesProgressResponse> =
+        ResponseEntity.ok(SeriesProgressResponse.from(seriesProgress.view(currentUser().userId, titleId)))
+
+    @PutMapping("/progress/{titleId}")
+    @Operation(
+        summary = "Record the last episode you finished",
+        description =
+        "Replaces whatever was recorded, in either direction: correcting a mistake and starting a " +
+            "rewatch both move backwards, and a marker that only goes forwards is one you cannot " +
+            "fix. The position is checked against the catalogue, so a season or episode that does " +
+            "not exist is a 400 rather than a row nothing can interpret. Specials (season 0) are " +
+            "refused -- your place in the story is not the Christmas episode.",
+    )
+    fun recordProgress(
+        @PathVariable titleId: UUID,
+        @Valid @RequestBody request: RecordProgressRequest,
+    ): ResponseEntity<SeriesProgressResponse> {
+        val view = seriesProgress.record(
+            userId = currentUser().userId,
+            titleId = titleId,
+            seasonNumber = requireNotNull(request.seasonNumber),
+            episodeNumber = requireNotNull(request.episodeNumber),
+        )
+        return ResponseEntity.ok(SeriesProgressResponse.from(view))
+    }
+
+    @DeleteMapping("/progress/{titleId}")
+    @Operation(
+        summary = "Forget where you are in a series",
+        description =
+        "Idempotent, and returns the view rather than 204: clearing progress puts you back at " +
+            "episode one, and the client needs to render that rather than an empty space.",
+    )
+    fun clearProgress(@PathVariable titleId: UUID): ResponseEntity<SeriesProgressResponse> =
+        ResponseEntity.ok(SeriesProgressResponse.from(seriesProgress.clear(currentUser().userId, titleId)))
 }

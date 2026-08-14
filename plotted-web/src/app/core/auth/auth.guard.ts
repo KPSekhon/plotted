@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, CanMatchFn, Router } from '@angular/router';
 
 import { AuthService } from './auth.service';
 
@@ -21,3 +21,19 @@ export const anonymousOnlyGuard: CanActivateFn = () => {
 
   return auth.isAuthenticated() ? router.createUrlTree(['/']) : true;
 };
+
+/*
+ * `/` is two different pages, chosen by whether anyone is signed in.
+ *
+ * `canMatch` rather than a redirect, deliberately. A redirect would put the
+ * landing page on its own path and bounce visitors to it, which means the URL
+ * somebody shares or a recruiter is handed is not the page they land on — and a
+ * signed-in user reloading would visibly flick through the marketing page on
+ * the way home. Matching instead means one URL that resolves to the right
+ * component the first time, and neither component ever loads for the wrong
+ * audience.
+ *
+ * Safe because `APP_INITIALIZER` awaits the token refresh before the first
+ * route resolves, so these are never asked before the answer is known.
+ */
+export const signedOutMatch: CanMatchFn = () => !inject(AuthService).isAuthenticated();

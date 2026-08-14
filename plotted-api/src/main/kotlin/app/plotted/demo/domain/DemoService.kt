@@ -5,13 +5,18 @@ import app.plotted.platform.config.PlottedProperties
 import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
 import app.plotted.platform.spi.AvailabilityDirectory
+import app.plotted.platform.spi.RecommendationFixtures
 import app.plotted.platform.spi.SessionIssuer
+import app.plotted.platform.spi.TasteFixtures
 import app.plotted.platform.spi.TitleDirectory
 import org.slf4j.LoggerFactory
+import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.time.Duration
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.util.UUID
 
 /**
@@ -51,6 +56,8 @@ class DemoService(
     private val demo: DemoRepository,
     private val titles: TitleDirectory,
     private val availability: AvailabilityDirectory,
+    private val taste: TasteFixtures,
+    private val decisions: RecommendationFixtures,
     private val sessions: SessionIssuer,
     private val properties: DemoProperties,
     private val platform: PlottedProperties,
@@ -78,6 +85,9 @@ class DemoService(
         val userId = demo.createUser(DEMO_DISPLAY_NAME, region, properties.accountLifetime)
         val watchlistId = demo.createWatchlist(userId, "Demo list")
 
+        val history = historyFor(chosen)
+        val completedAt = history.filter { it.completedAt != null }.associate { it.titleId to it.completedAt }
+
         chosen.forEachIndexed { index, titleId ->
             demo.insertWatchlistItem(
                 watchlistId = watchlistId,
@@ -88,13 +98,35 @@ class DemoService(
                 // than omitting it: the demo would be showing a ranker nobody
                 // built.
                 desiredBy = if (index == DEADLINE_INDEX) LocalDate.now(clock).plusDays(DEADLINE_DAYS) else null,
+                completedAt = completedAt[titleId],
             )
         }
 
         val subscribed = subscribe(userId, chosen, region)
+
+        // Part of the questionnaire, not all of it. A demo that arrives
+        // finished hides the fork, which is the interaction worth showing, and
+        // answering every axis would lose the demonstration that Plotted says
+        // so when it never asked. Failure here is not worth failing a demo
+        // over: the questionnaire simply starts from the beginning.
+        val answered = runCatching { taste.seedDemoPersona(userId, PILOT_ANSWERS) }
+            .onFailure { logger.warn("Could not seed the demo taste profile for {}: {}", userId, it.message) }
+            .getOrDefault(0)
+
+        // Same reasoning as the taste profile: a nicety, and not worth failing
+        // a demo over.
+        runCatching { history.forEach { it.record(userId, region) } }
+            .onFailure { logger.warn("Could not seed the demo decision log for {}: {}", userId, it.message) }
+
         val session = sessions.issueFor(userId, client)
 
-        logger.info("Started demo account {} with {} titles and {} subscriptions", userId, chosen.size, subscribed.size)
+        logger.info(
+            "Started demo account {} with {} titles, {} subscriptions and {} taste answers",
+            userId,
+            chosen.size,
+            subscribed.size,
+            answered,
+        )
 
         return DemoSession(
             userId = userId,
@@ -120,7 +152,11 @@ class DemoService(
      * thirty seconds someone gave the project.
      */
     private fun chooseTitles(region: String): List<UUID> {
-        val candidates = demo.findCandidateTitleIds(region, properties.watchlistSize * CANDIDATE_OVERFETCH)
+        val candidates = demo.findCandidateTitleIds(
+            region,
+            properties.watchlistSize * CANDIDATE_OVERFETCH,
+            preferredExternalIds(),
+        )
         if (candidates.isEmpty()) return emptyList()
 
         val usable = titles.findSummaries(candidates)
@@ -210,8 +246,122 @@ class DemoService(
         val catalogueIsEmpty: Boolean,
     )
 
+    /**
+     * Six weeks of manufactured evenings, shaped so End Credits has something
+     * to say without being flattered into saying it.
+     *
+     * The composition is the whole point, because every number on that screen
+     * is easy to make meaningless:
+     *
+     *  * **Three finished**, so the completion rate has a numerator.
+     *  * **One accepted and never finished, five weeks back** — past the
+     *    fourteen-day maturity window, so it lands in the denominator as an
+     *    honest failure. Without it the rate is 100%, which is not a
+     *    demonstration of anything.
+     *  * **One accepted twelve days ago and unfinished**, which is inside the
+     *    window and therefore held back rather than scored. That is the rule
+     *    the metric exists to enforce, and it is invisible unless a row
+     *    exercises it.
+     *  * **One acceptance five hours after being served**, which is outside the
+     *    four-hour latency window and gets excluded and counted — again, a rule
+     *    nothing else would show.
+     *  * **Two refusals**, because "nothing fits" is a feature here and the
+     *    screen reports it beside the rest.
+     *
+     * Latencies are seconds to minutes, which is what a decision made from
+     * three options should look like. They are not measurements of anything.
+     */
+    private fun historyFor(chosen: List<UUID>): List<FixtureDecision> {
+        if (chosen.isEmpty()) return emptyList()
+
+        val now = OffsetDateTime.now(clock)
+        fun title(index: Int) = chosen[index % chosen.size]
+
+        return listOf(
+            // Accepted and finished.
+            FixtureDecision(title(0), now.minusDays(34), Duration.ofSeconds(38), now.minusDays(33)),
+            FixtureDecision(title(1), now.minusDays(19), Duration.ofSeconds(171), now.minusDays(18)),
+            FixtureDecision(title(2), now.minusDays(5), Duration.ofSeconds(72), now.minusDays(4)),
+
+            // Accepted, never finished, old enough to count against the rate.
+            FixtureDecision(title(3), now.minusDays(27), Duration.ofSeconds(95), null),
+
+            // Accepted recently and unfinished: held back, not scored.
+            FixtureDecision(title(4), now.minusDays(12), Duration.ofSeconds(54), null),
+
+            // Accepted five hours later, so the latency is excluded as stale.
+            FixtureDecision(title(5), now.minusDays(9), Duration.ofHours(5), null),
+
+            // Served and not taken.
+            FixtureDecision(title(6), now.minusDays(2), null, null),
+
+            // Refusals.
+            FixtureDecision(null, now.minusDays(21), null, null),
+            FixtureDecision(null, now.minusDays(1), null, null),
+        )
+    }
+
+    /** One line of the manufactured history. See [historyFor]. */
+    private inner class FixtureDecision(
+        val titleId: UUID?,
+        private val requestedAt: OffsetDateTime,
+        private val decidedAfter: Duration?,
+        val completedAt: OffsetDateTime?,
+    ) {
+        fun record(userId: UUID, region: String) {
+            decisions.recordDemoDecision(
+                RecommendationFixtures.DemoDecision(
+                    userId = userId,
+                    regionCode = region,
+                    availableMinutes = FIXTURE_EVENING_MINUTES,
+                    titleId = titleId,
+                    requestedAt = requestedAt,
+                    acceptedAt = decidedAfter?.let { requestedAt.plus(it) },
+                ),
+            )
+        }
+    }
+
+    /**
+     * The curated persona, read from a versioned resource.
+     *
+     * Read on each demo start rather than cached: this is a handful of lines
+     * once per demo account, and a cache would mean editing the file did
+     * nothing until a restart — which is exactly the kind of quiet
+     * no-op this project keeps finding.
+     *
+     * A missing file is not an error. The persona simply falls back to being
+     * entirely data-derived, which is what it was before this existed.
+     */
+    private fun preferredExternalIds(): List<String> {
+        val resource = ClassPathResource(PREFERRED_PATH)
+        if (!resource.exists()) return emptyList()
+
+        return resource.inputStream.bufferedReader().useLines { lines ->
+            lines
+                .map { it.substringBefore('#').trim() }
+                .filter { it.isNotEmpty() }
+                .toList()
+        }
+    }
+
     private companion object {
         const val DEMO_DISPLAY_NAME = "Demo visitor"
+
+        /** Curated by a person. See the file's own header for why it exists. */
+        const val PREFERRED_PATH = "demo/preferred-titles.txt"
+
+        /**
+         * Two thirds of the ladder, leaving five to answer.
+         *
+         * Enough for the fit to have something to say on the axes it saw, few
+         * enough that at least one axis stays unasked — which is what puts the
+         * `NOT_ASKED` verdict on screen rather than only in the tests.
+         */
+        const val PILOT_ANSWERS = 10
+
+        /** What the manufactured evenings claim to have had free. Not a measurement. */
+        const val FIXTURE_EVENING_MINUTES = 95
         const val PRIORITY_LEVELS = 5
         const val DEADLINE_INDEX = 1
         const val DEADLINE_DAYS = 10L

@@ -8,7 +8,9 @@ import { RouterLink } from '@angular/router';
 import { Availability, Title } from '../../core/catalogue/catalogue.models';
 import { CatalogueService } from '../../core/catalogue/catalogue.service';
 import { messageFrom } from '../../core/error/problem-detail';
+import { UserSettingsService } from '../../core/user/user-settings.service';
 import { WatchlistService } from '../../core/watchlist/watchlist.service';
+import { RuntimeRouteComponent } from '../../shared/map/runtime-route.component';
 import { AvailabilityPanelComponent } from './availability-panel.component';
 
 /**
@@ -28,6 +30,7 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
     MatIconModule,
     MatProgressBarModule,
     AvailabilityPanelComponent,
+    RuntimeRouteComponent,
   ],
   template: `
     <a mat-button routerLink="/search" class="back">
@@ -61,27 +64,45 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
             <p class="original-name">{{ original }}</p>
           }
 
-          <p class="facts">
-            <span>{{ loaded.mediaType === 'movie' ? 'Film' : 'Series' }}</span>
+          <!-- Map annotations rather than a sentence: these are readings, and
+               reading them as readings is the point. -->
+          <dl class="facts coordinates">
+            <div>
+              <dt>Format</dt>
+              <dd>{{ loaded.mediaType === 'movie' ? 'Film' : 'Series' }}</dd>
+            </div>
             @if (loaded.releaseDate; as date) {
-              <span>&middot; {{ date | date: 'yyyy' }}</span>
+              <div>
+                <dt>Year</dt>
+                <dd class="readout">{{ date | date: 'yyyy' }}</dd>
+              </div>
             }
-            @if (loaded.watchMinutes; as minutes) {
-              <span>&middot; {{ formatMinutes(minutes) }}</span>
-              @if (loaded.mediaType === 'series' && loaded.episodeCount; as episodes) {
-                <span>across {{ episodes }} episodes</span>
-              }
+            @if (loaded.mediaType === 'series' && loaded.episodeCount; as episodes) {
+              <div>
+                <dt>Episodes</dt>
+                <dd class="readout">{{ episodes }}</dd>
+              </div>
             }
             @if (loaded.communityRating; as rating) {
-              <span>&middot; {{ rating }}/10</span>
+              <div>
+                <dt>Rated</dt>
+                <dd class="readout">{{ rating }}/10</dd>
+              </div>
             }
-          </p>
+          </dl>
+
+          <plotted-runtime-route
+            [watchMinutes]="loaded.watchMinutes"
+            [episodeCount]="loaded.episodeCount"
+            [isSeries]="loaded.mediaType === 'series'"
+            [availableMinutes]="usualEvening()"
+          />
 
           @if (!loaded.watchMinutes) {
             <p class="incomplete-note">
               <mat-icon inline>info</mat-icon>
-              Plotted does not know how long this is yet, so it cannot appear in
-              time-constrained recommendations until the next metadata refresh fills that in.
+              Until the next metadata refresh fills that in, this cannot appear in
+              time-constrained recommendations.
             </p>
           }
 
@@ -203,10 +224,28 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
 
     .facts {
       display: flex;
-      gap: 0.4rem;
       flex-wrap: wrap;
-      opacity: 0.8;
-      margin: 0 0 1rem;
+      gap: 0.35rem 1.75rem;
+      margin: 0.75rem 0 0;
+
+      div {
+        display: flex;
+        flex-direction: column;
+        gap: 0.05rem;
+      }
+
+      dt {
+        font-size: 0.6rem;
+        opacity: 0.7;
+      }
+
+      dd {
+        margin: 0;
+        font-size: 0.82rem;
+        color: var(--plotted-text-muted);
+        letter-spacing: 0;
+        text-transform: none;
+      }
     }
 
     .incomplete-note {
@@ -229,7 +268,7 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
     }
 
     .form-error {
-      color: var(--mat-sys-error, #b3261e);
+      color: var(--plotted-critical);
     }
 
     .list-actions {
@@ -242,7 +281,7 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
 
     .list-error {
       font-size: 0.85rem;
-      color: var(--mat-sys-error, #b3261e);
+      color: var(--plotted-critical);
     }
 
     .blocked-note {
@@ -262,11 +301,21 @@ export class TitleDetailPage implements OnInit {
 
   private readonly catalogue = inject(CatalogueService);
   private readonly watchlists = inject(WatchlistService);
+  private readonly settings = inject(UserSettingsService);
 
   protected readonly title = signal<Title | null>(null);
   protected readonly availability = signal<Availability | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+
+  /**
+   * The user's stated usual evening, used to draw a boundary across the runtime.
+   *
+   * Null until settings load, and left null if they fail — the runtime bar then
+   * simply has no window on it. A default invented here would put a limit on
+   * screen that the user never set and would then read as their own.
+   */
+  protected readonly usualEvening = signal<number | null>(null);
 
   protected readonly onList = signal(false);
   protected readonly adding = signal(false);
@@ -358,6 +407,14 @@ export class TitleDetailPage implements OnInit {
       // unblocked state is right for them, and surfacing an error for a
       // preference they have not expressed would be noise.
       error: () => this.blocked.set(false),
+    });
+
+    // A fourth independent load, and it fails silently for the same reason the
+    // others do: the runtime bar without a window is still useful, and an error
+    // banner about settings on a title page would be about the wrong thing.
+    this.settings.get().subscribe({
+      next: (settings) => this.usualEvening.set(settings.defaultAvailableMinutes),
+      error: () => this.usualEvening.set(null),
     });
   }
 

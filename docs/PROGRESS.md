@@ -57,6 +57,324 @@ than locally, and why each red run cost several round trips.
 
 ---
 
+## 2026-08-08 — the product definition changed, and two bugs came out of asking about it
+
+**The definition.** Plotted is now *"learn what I enjoy, search my watchlist and
+the wider catalogue, then find the best thing for the night I actually have"*.
+Discovery is in scope; taste is a real input; the linear ranker gets versioned
+rather than edited. [ADR 0009](adr/0009-discovery-and-taste-as-product-inputs.md)
+has the architecture, `NEXT.md` Part 0 has the working order and the five
+decisions that were open.
+
+### The coverage dashboard 500'd for every new account, and healed itself
+
+`CoverageService.forUser` is `@Transactional(readOnly = true)` and called
+`findOrCreateDefault`. Postgres refuses an `INSERT` in a read-only transaction,
+so the screen answered 500 — for every account that opened Coverage before its
+watchlist existed, which is every account that follows the navigation in the
+order it is written.
+
+**It heals on the next request.** By then some read-write endpoint has created
+the row, and the dashboard works forever after. That is why it survived: it
+cannot be reproduced by retrying, and no developer or demo account has been
+without a watchlist by the time anybody looked at Coverage.
+
+Reproduced against a fresh registration: 500, then 200, then 200. Only `add` and
+`list` provision now; everything that reads goes through `findDefault` and treats
+an absent list as empty. `update` and `remove` were creating a list on the way to
+a 404, which left a row behind as the side effect of a failed request.
+
+### One deleted account, four different answers, one of them a 500
+
+The demo sweep deletes expired accounts hourly, so a visitor's open tab keeps
+presenting a signed, unexpired token for an account that is gone. Every endpoint
+met that condition on its own terms:
+
+| Endpoint | Before | After |
+|---|---|---|
+| `/alerts` | 200, empty list | 401 |
+| `/watchlist` | **500** (foreign key violation) | 401 |
+| `/watchlist/coverage` | **500** | 401 |
+| `/users/me/settings` | 404 | 401 |
+| `/pilot/profile` | 204 | 401 |
+| `/analytics/end-credits` | 200 | 401 |
+
+A verified signature proves the token was issued here and has not expired. It
+says nothing about whether the account still exists, and this product deletes
+accounts on a schedule. `JwtAuthenticationFilter` resolves it once, through an
+`AccountDirectory` SPI, and leaves the context empty — so the existing entry
+point renders the 401 and nothing new throws inside a filter, where the
+controller advice cannot reach it.
+
+**The prior note said `/alerts` was returning 500 on auth transitions.** It was
+not; `/alerts` was one of the endpoints that quietly answered 200. Every plain
+auth path — no token, malformed token, expired token, garbage refresh cookie,
+replayed refresh token — was already correct and was checked one at a time. The
+defect was one step further in, at *authenticated but no longer anybody*.
+
+**Cost, measured rather than asserted.** One primary-key `EXISTS` per
+authenticated request, and only when a token verifies. Taking the line out and
+putting it back, 200 warmed sequential requests against `GET /api/v1/tonight`:
+with the check, medians of 21.0, 22.3 and 21.3 ms; without it, 23.5 and 21.4 ms.
+The arms overlap. The honest claim is that the check is under this rig's
+run-to-run spread, not that it is free — and these runs are not comparable to the
+15.8 ms recorded below, because they were against `bootRun` with devtools and
+jOOQ debug logging on.
+
+### Two checks that were not checks
+
+- **`verify:api` pointed at a script that never existed.** Writing it surfaced
+  that ADR 0005's central promise has never held: the generated client is wired
+  up and nothing imports it, so every model in `plotted-web/src/app/core` is
+  hand-written and only the *server* half of the contract was guarded. The script
+  now checks that every endpoint the application calls exists in the committed
+  document with the method it is called with — paths and methods, not shapes,
+  which it says about itself — and CI runs it. Watched fail on a renamed path
+  before being trusted.
+- **`ktlintCheck` was already failing on this branch**, on two signatures from
+  the demo-fixture commits. It is the *first* step of the API job, so nothing
+  after it had run on `cinematic-cartography` at all.
+
+### Regenerating the OpenAPI document without Docker
+
+`tools/openapi/regenerate.mjs`, and `make openapi-local`. The contract test is
+Docker-gated, so every added field previously cost a full round trip through CI
+to recover `build/openapi-actual.json`.
+
+Two traps, neither of which is `JSON.stringify`. Jackson's pretty printer writes
+`"key" : value` and keeps arrays on one line. And `OpenApiContractTest` reads the
+response through `readTree` before writing it, which turns springdoc's
+`"maximum" : 10000.00` into `10000.0` — so copying the server's bytes verbatim
+produces a document CI rejects while looking more faithful than the thing it
+disagreed with.
+
+`--verify` re-renders the committed document from its own contents and refuses if
+anything moved. It caught the first trap on its first run. **CI is still the
+authority**; this only shortens the loop.
+
+### The demo says which of its numbers were made up
+
+`users.is_demo` has existed since V13 and nothing read it. It travels with the
+session now, so the label comes from the server rather than from something the
+client remembers about how it signed in — that version survives until the first
+reload and then quietly stops being true.
+
+A quiet `Demo` badge in the chrome, and one caption under each of the three
+screens that make behavioural claims: the fitted taste profile, both End Credits
+figures, and the subscription total Cancel Culture optimises against. Muted
+rather than accented, because orange means the plotted choice everywhere else
+and a disclosure that shouts reads as an apology for the demo.
+`demo-note.component.spec.ts` asserts it renders **nothing** on a real account,
+which is the direction nobody developing against a demo would notice was broken.
+
+**296 API tests and 47 frontend tests pass locally** after this work, up from 290
+and 44.
+
+---
+
+## 2026-08-13 — a researched price was reaching the optimiser as a confirmed one
+
+`V11__provider_plan_prices.sql` seeds prices read from published sources and says
+so at length: *researched, not verified*. `docs/seed/provider-plans.md` says it
+too. Both were warnings in comments, and one join undid them.
+
+`SubscriptionRepository` read a held subscription's price as
+`COALESCE(user_subscriptions.actual_price, provider_plans.price)`. So a
+subscription the user never priced silently adopted the researched figure, and
+by the time it reached Cancel Culture's objective function nothing downstream
+could tell which branch it came from. The optimiser minimised real money against
+it and the result was presented as advice.
+
+This is the failure the project keeps naming — invented money producing
+confident, wrong financial advice — except the money was not invented. It was
+*cited*, which is worse, because the citation made it look handled.
+
+**A published list price is not a bill.** Legacy rates, student pricing, bundles,
+promotional periods, annual plans and family arrangements all move it, and every
+one moves it *down*. Optimising against list prices therefore overstates what
+cancelling would save, in the direction that flatters the advice.
+
+`price_provenance` is a column now (V18), and the rule is a property of the
+value rather than a condition at the call site:
+
+| Provenance | Source | Optimised against |
+|---|---|---|
+| `USER_ENTERED` | `actual_price` — they typed it | yes |
+| `VERIFIED` | Checked against a live source, with a date | yes; nothing produces it yet |
+| `REFERENCE` | Researched, per `provider-plans.md` | **no** |
+
+A reference-only service is uncostable, and the titles depending on it come back
+under `excluded.unconfirmedPrice`, kept apart from `unpricedService` because the
+two ask different things: a missing price is Plotted's gap, an unconfirmed one
+closes with a single field. The plan screen says which services and links to the
+form.
+
+**Reference prices are still shown and still pre-fill that form.** Withholding
+them would push somebody towards inventing one.
+
+**The demo needed a decision, and it is not a special case.** Demo subscriptions
+had `actual_price` deliberately null so the persona paid the cited figure — right
+when every price was equally trusted, wrong afterwards, because it left the demo
+account's services `REFERENCE` and Cancel Culture with nothing to say on the
+account that exists to demonstrate it. They now carry `actual_price` copied from
+the plan's own researched figure: the same cited number, and the persona
+confirming a fixture price is exactly as legitimate as its fixture watchlist. The
+subscriptions screen already says the data was generated.
+
+**Both new tests were watched fail first.** With `mayBeOptimisedAgainst` forced
+to `true`, exactly the two new cases fail and the other nineteen pass. The second
+is the one that would have slipped through: a *held* subscription that never had
+its price confirmed looks like a real subscription all the way down.
+
+**And regenerating the document turned up a springdoc wart.** Every field of
+`ExcludedResponse` is a `List<ExcludedTitleResponse>`, and springdoc applies a
+collection property's `@Schema(description = …)` to the *item* type rather than
+the array — so the published schema described `ExcludedTitleResponse` as "Only on
+services with no established price", one bucket's reason standing in for the
+shape all four share. A milder relative of the `CoveredTitleResponse` collision:
+the document was internally consistent and matched itself, so the drift check had
+nothing to object to. Fixed with a class-level description.
+
+**299 API tests pass locally**, 47 frontend. `/api/v1/plan` was not exercised
+end to end here and could not be — CP-SAT still takes the JVM down on this
+machine — so the boundary is verified at the service level and by CI.
+
+---
+
+## 2026-08-14 — the optimiser has its own process, and the crash was finally watched
+
+`/api/v1/plan` used to kill the API. Not fail — kill: CP-SAT is JNI, a native
+fault is an `EXCEPTION_ACCESS_VIOLATION` rather than an exception, and nothing in
+Kotlin catches it. Every other endpoint, every in-flight request and the
+scheduled jobs went with it, and the only evidence was an `hs_err_pid*.log`.
+
+This had been filed as a developer-machine annoyance because CI and production
+are Linux. It was not one. The failure mode is what happens when a native solver
+shares a process with a web application; the Windows install only makes it happen
+on demand.
+
+**The optimiser is now `plotted-solver`** — its own Gradle module, run as a child
+process, one request in on stdin and one answer out on stdout. `plotted-api`
+depends on it for the model types and `PlanChecker` and **excludes OR-Tools**, so
+the native library is not on the API's classpath at all.
+[ADR 0010](adr/0010-optimiser-runs-in-its-own-process.md) has the reasoning.
+
+### What that made observable
+
+Measured here on 2026-08-14, driving the request that used to end the process:
+
+| | Before | After |
+|---|---|---|
+| `GET /api/v1/plan` | process death | **503** `OPTIMISER_UNAVAILABLE` |
+| `/alerts`, `/watchlist`, `/watchlist/coverage` | gone with it | 200 |
+| `/tonight`, `/analytics/end-credits`, `/subscriptions` | gone with it | 200 |
+| `/actuator/health` | gone with it | 200 |
+| API restarts | 1 | 0 |
+
+**The optimiser's failure path had never been executed anywhere until now**, and
+it was executable here precisely because this is the machine where OR-Tools is
+broken. The thing that made Cancel Culture untestable locally is what made its
+containment testable.
+
+### Three things worth keeping
+
+**A crashing JVM writes to stdout, not stderr.** The `hs_err` report goes to the
+same stream the answer does, so the parent checks exit status *before* parsing —
+otherwise a dead solver is reported as a JSON parse error.
+
+**The Gradle exclusion is the whole guarantee, so a test holds it.**
+`SolverIsolationTest` asserts `com.google.ortools.Loader` cannot be resolved from
+the API, and was watched fail with the `exclude` removed. Four words in a build
+file that read like tidying up are otherwise one refactor away from being
+deleted.
+
+**The new module compiled, reported a green build, and ran no tests at all.**
+`kotest-runner-junit5` supplies Kotest's engine, not JUnit Jupiter's, and Spring
+Boot's test starter had been quietly providing that in `plotted-api`. Nine test
+classes sat there passing by not existing. That is the eighth mechanism in this
+project to report success while doing nothing, and it was caught only by counting
+the tests rather than reading the build result.
+
+**300 API and solver tests pass locally, 140 skip** — the Docker-gated ones plus
+the CP-SAT ones, which now skip in their own module and run in CI, where the
+agreement test against `PlanChecker` executes.
+
+---
+
+## 2026-08-14 — Tonight names the episode
+
+`Tonight` could say *Chainsaw Man, about 24 minutes an episode* and then leave
+the user to open another app and work out which episode they were on. That is
+exactly the decision this product exists to remove, and it was the largest
+remaining gap between what Plotted claims and what it does.
+
+`user_series_progress` (V19) is one row per user and series. Against the seeded
+catalogue, recording One Piece S1 E61 and asking for a 45-minute evening now
+returns:
+
+```
+1. Beyblade X                     Start with S1 E1  "X"                  25 min, 131 left
+2. Demon Slayer: Kimetsu no Yaiba Start with S1 E1  "Cruelty"            23 min,  63 left
+3. One Piece                      You are up to S2 E62 "…Laboon Appears!" 25 min, 1112 left
+```
+
+### Decisions worth not undoing
+
+**Position, not an episode id.** The obvious column is
+`last_completed_episode_id UUID REFERENCES episodes`, and episode ids are in fact
+stable — `SeasonRepository.upsert` conflicts on (season_id, episode_number). The
+position is still better: "what is next" is an `ORDER BY (season_number,
+episode_number)` over rows after this one, which needs the numbers rather than
+the identity, and a position keeps ordering correctly if an episode is ever
+removed upstream. The cost is that the database cannot check the episode exists,
+so `SeriesProgressService` does — and refuses a position the catalogue has never
+heard of, which One Piece proved immediately: S1 E1053 does not exist, because
+TMDB splits it across 23 seasons.
+
+**Position, not pace.** One last-completed episode says *where*, never *how
+fast*. Written into V19, the service and `NEXT.md`, because a timestamp on a row
+invites exactly the wrong inference. Anything downstream may say "at your
+configured three hours a week"; nothing may say "at your current pace".
+
+**Specials are never next**, following `recalculateTotalRuntime`, which already
+excludes season 0 from the runtime a series is judged by. Otherwise next-up steps
+out of the story into a Christmas episode and back again.
+
+**An unaired episode is not next, an undated one is.** A series caught up to its
+broadcast has nothing next — a real state, distinct from finished. A null air
+date is a gap in Plotted's data rather than evidence of an unreleased episode,
+and refusing on it would hide most older series entirely.
+
+**Not started still has a next episode.** It is episode one. Collapsing that into
+null would make "you have not begun" and "there is nothing left" the same value,
+and they are opposite answers to the only question being asked.
+
+**Progress may move backwards.** Correcting a mistake and starting a rewatch both
+do, and a marker that only ratchets forward is one the user cannot fix. Pinned by
+a test, because "progress only increases" is the obvious invariant to add later.
+
+### What this does not do yet, said plainly
+
+The runtime **filter** still reads the series' typical episode, not the episode
+being offered. Resolving next-up for every candidate before filtering would put
+an N+1 on the endpoint with the tightest latency budget in the product, so
+resolution happens after ranking for the three picks only. A 45-minute evening
+can therefore be offered a series whose next episode is a 61-minute finale; the
+card shows that episode's real runtime, so the number on screen is true, but the
+filter did not use it.
+
+Closing it means one batched `DISTINCT ON` over a per-series position and
+filtering on that. It is written into `TonightService` rather than left to be
+found, because the failure is quiet — a slightly wrong runtime on a card looks
+like rounding rather than like a filter reading the wrong number, which is
+precisely how the `watchMinutes` defect survived for months.
+
+**308 tests pass locally, 150 skip.** The new SQL — season boundaries, specials,
+unaired episodes, the count-versus-minutes asymmetry — is covered by
+`NextEpisodeIntegrationTest`, which is Docker-gated and runs in CI.
+
+---
+
 ## What is still open, and how to finish it
 
 Read this first if you are picking the project up. Every item below is either
@@ -288,6 +606,50 @@ nobody has measured is the same number and a different claim. Once profiles
 exist the mean should be their average. Left until there are users, because an
 average over nobody is still zero.
 
+### Measured 2026-08-08: the ladder cannot reach its own bar
+
+The demo persona is a stated weight vector, and its answers are whatever that
+vector implies — so it is the most consistent respondent Pilot Season will ever
+have. Fitting a **complete fifteen-answer** questionnaire from it:
+
+| Axis | fitted weight | standard error | \|w\|/se | verdict |
+|---|---|---|---|---|
+| Levity | 0.879 | 0.632 | **1.39** | `NO_PREFERENCE` |
+| Pace | 0.876 | 0.633 | **1.38** | `NO_PREFERENCE` |
+| Grounding | −0.879 | 0.632 | **1.39** | `NO_PREFERENCE` |
+| Commitment | 0.741 | 0.673 | **1.10** | `NO_PREFERENCE` |
+| Recency | 0.723 | 0.668 | **1.08** | `NO_PREFERENCE` |
+| Acclaim | 0.767 | 0.671 | **1.14** | `NO_PREFERENCE` |
+
+`CREDIBLE_MULTIPLIER` is 1.96. Nothing gets close, and `isInformative` is
+false. **A perfectly consistent respondent, answering every question, is told
+Plotted has nothing strong enough to act on** — and so, therefore, is every real
+user. The feature is built, correct and well tested, and structurally cannot
+produce its headline output.
+
+The cause is arithmetic rather than a defect: fifteen comparisons over six axes
+is 2.5 observations each, the Gaussian prior deliberately shrinks weights toward
+zero to keep the mode defined, and the posterior stays nearly as wide as the
+prior. A 95% bar is then unreachable.
+
+**The good news is that the fit is right.** It recovered the persona's sign on
+all six axes and its rank order roughly — the estimator works, the *evidence
+budget* does not.
+
+Four levers, and this is a design decision rather than a bug fix, so none has
+been pulled:
+
+1. **More comparisons.** Separating six axes at 95% wants something closer to
+   thirty or forty, not fifteen.
+2. **Fewer axes.** Six was a choice; four would spend the same answers on less.
+3. **A lower credible multiplier.** Cheapest and the most dangerous — the
+   threshold's own comment records that without it a profile "finds" two or
+   three preferences that are noise, indistinguishable from the real ones.
+4. **A weaker prior.** Widens the posterior it is there to constrain.
+
+Worth deciding before Pilot Season is shown to anybody, because at present the
+honest answer it gives is also the only answer it can give.
+
 ---
 
 ## Phases 10 to 12, and how to approach them
@@ -323,6 +685,22 @@ left in the enum.
 **The alert says "has left", not "about to leave."** The diff sees departures
 that already happened. Predicting one needs the removal-risk model and months of
 snapshot history, which is phase 12 and cannot start until the snapshot job runs.
+
+**Which is why the alert list has no boundary marker**, and that is worth
+recording because the boundary is the obvious design for this feature. A dated
+line the route crosses — *leaves Crave on 19 August* — needs a future date, and
+an `Alert` carries none: `alertType`, `severity`, `titleId`, `message`,
+`createdAt`. Drawing one would mean inventing both a date and a tense, on the
+single feature whose whole value is being trusted about availability. The list
+uses a **dead end** instead, which is true of a departure that has happened, and
+the boundary waits for the removal-risk model that could honestly produce one.
+
+**Designed against fixtures rather than production content**, since nothing has
+ever fired: `alert-list.component.spec.ts` carries a development story set —
+both event kinds, all three severities, a long message, and one alert with no
+title to link to — plus the two states that matter most, rendering nothing at
+all when there is nothing to say, and surviving a failed load without breaking
+the home page it sits on.
 
 **`ModuleBoundaryTest` could not catch a real violation here.** Plot Armour first
 read its event-type constant from `availability.domain`, straight across a
@@ -399,14 +777,48 @@ need. `PlanSolverBoundTest` asserts that count, which is deterministic and fails
 if a fourth probe is ever added; a wall-clock assertion would pass with three
 orders of magnitude to spare and would be flaky besides.
 
-**Not built: a throughput benchmark.** It needs a deployed environment to mean
-anything — run here it would measure the absence of a database — and the question
-was never requests per second but whether one request can block for twenty
-seconds, which is structural and now asserted. Worth doing against the
-deployment, with the measured numbers recorded here.
+**Latency measured locally on 2026-08-07; throughput still not.** Against the
+seeded native Postgres, `GET /api/v1/tonight` over 200 warmed requests:
+**median 15.8 ms, p95 26.7 ms, p99 36.4 ms, max 41.6 ms**. That is the whole
+request path — auth, three batched SPI lookups, screen, score, diversify, and
+the decision-log write — and it sits comfortably inside the §13.1 budget.
 
-**What is still missing is users.** Both metrics return null on an empty log, and
-that is the correct answer rather than a gap in the code.
+**The requests-per-second figure from the same run is discarded, and why is the
+useful part.** Eight concurrent PowerShell workers produced 32.6 req/s against
+63 req/s sequential — concurrency made it *slower*, which is impossible for the
+server and obvious once stated: `Start-Job` spawns a process per worker, so the
+harness was measuring PowerShell's startup cost. Quoting it would have been a
+number about the test rig wearing the costume of a number about Plotted. A real
+throughput figure needs a proper load tool against a deployed instance; the
+latency figures above stand on their own because they are sequential and
+warmed.
+
+**The optimiser is deliberately not benchmarked here.** CP-SAT crashes the JVM
+on this machine (phase 5), so `/api/v1/plan` cannot be driven locally at all.
+Its 20-second worst case remains asserted structurally as a solve count rather
+than measured.
+
+**Built 2026-08-08: the screen.** `GET /api/v1/analytics/end-credits` had no
+interface at all, so the two numbers the product's thesis rests on were
+reachable only with a bearer token. `/analytics` renders them, and the two
+exclusion counts — acceptances left out as stale, acceptances held back as too
+recent — are given the same weight as the headlines rather than tucked into a
+footnote. They are the rules that stop both figures drifting upward on their
+own, and a reader who cannot see them is taking the headline on trust, which is
+the one thing this screen exists not to ask for.
+
+A null metric renders as a sentence naming the condition that was not met,
+never as a dash or a zero. Both would read as "nothing happened"; the true
+meaning is "not enough evidence to say", which is a claim about the log rather
+than about the product.
+
+`Analytics` is in the main navigation now that there is something behind it.
+
+**What is still missing is users.** Both metrics return null on an empty log,
+and that is the correct answer rather than a gap in the code. The demo account
+carries a manufactured history so the screen can be evaluated before then —
+fixture rows, stamped `demo-fixture` rather than `linear-v1` so no later
+analysis can pool them with anything real.
 
 ### Phase 12 — stretch, and only if the earlier ones are genuinely done
 
@@ -537,6 +949,37 @@ the Docker-backed tests pass.
 a test that passes against a mock proves only that a call was made. Read the
 whole job log, and be suspicious of any check that has never had the chance to
 fail.
+
+### The ingest transaction, verified 2026-08-07
+
+`TitleWriter` puts the title write and the `TitleIngested` publish in one
+transaction. It had never been observed working — the seed that succeeded
+earlier that day was carried by `fallbackExecution` on the listener, not by the
+fix.
+
+**The obvious check could not have worked.** With `fallbackExecution = true`
+still on the listener, re-seeding and confirming availability appears is passed
+identically by the fix and by a full revert of it, because the safety net writes
+the same rows. So the check was made to discriminate instead — three runs,
+single ingests through `POST /api/v1/titles`:
+
+| Run | `@Transactional` on `store` | `fallbackExecution` | `availability_snapshots` |
+|---|---|---|---|
+| Negative control | removed | `false` | **0** — HTTP 200, silent drop |
+| The fix alone | restored | `false` | **0 → 1** |
+| Committed code, full seed | as merged | `true` | **1 → 520** |
+
+The middle row is the result: with the safety net off, the transaction alone
+delivered the event. The first row matters as much — it reproduced the original
+bug exactly, returning 200 with no exception and no log line, so this check has
+now been watched fail rather than merely watched pass. The working tree was
+restored between runs and `git diff` against `HEAD` was empty before the seed,
+which reported `519 requested: 0 new, 519 refreshed, 0 unmatched, 0 failed`.
+
+**One correction.** `docs/HANDOFF.md` recorded 504 snapshots in the local
+database. There were none: `pg_stat_user_tables` showed 519 inserted and 519
+deleted, and nothing in the codebase deletes from that table, so it was cleared
+by hand. That happened to make "above zero" a clean signal.
 
 ---
 
@@ -754,6 +1197,57 @@ The six things the plan below warned about, and where each one lives:
 - **Propensity logging from day one** — `V12__recommendations.sql`. It is one
   numeric column and phase 7 cannot be built without it.
 
+### The runtime filter was measuring the wrong thing (fixed 2026-08-08)
+
+The worst defect found in this project so far, and it was never a crash.
+
+Tonight Mode's time filter read `watchMinutes`, which for a series is **every
+episode added up**. One Piece is 472 hours, so it never fitted an evening — and
+neither did any other multi-season series. Asked *"I have 45 minutes"* against a
+list of half-hour comedies and anime, Plotted answered *"nothing fits:
+everything on your list is longer than the time you have."*
+
+| Ask | Before | After |
+|---|---|---|
+| 45 min | nothing fits | Chainsaw Man, Demon Slayer, Beyblade X |
+| 90 min | nothing fits | The Boys, ONE PIECE, Chainsaw Man |
+
+Nobody watches a series in one sitting; they watch an episode. There are two
+figures now, named for the questions they answer — `watchMinutes` is the whole
+**commitment**, and `sessionMinutes` is one **sitting**. The filter and the
+runtime-fit feature read the second. Tonight shows the episode length with the
+total beside it: showing only the total was the bug, and showing only the
+episode would hide what somebody is signing up for.
+
+The filter is still a filter. A 75-minute episode is still refused for a
+45-minute evening, and a series with no known episode length is
+`RUNTIME_UNKNOWN` rather than being handed a total divided by an episode count.
+
+**The half that mattered more.** Only **77 of 260** seeded series had an episode
+length at all; the other 181 had a total and nothing else, because that field
+came from TMDB's `episode_run_time`, which upstream leaves empty for most shows.
+Two thirds of the series catalogue would have stayed unrecommendable even after
+the filter was corrected. `recalculateTotalRuntime` now derives the typical
+episode from the episodes it is already summing — the same principle the total
+follows, that real stored rows beat a field upstream is abandoning. After a
+re-seed it is **260 of 260**, and The Boys and Demon Slayer stopped being
+`partial` metadata.
+
+**How it hid.** Every test passed throughout. `HardFiltersTest` only ever built
+film-shaped candidates, so the one case that mattered — a long series with short
+episodes — was never constructed. The filter was correct about the number it was
+given and the number was the wrong one, which no unit test asserting "180
+minutes does not fit 90" can catch. It surfaced only by asking the running
+product the question it exists to answer, with a watchlist somebody had actually
+chosen.
+
+**One knock-on worth knowing.** `MetadataCensoringSimulation` ties both figures
+to a single draw. The ranker reads only `sessionMinutes`, so censoring
+`watchMinutes` alone would have left the runtime feature permanently present and
+turned the phase 7 ablation into a measurement of nothing — while still printing
+a plausible number. `EVALUATION.md` is byte-identical after the change, which is
+the check that it worked.
+
 **One bug found while writing this**, worth keeping in mind for the rest of the
 phase: with a single pick and a nonzero exploration rate, the last slot was
 discounted by the chance it was replaced even though exploration can only fire
@@ -814,6 +1308,20 @@ directory on each run and the first extraction failed to load, which is
 consistent with antivirus interference or a `%TEMP%` permissions problem; or a
 sibling DLL genuinely missing from the packaged set. Anyone picking this up
 should start from the `hs_err` log's module list rather than from this note.
+
+**Confirmed at runtime on 2026-08-08, which is worse than it sounds.** This note
+previously described a *test* problem. One request to `GET /api/v1/plan` from
+the running application killed the whole API — same `EXCEPTION_ACCESS_VIOLATION`,
+a fresh `hs_err_pid*.log`, and the process gone, taking every other endpoint
+with it. So on a Windows development machine Cancel Culture is not merely
+unverifiable, it is a denial of service against the local server: anything else
+being tested at the time dies too, and the failure looks like the API crashing
+rather than like the solver failing.
+
+Two consequences worth carrying: the Cancel Culture screen cannot be seen
+against real solver output here at all, so anything built for it needs
+component-level tests rather than a look (`plan-transit-map.component.spec.ts`
+is that); and CI, being Linux, remains the only place the feature has ever run.
 
 `SolverSupport` gates the solver tests exactly as `DockerSupport` gates the
 database ones, and it has to guess from the OS rather than probe, because

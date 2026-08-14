@@ -2,10 +2,10 @@ package app.plotted.optimisation.api
 
 import app.plotted.optimisation.domain.ExcludedDemand
 import app.plotted.optimisation.domain.ExcludedTitle
-import app.plotted.optimisation.domain.MonthPlan
-import app.plotted.optimisation.domain.PlanOutcome
 import app.plotted.optimisation.domain.PlanReport
-import app.plotted.optimisation.domain.Sensitivity
+import app.plotted.solver.MonthPlan
+import app.plotted.solver.PlanOutcome
+import app.plotted.solver.Sensitivity
 import io.swagger.v3.oas.annotations.media.Schema
 import java.util.UUID
 
@@ -209,16 +209,41 @@ data class ExcludedResponse(
     val neverChecked: List<ExcludedTitleResponse>,
     @Schema(description = "Only on services with no established price. Guessing one would put invented money in the objective.")
     val unpricedService: List<ExcludedTitleResponse>,
+    @Schema(
+        description =
+        "Only on services whose price Plotted researched but the user never confirmed. Kept apart from " +
+            "unpricedService because this one closes with a single field: a published list price is not a " +
+            "bill, and optimising against it overstates what cancelling would save.",
+    )
+    val unconfirmedPrice: List<ExcludedTitleResponse>,
 ) {
     companion object {
         fun from(excluded: ExcludedDemand) = ExcludedResponse(
             freeToWatch = excluded.freeToWatch.map(ExcludedTitleResponse::from),
             neverChecked = excluded.neverChecked.map(ExcludedTitleResponse::from),
             unpricedService = excluded.unpricedService.map(ExcludedTitleResponse::from),
+            unconfirmedPrice = excluded.unconfirmedPrice.map(ExcludedTitleResponse::from),
         )
     }
 }
 
+/**
+ * Carries a class-level description, because without one springdoc writes
+ * whichever property description it happened to process last onto this shared
+ * schema.
+ *
+ * Every field of [ExcludedResponse] is a `List<ExcludedTitleResponse>`, and
+ * springdoc applies a collection property's `@Schema(description = …)` to the
+ * *item* type rather than to the array. Before this, the published document
+ * described `ExcludedTitleResponse` as "Only on services with no established
+ * price" — one bucket's reason standing in for the shape all four of them share,
+ * and the generated client would have carried it as documentation.
+ *
+ * A milder relative of the `CoveredTitleResponse` collision recorded in
+ * `PROGRESS.md`: the document stayed internally consistent and matched itself,
+ * so the drift check had nothing to object to.
+ */
+@Schema(description = "A watchlist title the optimiser was not shown, and the services carrying it.")
 data class ExcludedTitleResponse(val titleId: UUID, val name: String, val providerNames: List<String>) {
     companion object {
         fun from(title: ExcludedTitle) = ExcludedTitleResponse(title.titleId, title.name, title.providerNames)

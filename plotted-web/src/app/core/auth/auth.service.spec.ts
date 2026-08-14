@@ -26,6 +26,7 @@ describe('AuthService', () => {
       preferredCurrency: 'CAD',
       onboardingStatus: 'registered',
       createdAt: '2026-07-26T18:00:00Z',
+      isDemo: false,
     },
   };
 

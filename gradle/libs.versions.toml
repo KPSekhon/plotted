@@ -13,6 +13,14 @@ wiremock = "3.9.2"
 jjwt = "0.12.6"
 bouncycastle = "1.78.1"
 ortools = "9.14.6206"
+# Pinned only for plotted-solver, which has no Spring and therefore no BOM to
+# manage it. Keep in step with the version Boot resolves for plotted-api, so the
+# two sides of the worker protocol read and write JSON with the same library.
+jackson = "2.17.2"
+# Also pinned only for plotted-solver: Spring Boot's test starter brings JUnit to
+# plotted-api, and there is no Spring here. Kept at the version Boot resolves, so
+# both modules run on one engine.
+junit = "5.10.5"
 onnxruntime = "1.20.0"
 
 [libraries]
@@ -29,6 +37,8 @@ spring-security-test = { module = "org.springframework.security:spring-security-
 
 # --- Kotlin ---
 jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin" }
+# Same module, versioned, for the Spring-free solver.
+jackson-module-kotlin-pinned = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
 
 # --- Optimisation ---
@@ -63,6 +73,7 @@ micrometer-prometheus = { module = "io.micrometer:micrometer-registry-prometheus
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 kotest-property = { module = "io.kotest:kotest-property", version.ref = "kotest" }
 kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 springmockk = { module = "com.ninja-squad:springmockk", version.ref = "springmockk" }
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }

@@ -189,7 +189,7 @@ import { UserSettingsService } from '../../core/user/user-settings.service';
     }
 
     .form-error {
-      color: var(--mat-sys-error, #b3261e);
+      color: var(--plotted-critical);
     }
 
     .form-saved {

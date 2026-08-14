@@ -45,6 +45,70 @@ class HardFiltersTest {
     }
 
     @Test
+    fun `a long series fits an evening, because you watch an episode of it`() {
+        // One Piece: 472 hours end to end, 24 minutes an episode.
+        val onePiece = candidate(watchMinutes = 28_344).copy(
+            mediaType = "series",
+            sessionMinutes = 24,
+        )
+
+        val result = screen(
+            onePiece,
+            context(availableMinutes = 45),
+            blockedTitleIds = emptySet(),
+            subscribedProviderIds = setOf(netflix),
+        )
+
+        // This is the bug that made the product fail its own promise. The filter
+        // read the total, so every multi-season series was "longer than the time
+        // you have" for every evening anybody has ever had -- and somebody whose
+        // list was half-hour comedies asking for forty-five minutes was told
+        // nothing fits. A series is watched in increments; the question is
+        // whether the next sitting fits, and it plainly does.
+        result.shouldBeInstanceOf<Screened.Eligible>()
+    }
+
+    @Test
+    fun `a series whose episodes are longer than the evening is still excluded`() {
+        val feature = candidate(watchMinutes = 6_000).copy(
+            mediaType = "series",
+            sessionMinutes = 75,
+        )
+
+        val result = screen(
+            feature,
+            context(availableMinutes = 45),
+            blockedTitleIds = emptySet(),
+            subscribedProviderIds = setOf(netflix),
+        )
+
+        // The fix is not "series always pass". A seventy-five minute episode
+        // does not fit forty-five minutes either, and the filter still has to
+        // say so or it has stopped being a filter.
+        result.shouldBeInstanceOf<Screened.Rejected>().reason shouldBe Rejection.TOO_LONG
+    }
+
+    @Test
+    fun `a series with no episode length is excluded when a budget was given`() {
+        val unmeasured = candidate(watchMinutes = 4_000).copy(
+            mediaType = "series",
+            sessionMinutes = null,
+        )
+
+        val result = screen(
+            unmeasured,
+            context(availableMinutes = 45),
+            blockedTitleIds = emptySet(),
+            subscribedProviderIds = setOf(netflix),
+        )
+
+        // Knowing the total is not knowing the sitting. Dividing one by the
+        // episode count would produce a number, and a number Plotted made up is
+        // exactly what the runtime promise exists to refuse.
+        result.shouldBeInstanceOf<Screened.Rejected>().reason shouldBe Rejection.RUNTIME_UNKNOWN
+    }
+
+    @Test
     fun `an unknown runtime is disqualifying only when a time budget was given`() {
         val withBudget = screen(
             candidate(watchMinutes = null),
@@ -150,6 +214,9 @@ class HardFiltersTest {
         mediaType = "movie",
         posterUrl = null,
         watchMinutes = watchMinutes,
+        // The filter reads the sitting. These fixtures are films, where the
+        // two are the same thing.
+        sessionMinutes = watchMinutes,
         priority = 3,
         desiredByDate = null,
         communityRating = null,

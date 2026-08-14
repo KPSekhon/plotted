@@ -2,12 +2,9 @@ package app.plotted.catalogue.domain
 
 import app.plotted.catalogue.integration.tmdb.TmdbTitleMapper
 import app.plotted.catalogue.persistence.SeasonRepository
-import app.plotted.catalogue.persistence.TitleRepository
-import app.plotted.platform.events.TitleIngested
 import app.plotted.platform.integration.tmdb.TmdbClient
 import app.plotted.platform.integration.tmdb.TmdbException
 import org.slf4j.LoggerFactory
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -24,9 +21,8 @@ import java.util.UUID
 class TitleIngestionService(
     private val client: TmdbClient,
     private val mapper: TmdbTitleMapper,
-    private val titles: TitleRepository,
+    private val writer: TitleWriter,
     private val seasons: SeasonRepository,
-    private val events: ApplicationEventPublisher,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -91,32 +87,21 @@ class TitleIngestionService(
     }
 
     fun ingest(mediaType: MediaType, tmdbId: Int): IngestionOutcome = try {
+        // The network call stays outside the transaction. Wrapping this method
+        // instead would hold a database connection across it -- and across one
+        // per season for a series.
         val ingested =
             when (mediaType) {
                 MediaType.MOVIE -> mapper.toIngestedTitle(client.movie(tmdbId))
                 MediaType.SERIES -> mapper.toIngestedTitle(client.series(tmdbId))
             }
-        val result = titles.upsert(ingested)
 
-        if (result.unknownGenreIds.isNotEmpty()) {
-            log.warn(
-                "Title {} referenced unseeded genre ids {}; the genre seed needs updating",
-                ingested.name,
-                result.unknownGenreIds,
-            )
-        }
-
-        // Published after the write, so a listener that reads the title back
-        // will find it. Availability refresh happens on its own transaction:
-        // a TMDB provider outage must not roll back a title that stored fine.
-        events.publishEvent(
-            TitleIngested(
-                titleId = result.titleId,
-                externalId = ingested.externalId,
-                mediaType = mediaType.dbValue,
-                created = result.created,
-            ),
-        )
+        // Writes and announces in one transaction. Deliberately a separate bean:
+        // this method is called on `this` by `ingestWithSeasons` and `ingestAll`,
+        // and a `@Transactional` annotation here would not apply to either --
+        // Spring's proxy is only crossed on a call from outside. See
+        // [TitleWriter] for what that cost the availability pipeline.
+        val result = writer.store(ingested, mediaType)
 
         IngestionOutcome.Ingested(result.titleId, ingested.name, result.created, ingested.metadataStatus)
     } catch (failure: TmdbException.NotFound) {

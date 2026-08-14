@@ -97,38 +97,70 @@ class DemoRepository(
 
     /**
      * Candidate titles for the demo list: those a subscription service actually
-     * carries here, most-carried first, then by name so the demo is the same
-     * every time.
+     * carries here, curated picks first, then most-carried, then by name so the
+     * demo is the same every time.
      *
-     * Ids only. Whether a title is *usable* — whether its runtime is known —
-     * is decided by the caller through `TitleDirectory`, because the answer
-     * differs between films and series and the catalogue owns that rule.
-     * Over-fetches so the caller has spares to discard.
+     * ### Why there is a curated tier at all
+     *
+     * Ranking by carrier count alone is a fine tie-break and a poor persona. It
+     * returns whatever happens to be on the most platforms, which reads as a
+     * list nobody chose — and the demo's job is to look like a real person's
+     * watchlist, which means having opinions in it. `demo/preferred-titles.txt`
+     * holds those opinions, versioned, for the same reason the curated half of
+     * the seed is.
+     *
+     * It only *reorders*. Every existing rule still applies: a title nothing
+     * carries on a subscription never appears however high it is listed, and
+     * the caller still discards anything whose runtime is unknown. A preference
+     * cannot promote a title past a filter, which is the point — otherwise the
+     * demo would be a place where the product's own rules quietly do not hold.
+     *
+     * Ids only. Whether a title is *usable* is decided by the caller through
+     * `TitleDirectory`, because the answer differs between films and series and
+     * the catalogue owns that rule. Over-fetches so the caller has spares.
      */
-    fun findCandidateTitleIds(regionCode: String, limit: Int): List<UUID> {
+    fun findCandidateTitleIds(regionCode: String, limit: Int, preferredExternalIds: List<String> = emptyList()): List<UUID> {
         val carriers = DSL.countDistinct(TITLE_AVAILABILITY.PROVIDER_ID)
-        return dsl.select(TITLES.ID, TITLES.NAME, carriers)
+        // 0 sorts before 1, so the curated tier leads. Built from a bound list
+        // rather than interpolated, so an id from the file cannot reach the
+        // statement as SQL.
+        val curatedFirst = DSL.`when`(TITLES.EXTERNAL_ID.`in`(preferredExternalIds), 0).otherwise(1)
+
+        return dsl.select(TITLES.ID, TITLES.NAME, carriers, curatedFirst)
             .from(TITLES)
             .join(TITLE_AVAILABILITY).on(TITLE_AVAILABILITY.TITLE_ID.eq(TITLES.ID))
             .where(TITLE_AVAILABILITY.REGION_CODE.eq(regionCode))
             .and(TITLE_AVAILABILITY.ACCESS_TYPE.eq("subscription"))
             .and(TITLE_AVAILABILITY.ACTIVE.isTrue)
-            .groupBy(TITLES.ID, TITLES.NAME)
-            .orderBy(carriers.desc(), TITLES.NAME.asc())
+            .groupBy(TITLES.ID, TITLES.NAME, TITLES.EXTERNAL_ID)
+            .orderBy(curatedFirst.asc(), carriers.desc(), TITLES.NAME.asc())
             .limit(limit)
             .fetch(TITLES.ID)
             .filterNotNull()
     }
 
-    fun insertWatchlistItem(watchlistId: UUID, titleId: UUID, priority: Int, desiredBy: LocalDate?) {
+    /**
+     * One watchlist row.
+     *
+     * [completedAt] exists so the persona can have finished a few things. That
+     * is not decoration: End Credits' completion rate joins on
+     * `completed_at >= accepted_at`, so without it the demo's rate has an empty
+     * numerator, and the watchlist's own "finished and set aside" group never
+     * appears on screen at all.
+     */
+    fun insertWatchlistItem(watchlistId: UUID, titleId: UUID, priority: Int, desiredBy: LocalDate?, completedAt: OffsetDateTime? = null) {
         dsl.insertInto(WATCHLIST_ITEMS)
             .set(WATCHLIST_ITEMS.ID, UUID.randomUUID())
             .set(WATCHLIST_ITEMS.WATCHLIST_ID, watchlistId)
             .set(WATCHLIST_ITEMS.TITLE_ID, titleId)
             .set(WATCHLIST_ITEMS.PRIORITY, priority.toShort())
-            .set(WATCHLIST_ITEMS.STATUS, "pending")
+            // The status and the timestamp are set together. A row saying
+            // "completed" with no completed_at, or the reverse, is a state the
+            // rest of the product has to defend against for no reason.
+            .set(WATCHLIST_ITEMS.STATUS, if (completedAt == null) "pending" else "completed")
             .set(WATCHLIST_ITEMS.ADDED_AT, OffsetDateTime.now(clock))
             .set(WATCHLIST_ITEMS.DESIRED_BY_DATE, desiredBy)
+            .set(WATCHLIST_ITEMS.COMPLETED_AT, completedAt)
             .set(WATCHLIST_ITEMS.SOURCE, "demo")
             .onConflictDoNothing()
             .execute()
@@ -174,10 +206,27 @@ class DemoRepository(
                 commitmentEndsOn != null && commitmentEndsOn.isAfter(LocalDate.now(clock)),
             )
             .set(USER_SUBSCRIPTIONS.AUTO_RENEWS, true)
-            // Deliberately null: the persona pays the researched list price
-            // rather than a made-up personal rate. An invented actual_price
-            // would override a cited figure with an uncited one.
-            .set(USER_SUBSCRIPTIONS.ACTUAL_PRICE, null as BigDecimal?)
+            // Set to the plan's own researched price rather than left null.
+            //
+            // This used to be null so the persona paid the cited figure rather
+            // than a made-up personal rate, which was right while every price
+            // was equally trusted. It is not right now: since V18 the optimiser
+            // only spends prices somebody confirmed, and a null here leaves the
+            // demo's services priced REFERENCE, excluded from the model, and
+            // Cancel Culture with nothing to say on the account that exists to
+            // demonstrate it.
+            //
+            // The number is not invented -- it is the same researched figure,
+            // copied. What changes is the claim: on a synthetic account the
+            // persona confirming a fixture price is exactly as legitimate as
+            // the rest of the fixture, and the subscriptions screen says in so
+            // many words that this data was generated.
+            .set(
+                USER_SUBSCRIPTIONS.ACTUAL_PRICE,
+                DSL.field(
+                    dsl.select(PROVIDER_PLANS.PRICE).from(PROVIDER_PLANS).where(PROVIDER_PLANS.ID.eq(planId)),
+                ),
+            )
             .set(USER_SUBSCRIPTIONS.CREATED_AT, now)
             .set(USER_SUBSCRIPTIONS.UPDATED_AT, now)
             .execute()

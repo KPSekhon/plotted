@@ -9,6 +9,7 @@ import {
   BlockedTitle,
   BlockedTitles,
   Coverage,
+  SeriesProgress,
   UpdateWatchlistItemRequest,
   Watchlist,
   WatchlistItem,
@@ -58,5 +59,28 @@ export class WatchlistService {
 
   unblock(titleId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/watchlist/blocked/${titleId}`);
+  }
+
+  /** Where you are in a series, and what is next. */
+  progress(titleId: string): Observable<SeriesProgress> {
+    return this.http.get<SeriesProgress>(`${this.baseUrl}/watchlist/progress/${titleId}`);
+  }
+
+  /**
+   * Records the last episode finished.
+   *
+   * Returns the new view rather than void, because recording that you watched
+   * S1 E8 immediately changes what is next -- and a client that has to re-fetch
+   * to find that out will render the old answer for a frame.
+   */
+  recordProgress(titleId: string, seasonNumber: number, episodeNumber: number): Observable<SeriesProgress> {
+    return this.http.put<SeriesProgress>(`${this.baseUrl}/watchlist/progress/${titleId}`, {
+      seasonNumber,
+      episodeNumber,
+    });
+  }
+
+  clearProgress(titleId: string): Observable<SeriesProgress> {
+    return this.http.delete<SeriesProgress>(`${this.baseUrl}/watchlist/progress/${titleId}`);
   }
 }

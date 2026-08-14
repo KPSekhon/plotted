@@ -113,6 +113,64 @@ class PilotService(
         pilot.reset(userId)
     }
 
+    /**
+     * Answers the first [count] ladder questions as a stated persona would.
+     *
+     * **Fixture data, for demo accounts only.** Nothing here is evidence about
+     * anybody's taste, and no number derived from it belongs in `EVALUATION.md`
+     * or any claim about how Plotted performs. It exists so a visitor can see
+     * what a fitted profile looks like without answering fifteen questions
+     * first, and so the screens can be evaluated before there are users.
+     *
+     * ### Why a weight vector rather than scripted answers
+     *
+     * The persona is expressed as [persona] — the same shape the fitter
+     * produces — and each question is answered by whichever title that vector
+     * scores higher. So the answers are not invented one at a time; they are
+     * *implied* by a preference stated once and written down. That has a
+     * property worth having: fitting these answers should approximately recover
+     * the vector they came from, which is a real check on the fitter that
+     * scripted answers could not provide.
+     *
+     * Every answer still goes through [answer], so the attribute difference is
+     * derived from the catalogue exactly as it would be for a person. Writing
+     * `pilot_comparisons` rows directly would have been simpler and would have
+     * skipped the one computation that makes a comparison mean anything.
+     *
+     * Deliberately stops short of the full ladder. A demo that arrives with the
+     * questionnaire already finished hides the most interesting thing about
+     * this feature, which is the fork itself — and leaving axes unasked shows
+     * off the `NOT_ASKED` verdict, which is the honest-refusal design working.
+     *
+     * @return how many were actually answered, which is fewer than [count] when
+     *   the catalogue runs out of pairs worth asking about.
+     */
+    @Transactional
+    fun seedPersona(userId: UUID, persona: DoubleArray, count: Int): Int {
+        require(persona.size == TasteAxis.size) {
+            "A persona needs one weight per axis, got ${persona.size} of ${TasteAxis.size}"
+        }
+
+        var answered = 0
+        repeat(count) {
+            val catalogue = catalogue()
+            val question = stateFor(userId, catalogue).question ?: return answered
+
+            val left = catalogue.choice(question.left.titleId) ?: return answered
+            val right = catalogue.choice(question.right.titleId) ?: return answered
+
+            // The persona's own utility, exactly as Bradley-Terry defines it:
+            // prefer left when the difference it would record scores positive.
+            val difference = left.attributes.minus(right.attributes)
+            val utility = difference.indices.sumOf { axis -> difference[axis] * persona[axis] }
+
+            val chosen = if (utility >= 0) left.titleId else right.titleId
+            answer(userId, left.titleId, right.titleId, chosen)
+            answered++
+        }
+        return answered
+    }
+
     // --- internals ---------------------------------------------------------
 
     /**

@@ -202,7 +202,7 @@ import { TitleCardComponent } from './title-card.component';
     }
 
     .form-error {
-      color: var(--mat-sys-error, #b3261e);
+      color: var(--plotted-critical);
     }
   `,
 })

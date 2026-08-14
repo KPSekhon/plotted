@@ -6,7 +6,7 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0e0f13" />
+    <meta name="theme-color" content="#090909" />
     <meta
       name="description"
       content="Plotted is a platform-neutral streaming decision and subscription optimisation platform."
@@ -14,8 +14,14 @@
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Two faces, doing two jobs. Geist carries the interface; IBM Plex Mono is
+         used only for map annotations -- runtimes, match scores, coordinates --
+         where the point is that a figure reads as an instrument reading rather
+         than as prose. Inter stays in the stack as the fallback because it is
+         metrically close enough to Geist that a failed font load rearranges
+         nothing. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link
@@ -27,7 +33,7 @@
          rather than a white flash into a dark application. */
       html,
       body {
-        background: #0e0f13;
+        background: #090909;
         margin: 0;
       }
 

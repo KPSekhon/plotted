@@ -5,6 +5,12 @@ import app.plotted.platform.spi.AvailabilityDirectory
 import app.plotted.platform.spi.SubscriptionDirectory
 import app.plotted.platform.spi.TitleDirectory
 import app.plotted.platform.spi.WatchlistDirectory
+import app.plotted.solver.PlanConstraints
+import app.plotted.solver.PlanOutcome
+import app.plotted.solver.PlanRequest
+import app.plotted.solver.PlanWeights
+import app.plotted.solver.ServiceOption
+import app.plotted.solver.TitleDemand
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Clock
@@ -21,7 +27,7 @@ import java.util.UUID
  *
  * ### What is deliberately left out of the model
  *
- * Three classes of watchlist item never reach the solver, and each is reported
+ * Four classes of watchlist item never reach the solver, and each is reported
  * back rather than dropped (see [ExcludedDemand]):
  *
  * - **Free to watch.** A title on CBC Gem or Tubi needs no subscription, so it
@@ -32,11 +38,20 @@ import java.util.UUID
  *   scored as uncovered. Scoring them would depress every plan's coverage in
  *   proportion to how stale Plotted's data is, invisibly, because a low
  *   percentage looks the same either way.
- * - **Only on a service with no known price.** `provider_plans` is researched
- *   per `docs/seed/provider-plans.md` and is deliberately incomplete. A service
- *   whose price nobody has established cannot be costed, and inventing one puts
- *   fabricated money into the objective function — which does not produce a
- *   visibly broken feature, it produces confident wrong financial advice.
+ * - **Only on a service with no known price.** `provider_plans` is deliberately
+ *   incomplete. A service whose price nobody has established cannot be costed,
+ *   and inventing one puts fabricated money into the objective function — which
+ *   does not produce a visibly broken feature, it produces confident wrong
+ *   financial advice.
+ * - **Only on a service whose price nobody confirmed.** The same failure one
+ *   step further along, and the one that was actually live: `provider_plans`
+ *   holds *researched* figures, and the repository fell back to them whenever a
+ *   subscription had no `actual_price`, so a number read off a pricing article
+ *   arrived at the objective indistinguishable from one the user typed. A list
+ *   price is not a bill — legacy rates, bundles, student and promotional
+ *   pricing all move it, and all downward, so optimising against it overstates
+ *   what cancelling saves. Since V18 only `USER_ENTERED` and `VERIFIED` prices
+ *   are spent; the rest are named in the answer instead.
  *
  * ### Why there is no transaction around the solve
  *
@@ -64,7 +79,10 @@ class CancelCultureService(
         val services = gatherServices(userId, region, today)
         val demand = gatherDemand(userId, region, services)
 
-        val providerNames = services.associate { it.providerId to it.name }
+        // Includes the services held back for want of a confirmed price. They
+        // are absent from the model and still have to be nameable, or the
+        // report can only say "a service".
+        val providerNames = services.options.associate { it.providerId to it.name } + services.unconfirmed
 
         if (demand.titles.isEmpty()) {
             // The optimum over an empty demand set is "cancel everything you are
@@ -84,7 +102,7 @@ class CancelCultureService(
         // month to the model. Held services stay in regardless — being able to
         // recommend cancelling one is the entire feature.
         val demanded = demand.titles.flatMapTo(mutableSetOf()) { it.availableOn }
-        val modelled = services.filter { it.currentlySubscribed || it.providerId in demanded }
+        val modelled = services.options.filter { it.currentlySubscribed || it.providerId in demanded }
 
         val request = PlanRequest(
             services = modelled,
@@ -122,44 +140,77 @@ class CancelCultureService(
     }
 
     /**
-     * Every service the optimiser may switch on or off, priced.
+     * Every service the optimiser may switch on or off, priced with a figure it
+     * is entitled to spend.
      *
      * The union of what the user holds and what has a current list price. Where
      * both exist the held price wins: a grandfathered rate or a bundle discount
      * is what the person is really billed, and minimising against the list price
      * would optimise somebody else's bill.
+     *
+     * **A price is not admitted merely because one exists.** `provider_plans`
+     * carries researched figures — read from a published source on a date, and
+     * never confirmed against what anybody is actually charged. Those are fine
+     * to display and to pre-fill a form with; spending them here would turn
+     * research into financial advice. The services they belong to come back as
+     * [Services.unconfirmed] so the answer can name them instead of quietly
+     * planning around a gap.
      */
-    private fun gatherServices(userId: UUID, region: String, today: LocalDate): List<ServiceOption> {
+    private fun gatherServices(userId: UUID, region: String, today: LocalDate): Services {
         val held = subscriptions.currentSubscriptions(userId, today).associateBy { it.providerId }
         val plans = subscriptions.availablePlans(region).associateBy { it.providerId }
 
-        return (held.keys + plans.keys)
-            .mapNotNull { providerId ->
-                val holding = held[providerId]
-                val plan = plans[providerId]
-                // One of the two is always present — the id came from their
-                // keys. Written so the compiler knows it rather than asserted,
-                // because a service with no price at all must be left out
-                // regardless of how it got here: there is nothing to optimise
-                // against and nothing honest to invent.
-                val priced = holding?.let { it.providerName to it.monthlyCents }
-                    ?: plan?.let { it.providerName to it.monthlyCents }
-                    ?: return@mapNotNull null
-                ServiceOption(
-                    providerId = providerId,
-                    name = priced.first,
-                    monthlyCents = priced.second,
-                    committedMonths = holding?.committedMonths ?: 0,
-                    currentlySubscribed = holding != null,
-                )
+        val options = mutableListOf<ServiceOption>()
+        val unconfirmed = mutableMapOf<UUID, String>()
+
+        (held.keys + plans.keys).forEach { providerId ->
+            val holding = held[providerId]
+            val plan = plans[providerId]
+            // One of the two is always present — the id came from their keys.
+            // Written so the compiler knows it rather than asserted, because a
+            // service with no price at all must be left out regardless of how it
+            // got here: there is nothing to optimise against and nothing honest
+            // to invent.
+            val name = holding?.providerName ?: plan?.providerName ?: return@forEach
+            val cents = holding?.monthlyCents ?: plan?.monthlyCents ?: return@forEach
+            val provenance = holding?.priceProvenance ?: plan?.priceProvenance ?: return@forEach
+
+            if (!provenance.mayBeOptimisedAgainst) {
+                unconfirmed[providerId] = name
+                return@forEach
             }
-            .sortedBy { it.name }
+
+            options += ServiceOption(
+                providerId = providerId,
+                name = name,
+                monthlyCents = cents,
+                committedMonths = holding?.committedMonths ?: 0,
+                currentlySubscribed = holding != null,
+            )
+        }
+
+        return Services(options.sortedBy { it.name }, unconfirmed)
     }
+
+    /**
+     * The priceable services, and the ones held back for want of a confirmed
+     * price.
+     *
+     * The second list is not a leftover. A user who is told "cancel Crave" and
+     * never told "Paramount+ was not considered, because you have not told us
+     * what you pay for it" has been given a plan over a smaller world than they
+     * think, with nothing on screen to say so.
+     */
+    private data class Services(
+        val options: List<ServiceOption>,
+        /** Provider id to name, so the report can say which service it left out. */
+        val unconfirmed: Map<UUID, String>,
+    )
 
     /**
      * The watchlist, reduced to what a subscription decision can actually turn on.
      */
-    private fun gatherDemand(userId: UUID, region: String, services: List<ServiceOption>): Demand {
+    private fun gatherDemand(userId: UUID, region: String, services: Services): Demand {
         val entries = watchlists.outstandingItems(userId)
         if (entries.isEmpty()) return Demand(emptyList(), ExcludedDemand.NONE)
 
@@ -170,12 +221,13 @@ class CancelCultureService(
         val titleIds = wanted.map { it.titleId }
         val summaries = titles.findSummaries(titleIds).associateBy { it.titleId }
         val coverage = availability.subscriptionCoverage(titleIds, region)
-        val priceable = services.mapTo(mutableSetOf()) { it.providerId }
+        val priceable = services.options.mapTo(mutableSetOf()) { it.providerId }
 
         val demands = mutableListOf<TitleDemand>()
         val free = mutableListOf<ExcludedTitle>()
         val unchecked = mutableListOf<ExcludedTitle>()
         val unpriced = mutableListOf<ExcludedTitle>()
+        val unconfirmed = mutableListOf<ExcludedTitle>()
 
         wanted.forEach { entry ->
             // A watchlist row whose catalogue title has gone. Dropped rather
@@ -200,7 +252,18 @@ class CancelCultureService(
 
             val payable = offers.filter { it.providerId in priceable }
             if (payable.isEmpty() && offers.isNotEmpty()) {
-                unpriced += ExcludedTitle(entry.titleId, summary.name, offers.map { it.name }.distinct().sorted())
+                val names = offers.map { it.name }.distinct().sorted()
+                // Two different problems, and the difference is the whole point
+                // of the provenance column. "Nobody has established a price" is
+                // a gap in Plotted's data. "There is a price and you have not
+                // confirmed it" is a gap the user can close in one field, and
+                // telling them that is worth more than telling them it is
+                // missing.
+                if (offers.any { it.providerId in services.unconfirmed.keys }) {
+                    unconfirmed += ExcludedTitle(entry.titleId, summary.name, names)
+                } else {
+                    unpriced += ExcludedTitle(entry.titleId, summary.name, names)
+                }
                 return@forEach
             }
 
@@ -215,7 +278,15 @@ class CancelCultureService(
             )
         }
 
-        return Demand(demands, ExcludedDemand(freeToWatch = free, neverChecked = unchecked, unpricedService = unpriced))
+        return Demand(
+            demands,
+            ExcludedDemand(
+                freeToWatch = free,
+                neverChecked = unchecked,
+                unpricedService = unpriced,
+                unconfirmedPrice = unconfirmed,
+            ),
+        )
     }
 
     /**
@@ -234,14 +305,21 @@ class CancelCultureService(
         excluded.total == 0 ->
             "There is nothing outstanding on your watchlist, so there is no basis for a subscription plan. " +
                 "Add what you want to watch and this will have something to work with."
-        excluded.freeToWatch.isNotEmpty() && excluded.neverChecked.isEmpty() && excluded.unpricedService.isEmpty() ->
+        excluded.freeToWatch.isNotEmpty() && excluded.neverChecked.isEmpty() &&
+            excluded.unpricedService.isEmpty() && excluded.unconfirmedPrice.isEmpty() ->
             "Everything outstanding on your list is already free to watch, so no subscription is needed for any of it."
+        // Named ahead of the general case because it is the only one of these
+        // the user can fix, and it takes one field to fix it.
+        excluded.unconfirmedPrice.size > excluded.neverChecked.size + excluded.freeToWatch.size ->
+            "Your outstanding titles are on services Plotted has a researched price for but you have not " +
+                "confirmed. A published price is not a bill, so it is not spent here. Enter what you actually " +
+                "pay on the subscriptions screen and this will have something to plan with."
         excluded.neverChecked.size >= excluded.freeToWatch.size + excluded.unpricedService.size ->
             "Plotted has not checked where any of your outstanding titles are streaming yet, " +
                 "so there is nothing to plan against. This resolves itself once availability has been refreshed."
         else ->
             "None of your outstanding titles can be used for a subscription plan: they are either free to watch, " +
-                "unchecked, or only on services with no established price."
+                "unchecked, or only on services with no price you have confirmed."
     }
 
     private data class Demand(val titles: List<TitleDemand>, val excluded: ExcludedDemand)

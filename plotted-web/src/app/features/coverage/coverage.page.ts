@@ -9,6 +9,8 @@ import { RouterLink } from '@angular/router';
 import { messageFrom } from '../../core/error/problem-detail';
 import { Coverage } from '../../core/watchlist/watchlist.models';
 import { WatchlistService } from '../../core/watchlist/watchlist.service';
+import { EmptyStateComponent } from '../../shared/map/empty-state.component';
+import { SectionNavComponent } from '../../shared/map/section-nav.component';
 
 /**
  * Which service covers the most of the watchlist.
@@ -30,9 +32,13 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
     MatExpansionModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    SectionNavComponent,
+    EmptyStateComponent,
   ],
   template: `
     <section class="page">
+      <plotted-section-nav />
+
       <header class="head">
         <h1>Coverage</h1>
         <p class="sub">
@@ -48,24 +54,27 @@ import { WatchlistService } from '../../core/watchlist/watchlist.service';
       } @else {
         @if (report(); as data) {
           @if (data.consideredTitles === 0) {
-          <div class="empty">
-            <mat-icon>insights</mat-icon>
-            <h2>Nothing to measure yet</h2>
+            <!-- The distinction that matters: there IS a list, Plotted just has
+                 not checked any of it. Saying "0% covered" here would be a
+                 statement about the services, and it would be false — so the
+                 unknown mode exists precisely to keep those two apart. -->
             @if (data.unknownTitles > 0) {
-              <!-- The distinction that matters: there IS a list, Plotted just has
-                   not checked any of it. Saying "0% covered" here would be a
-                   statement about the services, and it would be false. -->
-              <p>
-                {{ data.unknownTitles }}
-                {{ data.unknownTitles === 1 ? 'title has' : 'titles have' }} never had their
-                availability checked, so there is nothing to score yet. This resolves once the
-                catalogue has been refreshed.
-              </p>
+              <plotted-empty-state mode="unknown" heading="Not checked yet.">
+                <p>
+                  {{ data.unknownTitles }}
+                  {{ data.unknownTitles === 1 ? 'title has' : 'titles have' }} never had their
+                  availability checked, so there is nothing to score yet. This resolves once the
+                  catalogue has been refreshed.
+                </p>
+              </plotted-empty-state>
             } @else {
-              <p>Add a few things to your list and this will tell you which service to keep.</p>
-              <a mat-flat-button routerLink="/watchlist">Go to your list</a>
+              <plotted-empty-state heading="Nothing to measure yet.">
+                <p>Add a few things to your list and this will tell you which service to keep.</p>
+                <div class="actions">
+                  <a mat-flat-button routerLink="/watchlist">Go to your list</a>
+                </div>
+              </plotted-empty-state>
             }
-          </div>
         } @else {
           <p class="basis">
             Measured across <strong>{{ data.consideredTitles }}</strong>

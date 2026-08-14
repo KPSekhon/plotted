@@ -1,5 +1,6 @@
 package app.plotted.recommendation.domain
 
+import app.plotted.platform.spi.WatchlistDirectory
 import java.time.LocalDate
 import java.util.UUID
 
@@ -21,7 +22,18 @@ data class Candidate(
     val name: String,
     val mediaType: String,
     val posterUrl: String?,
+    /**
+     * The whole thing, start to finish. Shown so somebody can see what they are
+     * taking on; never filtered against, because a long series is watched in
+     * increments rather than in one go.
+     */
     val watchMinutes: Int?,
+    /**
+     * One sitting — a film, or a typical episode. Everything time-related is
+     * decided from this, because "what can I watch tonight" is a question about
+     * an evening rather than about a box set.
+     */
+    val sessionMinutes: Int?,
     /** 1 is the highest, 5 the lowest. */
     val priority: Int,
     val desiredByDate: LocalDate?,
@@ -42,6 +54,14 @@ data class Candidate(
      * sees rather than what the database holds.
      */
     val tasteMatch: Double? = null,
+    /**
+     * Which episode of a series this pick actually is, when the catalogue knows.
+     *
+     * Null for a film, and for a series with no episodes stored. Attached after
+     * ranking rather than before it -- see `TonightService.recommend` for why the
+     * filter still reads the typical episode.
+     */
+    val nextUp: WatchlistDirectory.NextUp? = null,
 ) {
     data class Offer(
         val providerId: UUID,

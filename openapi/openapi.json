@@ -16,6 +16,99 @@
     "bearerAuth" : [ ]
   } ],
   "paths" : {
+    "/api/v1/watchlist/progress/{titleId}" : {
+      "get" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "Where you are in a series, and what is next",
+        "description" : "`next` is the first aired episode you have not finished. With nothing recorded that is episode one, because not having started is different from having nothing left. `next` is null only when there is genuinely nothing to watch: the series is finished, or everything remaining has not aired.",
+        "operationId" : "progress",
+        "parameters" : [ {
+          "name" : "titleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SeriesProgressResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "Record the last episode you finished",
+        "description" : "Replaces whatever was recorded, in either direction: correcting a mistake and starting a rewatch both move backwards, and a marker that only goes forwards is one you cannot fix. The position is checked against the catalogue, so a season or episode that does not exist is a 400 rather than a row nothing can interpret. Specials (season 0) are refused -- your place in the story is not the Christmas episode.",
+        "operationId" : "recordProgress",
+        "parameters" : [ {
+          "name" : "titleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RecordProgressRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SeriesProgressResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "watchlist-controller" ],
+        "summary" : "Forget where you are in a series",
+        "description" : "Idempotent, and returns the view rather than 204: clearing progress puts you back at episode one, and the client needs to render that rather than an empty space.",
+        "operationId" : "clearProgress",
+        "parameters" : [ {
+          "name" : "titleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SeriesProgressResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/watchlist/items" : {
       "post" : {
         "tags" : [ "watchlist-controller" ],
@@ -998,6 +1091,108 @@
   },
   "components" : {
     "schemas" : {
+      "RecordProgressRequest" : {
+        "required" : [ "episodeNumber", "seasonNumber" ],
+        "type" : "object",
+        "properties" : {
+          "seasonNumber" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "description" : "Specials (season 0) are not a place in the story and are refused.",
+            "format" : "int32"
+          },
+          "episodeNumber" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EpisodeRefResponse" : {
+        "required" : [ "episodeNumber", "seasonNumber" ],
+        "type" : "object",
+        "properties" : {
+          "seasonNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "episodeNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "description" : "Null until you have finished something. Absent history, not episode zero."
+      },
+      "NextEpisodeResponse" : {
+        "required" : [ "episodeId", "episodeNumber", "seasonNumber" ],
+        "type" : "object",
+        "properties" : {
+          "episodeId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "seasonNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "episodeNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "runtimeMinutes" : {
+            "type" : "integer",
+            "description" : "This episode's own runtime, or null when upstream never gave one. Not filled in from the series average: a fallback presented as a measurement is how a time filter becomes precise about something nobody measured.",
+            "format" : "int32"
+          }
+        },
+        "description" : "The first aired episode you have not finished, or episode one when nothing is recorded. Null only when there is nothing left to watch."
+      },
+      "RemainingResponse" : {
+        "required" : [ "episodes" ],
+        "type" : "object",
+        "properties" : {
+          "episodes" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "minutes" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "description" : "The count includes episodes with no known runtime; the minutes do not. So nine episodes and three hours can mean nine episodes of which seven are measured, which is the honest pair."
+      },
+      "SeriesProgressResponse" : {
+        "required" : [ "caughtUp", "remaining", "titleId" ],
+        "type" : "object",
+        "properties" : {
+          "titleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "lastCompleted" : {
+            "$ref" : "#/components/schemas/EpisodeRefResponse"
+          },
+          "next" : {
+            "$ref" : "#/components/schemas/NextEpisodeResponse"
+          },
+          "remaining" : {
+            "$ref" : "#/components/schemas/RemainingResponse"
+          },
+          "caughtUp" : {
+            "type" : "boolean",
+            "description" : "True when nothing aired is left. Different from not having started."
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
+        "description" : "Where you are in a series and what comes next. Position only: this records which episode you finished, never how quickly you got there, so nothing built on it may claim a viewing pace."
+      },
       "AddWatchlistItemRequest" : {
         "required" : [ "titleId" ],
         "type" : "object",
@@ -1525,7 +1720,7 @@
         "description" : "The access token is short-lived and belongs in memory. The refresh token is returned as an HttpOnly cookie and never appears in this body."
       },
       "UserResponse" : {
-        "required" : [ "createdAt", "displayName", "email", "id", "onboardingStatus", "preferredCurrency", "regionCode", "timezone" ],
+        "required" : [ "createdAt", "displayName", "email", "id", "isDemo", "onboardingStatus", "preferredCurrency", "regionCode", "timezone" ],
         "type" : "object",
         "properties" : {
           "id" : {
@@ -1553,6 +1748,10 @@
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "isDemo" : {
+            "type" : "boolean",
+            "description" : "True when this account's watchlist, subscriptions, taste profile and viewing history were generated for the demo rather than recorded from use. The interface says so where it would otherwise imply those figures were measured."
           }
         }
       },
@@ -1884,8 +2083,40 @@
         },
         "description" : "Present only when nothing fit."
       },
+      "NextEpisodeRef" : {
+        "required" : [ "episodeNumber", "remainingEpisodes", "seasonNumber", "started" ],
+        "type" : "object",
+        "properties" : {
+          "seasonNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "episodeNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "runtimeMinutes" : {
+            "type" : "integer",
+            "description" : "This episode's own runtime, or null when upstream never gave one. Never an average.",
+            "format" : "int32"
+          },
+          "started" : {
+            "type" : "boolean",
+            "description" : "False when nothing has been finished yet, so this is episode one rather than a resumption."
+          },
+          "remainingEpisodes" : {
+            "type" : "integer",
+            "description" : "Aired episodes still ahead, including this one.",
+            "format" : "int32"
+          }
+        },
+        "description" : "The episode to actually put on. Without this the answer is \"Chainsaw Man, about 24 minutes an episode\", which leaves the user to open another app and work out where they were -- the decision this product exists to remove."
+      },
       "PickResponse" : {
-        "required" : [ "availableOn", "exploration", "mediaType", "name", "position", "reasons", "score", "titleId" ],
+        "required" : [ "availableOn", "exploration", "mediaType", "name", "perEpisode", "position", "reasons", "score", "titleId" ],
         "type" : "object",
         "properties" : {
           "position" : {
@@ -1908,7 +2139,20 @@
           },
           "watchMinutes" : {
             "type" : "integer",
+            "description" : "The whole commitment: a film's runtime, or every episode of a series added up. Shown so somebody can see what they are taking on. Not what the time filter used.",
             "format" : "int32"
+          },
+          "sessionMinutes" : {
+            "type" : "integer",
+            "description" : "One sitting: a film, or a typical episode. This is what the time budget was measured against, because a long series is watched in increments rather than in one go.",
+            "format" : "int32"
+          },
+          "perEpisode" : {
+            "type" : "boolean",
+            "description" : "True when sessionMinutes describes an episode rather than the whole title."
+          },
+          "nextEpisode" : {
+            "$ref" : "#/components/schemas/NextEpisodeRef"
           },
           "availableOn" : {
             "type" : "array",
@@ -2154,7 +2398,7 @@
         "description" : "A streaming service. No price: the user supplies what they pay."
       },
       "ExcludedResponse" : {
-        "required" : [ "freeToWatch", "neverChecked", "unpricedService" ],
+        "required" : [ "freeToWatch", "neverChecked", "unconfirmedPrice", "unpricedService" ],
         "type" : "object",
         "properties" : {
           "freeToWatch" : {
@@ -2174,6 +2418,13 @@
           "unpricedService" : {
             "type" : "array",
             "description" : "Only on services with no established price. Guessing one would put invented money in the objective.",
+            "items" : {
+              "$ref" : "#/components/schemas/ExcludedTitleResponse"
+            }
+          },
+          "unconfirmedPrice" : {
+            "type" : "array",
+            "description" : "Only on services whose price Plotted researched but the user never confirmed. Kept apart from unpricedService because this one closes with a single field: a published list price is not a bill, and optimising against it overstates what cancelling would save.",
             "items" : {
               "$ref" : "#/components/schemas/ExcludedTitleResponse"
             }
@@ -2199,7 +2450,7 @@
             }
           }
         },
-        "description" : "Only on services with no established price. Guessing one would put invented money in the objective."
+        "description" : "A watchlist title the optimiser was not shown, and the services carrying it."
       },
       "MonthResponse" : {
         "required" : [ "month", "monthlyCents", "started", "stopped", "subscribed" ],

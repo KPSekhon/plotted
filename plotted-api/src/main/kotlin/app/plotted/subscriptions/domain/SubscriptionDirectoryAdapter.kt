@@ -33,6 +33,7 @@ class SubscriptionDirectoryAdapter(
                 providerName = subscription.providerName,
                 monthlyCents = subscription.monthlyCost.movePointRight(2).toLong(),
                 committedMonths = committedMonths(subscription, today),
+                priceProvenance = subscription.priceProvenance,
             )
         }
 
@@ -67,6 +68,7 @@ class SubscriptionDirectoryAdapter(
                 providerName = it.providerName,
                 planName = it.planName,
                 monthlyCents = it.monthlyCents,
+                priceProvenance = it.priceProvenance,
             )
         }
         .sortedBy { it.providerName }

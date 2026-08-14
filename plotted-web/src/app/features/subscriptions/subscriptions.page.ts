@@ -20,6 +20,9 @@ import {
   SubscriptionStatus,
 } from '../../core/subscriptions/subscriptions.models';
 import { SubscriptionsService } from '../../core/subscriptions/subscriptions.service';
+import { EmptyStateComponent } from '../../shared/map/empty-state.component';
+import { DemoNoteComponent } from '../../shared/map/demo-note.component';
+import { SectionNavComponent } from '../../shared/map/section-nav.component';
 
 /**
  * What the user pays for.
@@ -44,9 +47,14 @@ import { SubscriptionsService } from '../../core/subscriptions/subscriptions.ser
     MatProgressSpinnerModule,
     MatSelectModule,
     MatTooltipModule,
+    SectionNavComponent,
+    EmptyStateComponent,
+    DemoNoteComponent,
   ],
   template: `
     <section class="page">
+      <plotted-section-nav />
+
       <header class="head">
         <div>
           <h1>Subscriptions</h1>
@@ -72,6 +80,15 @@ import { SubscriptionsService } from '../../core/subscriptions/subscriptions.ser
               {{ counted() === 1 ? 'service' : 'services' }}
             </span>
           </div>
+
+          <!-- These are the prices Cancel Culture optimises against, so an
+               unlabelled figure here is money the demo is implying somebody
+               actually pays. Stamped once, at the total, rather than against
+               every row: the claim being qualified is "this is your bill". -->
+          <plotted-demo-note>
+            Subscriptions and prices were generated for this demo account. Editing one replaces it
+            with a figure you entered.
+          </plotted-demo-note>
 
           <div class="list">
             @for (item of subscriptions(); track item.id) {
@@ -140,11 +157,9 @@ import { SubscriptionsService } from '../../core/subscriptions/subscriptions.ser
             }
           </div>
         } @else {
-          <div class="empty">
-            <mat-icon>credit_card</mat-icon>
-            <h2>No subscriptions recorded</h2>
+          <plotted-empty-state heading="Nothing recorded yet.">
             <p>Add what you pay for and Plotted can start telling you what it is worth.</p>
-          </div>
+          </plotted-empty-state>
         }
 
         <form class="add" (ngSubmit)="add()">

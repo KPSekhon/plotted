@@ -66,6 +66,13 @@ data class UserResponse(
     val preferredCurrency: String,
     val onboardingStatus: String,
     val createdAt: Instant,
+    @Schema(
+        description =
+        "True when this account's watchlist, subscriptions, taste profile and viewing history were " +
+            "generated for the demo rather than recorded from use. The interface says so where it " +
+            "would otherwise imply those figures were measured.",
+    )
+    val isDemo: Boolean,
 ) {
     companion object {
         fun from(account: UserAccount): UserResponse = UserResponse(
@@ -77,6 +84,7 @@ data class UserResponse(
             preferredCurrency = account.preferredCurrency,
             onboardingStatus = account.onboardingStatus.dbValue,
             createdAt = account.createdAt,
+            isDemo = account.isDemo,
         )
     }
 }

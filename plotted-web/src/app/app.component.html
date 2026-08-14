@@ -3,28 +3,84 @@
 <header class="app-bar">
   <div class="app-bar__inner">
     <a routerLink="/" class="brand" aria-label="Plotted home">
-      <span class="brand__mark" aria-hidden="true"></span>
+      <plotted-x [size]="20" />
       <span class="brand__text">
-        <span class="brand__name">Plotted</span>
+        <span class="brand__name">plotted<span class="brand__dot" aria-hidden="true">.</span></span>
         <span class="brand__tagline">Stop browsing. Your night&rsquo;s plotted.</span>
       </span>
     </a>
 
     @if (auth.isAuthenticated()) {
+      <!-- Four destinations, not nine. Coverage and Cancel Culture moved inside
+           Subscriptions because that is the question they answer, and Settings
+           moved behind the account menu because it is a preference rather than
+           a place. Analytics is deliberately absent: End Credits has no screen
+           yet, and a link to an empty page is worse than no link. -->
       <nav aria-label="Main" class="nav">
         <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">
           Home
         </a>
         <a routerLink="/tonight" routerLinkActive="is-active">Tonight</a>
-        <a routerLink="/plan" routerLinkActive="is-active">Plan</a>
-        <a routerLink="/search" routerLinkActive="is-active">Search</a>
-        <a routerLink="/watchlist" routerLinkActive="is-active">Your list</a>
-        <a routerLink="/coverage" routerLinkActive="is-active">Coverage</a>
-        <a routerLink="/subscriptions" routerLinkActive="is-active">Subscriptions</a>
-        <a routerLink="/settings" routerLinkActive="is-active">Settings</a>
-        <a routerLink="/about" routerLinkActive="is-active">About</a>
+        <a routerLink="/watchlist" routerLinkActive="is-active">Watchlist</a>
+        <!-- Active across the whole section, not just its own path, so the
+             current area stays legible while you are inside Coverage or
+             Cancel Culture. -->
+        <a routerLink="/subscriptions" [class.is-active]="inSubscriptions()">Subscriptions</a>
+        <a routerLink="/analytics" routerLinkActive="is-active">Analytics</a>
       </nav>
-      <button class="ghost-button" type="button" (click)="signOut()">Sign out</button>
+
+      <div class="app-bar__tools">
+        <!-- Persistent, quiet, and shown only to a demo account. The screens
+             that make behavioural claims carry their own note beside the figure
+             they qualify; this is the standing answer to "whose data am I
+             looking at", which otherwise has to be inferred from the fact that
+             the watchlist is suspiciously well curated. -->
+        @if (auth.user()?.isDemo) {
+          <span
+            class="demo-badge"
+            title="This sample account contains generated watchlist, subscription, taste and viewing data so you can explore Plotted immediately. Anything you change from here is really yours."
+            >Demo</span
+          >
+        }
+
+        <!-- Search is an action available everywhere rather than a destination
+             competing with the four above. The slash shortcut is bound on the
+             document; the button is what makes it discoverable. -->
+        <button
+          type="button"
+          class="icon-button"
+          (click)="goToSearch()"
+          aria-label="Search the catalogue"
+          title="Search  /"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="M16 16l4.5 4.5" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="icon-button account"
+          [matMenuTriggerFor]="accountMenu"
+          aria-label="Account"
+        >
+          <span class="initial" aria-hidden="true">{{ initial() }}</span>
+        </button>
+
+        <mat-menu #accountMenu="matMenu" xPosition="before">
+          @if (auth.user(); as user) {
+            <div class="menu-head" mat-menu-item disabled>
+              <span class="menu-name">{{ user.displayName }}</span>
+              <span class="menu-region coordinates">{{ user.regionCode }}</span>
+            </div>
+          }
+          <a mat-menu-item routerLink="/settings">Settings</a>
+          <a mat-menu-item routerLink="/pilot">Pilot Season</a>
+          <button mat-menu-item type="button" (click)="signOut()">Sign out</button>
+        </mat-menu>
+      </div>
     } @else {
       <nav aria-label="Main" class="nav">
         <a routerLink="/about" routerLinkActive="is-active">About</a>
@@ -40,10 +96,13 @@
 </main>
 
 <footer class="app-footer">
+  <nav class="footer-nav" aria-label="Secondary">
+    <a routerLink="/about">About</a>
+    <a routerLink="/legal/data-sources">Data sources</a>
+  </nav>
   <p>
     Title metadata and streaming availability supplied by
     <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a>
     and JustWatch. Plotted is not endorsed or certified by either.
-    <a routerLink="/legal/data-sources">Where the data comes from</a>.
   </p>
 </footer>

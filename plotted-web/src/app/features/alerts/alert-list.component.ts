@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -5,6 +6,7 @@ import { RouterLink } from '@angular/router';
 
 import { Alert } from '../../core/alerts/alerts.models';
 import { AlertsService } from '../../core/alerts/alerts.service';
+import { PlottedIconComponent, PlottedIconName } from '../../shared/map/plotted-icon.component';
 
 /**
  * Unread alerts, or nothing at all.
@@ -21,20 +23,31 @@ import { AlertsService } from '../../core/alerts/alerts.service';
 @Component({
   selector: 'plotted-alert-list',
   standalone: true,
-  imports: [RouterLink, MatButtonModule, MatIconModule],
+  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, PlottedIconComponent],
   template: `
     @if (alerts().length > 0) {
       <section class="alerts" aria-label="Alerts">
         @for (alert of alerts(); track alert.id) {
           <article class="alert" [class]="alert.severity">
-            <mat-icon aria-hidden="true">{{ icon(alert.severity) }}</mat-icon>
-            <p class="message">
-              @if (alert.titleId) {
-                <a [routerLink]="['/titles', alert.titleId]">{{ alert.message }}</a>
-              } @else {
-                {{ alert.message }}
-              }
-            </p>
+            <!-- Geometry first, colour second. A departure is a dead end: the
+                 route to that title through that service has terminated. The
+                 severity colour is a secondary signal, so the alert still reads
+                 correctly to someone who cannot distinguish gold from red. -->
+            <plotted-icon [name]="shape(alert)" [size]="18" />
+
+            <div class="body">
+              <p class="message">
+                @if (alert.titleId) {
+                  <a [routerLink]="['/titles', alert.titleId]">{{ alert.message }}</a>
+                } @else {
+                  {{ alert.message }}
+                }
+              </p>
+              <p class="when coordinates">
+                {{ label(alert) }} &middot; detected {{ alert.createdAt | date: 'MMM d, h:mm a' }}
+              </p>
+            </div>
+
             <button
               mat-icon-button
               [disabled]="busy() === alert.id"
@@ -58,20 +71,38 @@ import { AlertsService } from '../../core/alerts/alerts.service';
     .alert {
       display: grid;
       grid-template-columns: auto 1fr auto;
-      gap: 0.6rem;
+      gap: 0.7rem;
       align-items: center;
-      padding: 0.6rem 0.75rem;
+      padding: 0.7rem 0.85rem;
       border-radius: 0.6rem;
       background: var(--plotted-surface-raised);
       border-left: 3px solid var(--plotted-text-faint);
     }
 
+    plotted-icon {
+      color: var(--plotted-text-faint);
+    }
+
+    .body {
+      display: grid;
+      gap: 0.1rem;
+    }
+
+    .when {
+      margin: 0;
+      font-size: 0.6rem;
+    }
+
+    /* Status, not brand. This used the accent, which meant orange said both
+       "Plotted chose this" and "something needs attention" on the same screen
+       -- and the accent has to keep meaning exactly one thing. The gold sits
+       far enough from #ff641a in hue that the two never read as one signal. */
     .alert.warning {
-      border-left-color: var(--plotted-accent, #ffb300);
+      border-left-color: var(--plotted-warning);
     }
 
     .alert.urgent {
-      border-left-color: var(--mat-sys-error, #b3261e);
+      border-left-color: var(--plotted-critical);
     }
 
     .message {
@@ -112,7 +143,35 @@ export class AlertListComponent implements OnInit {
     });
   }
 
-  protected icon(severity: string): string {
-    return severity === 'urgent' ? 'priority_high' : 'info';
+  /**
+   * The shape that matches what happened, independent of severity.
+   *
+   * A departure is a dead end — the route to that title through that service
+   * has ended. Anything else is a waypoint until there is a reason to say more.
+   *
+   * ### Why there is no boundary here
+   *
+   * The obvious map treatment for Plot Armour is a dated boundary the route
+   * crosses: "leaves Crave on 19 August". It is not built, because Plotted
+   * cannot currently know that. The nightly diff detects departures that have
+   * *already happened* — the alert says "has left", never "is about to" — and
+   * an `Alert` carries no future date to draw. Predicting one needs the
+   * removal-risk model and months of snapshot history, which is phase 12 and
+   * cannot start until the snapshot job runs somewhere continuous.
+   *
+   * Drawing the boundary anyway would mean inventing both a date and a tense,
+   * on the one feature whose entire value is being trusted about availability.
+   */
+  protected shape(alert: Alert): PlottedIconName {
+    return alert.alertType.includes('left') || alert.alertType.includes('removed')
+      ? 'dead-end'
+      : 'waypoint';
+  }
+
+  /** A short human label for the kind of thing this is, from the event type. */
+  protected label(alert: Alert): string {
+    if (alert.alertType.includes('left') || alert.alertType.includes('removed')) return 'Left a service';
+    if (alert.alertType.includes('added')) return 'Now available';
+    return 'Notice';
   }
 }

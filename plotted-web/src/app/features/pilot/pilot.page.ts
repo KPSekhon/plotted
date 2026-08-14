@@ -6,7 +6,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 
 import { messageFrom } from '../../core/error/problem-detail';
-import { PilotState, PreferenceProfile } from '../../core/pilot/pilot.models';
+import { AxisOpinion, PilotState, PreferenceProfile } from '../../core/pilot/pilot.models';
+import { DemoNoteComponent } from '../../shared/map/demo-note.component';
 import { PilotService } from '../../core/pilot/pilot.service';
 
 /**
@@ -36,6 +37,7 @@ import { PilotService } from '../../core/pilot/pilot.service';
     MatIconModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
+    DemoNoteComponent,
   ],
   template: `
     <section class="page">
@@ -67,41 +69,53 @@ import { PilotService } from '../../core/pilot/pilot.service';
             aria-label="Progress"
           />
 
-          <p class="prompt">Which would you rather watch?</p>
+          <p class="prompt">Which way?</p>
 
-          <div class="pair">
-            @for (option of [question.left, question.right]; track option.titleId) {
-              <button
-                class="option"
-                type="button"
-                [disabled]="busy()"
-                (click)="choose(option.titleId)"
-              >
-                @if (option.posterUrl) {
-                  <img [src]="option.posterUrl" [alt]="'Poster for ' + option.name" />
-                } @else {
-                  <span class="poster-fallback" aria-hidden="true"><mat-icon>movie</mat-icon></span>
-                }
-                <span class="name">{{ option.name }}</span>
-                <span class="meta">
-                  {{ option.mediaType === 'movie' ? 'Film' : 'Series' }}
-                  @if (option.releaseYear) {
-                    &middot; {{ option.releaseYear }}
+          <!-- A fork with three directions, not two options and an escape
+               hatch. The two branches are the preference-learning routes; the
+               neutral continuation below is "haven't seen either", which is a
+               real third direction because choosing it communicates no
+               preference rather than a weak one. It is drawn straight down and
+               grey precisely so it reads as neutral rather than lesser. -->
+          <div class="fork">
+            <svg class="fork-lines" viewBox="0 0 120 200" fill="none" aria-hidden="true"
+                 preserveAspectRatio="none">
+              <circle class="origin" cx="8" cy="100" r="4" />
+              <path class="branch" d="M12 100 C 60 100, 60 40, 116 40" />
+              <path class="branch" d="M12 100 C 60 100, 60 160, 116 160" />
+              <path class="branch neutral" d="M12 100 C 40 100, 40 196, 116 196" />
+            </svg>
+
+            <div class="choices">
+              @for (option of [question.left, question.right]; track option.titleId) {
+                <button
+                  class="option"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="choose(option.titleId)"
+                >
+                  @if (option.posterUrl) {
+                    <img [src]="option.posterUrl" [alt]="'Poster for ' + option.name" />
+                  } @else {
+                    <span class="poster-fallback" aria-hidden="true"><mat-icon>movie</mat-icon></span>
                   }
-                </span>
-              </button>
-            }
-          </div>
+                  <span class="name">{{ option.name }}</span>
+                  <span class="meta coordinates">
+                    {{ option.mediaType === 'movie' ? 'Film' : 'Series' }}
+                    @if (option.releaseYear) {
+                      &middot; {{ option.releaseYear }}
+                    }
+                  </span>
+                </button>
+              }
 
-          <!-- Given the same weight as the two options on purpose. A forced
-               choice between two titles you have not seen is a coin flip, and a
-               coin flip recorded as a preference is worse than a shorter
-               questionnaire. -->
-          <button mat-stroked-button class="skip" [disabled]="busy()" (click)="skip()">
-            <mat-icon>skip_next</mat-icon>
-            Haven't seen either
-          </button>
-          <p class="skip-note">Skipping records nothing about your taste. It just moves on.</p>
+              <button class="option neither" type="button" [disabled]="busy()" (click)="skip()">
+                <span class="waypoint" aria-hidden="true"></span>
+                <span class="name">Haven't seen either</span>
+                <span class="meta coordinates">Records nothing about your taste</span>
+              </button>
+            </div>
+          </div>
         } @else if (current.exhausted) {
           <!-- Not "all done". The ladder ran out of pairs that contrast enough
                to be worth asking about, which is a thin catalogue rather than a
@@ -145,15 +159,47 @@ import { PilotService } from '../../core/pilot/pilot.service';
             </p>
           }
 
+          <!-- Literally plotted: each axis is a line between its two poles and
+               the point sits where the fit put you.
+
+               Rendered by verdict rather than by "stated", and the difference
+               is the whole point of this feature. NO_PREFERENCE is a *finding*
+               — we asked, and you were balanced — so it gets a real point at
+               its real position, drawn neutral because there is no direction
+               to claim. NOT_ASKED gets a question mark instead, because a dot
+               anywhere would be an absence of evidence wearing the costume of
+               a measurement.
+
+               Lumping the two together under one flag, which is what this did
+               first, throws away the distinction the fitter returns a
+               posterior width specifically to make. -->
           <ul class="axes">
             @for (axis of fitted.axes; track axis.axis) {
-              <li [class.unstated]="!axis.stated">
-                <span class="label">{{ axis.label }}</span>
+              <li [class]="'verdict-' + axis.verdict.toLowerCase()">
+                <span class="poles coordinates">
+                  <span>{{ axis.negative }}</span>
+                  <span>{{ axis.positive }}</span>
+                </span>
+
+                <span class="axis-track" aria-hidden="true">
+                  @if (axis.verdict === 'NOT_ASKED') {
+                    <span class="axis-unknown">?</span>
+                  } @else {
+                    <span class="axis-point" [style.left.%]="position(axis)"></span>
+                  }
+                </span>
+
                 <span class="sentence">{{ axis.sentence }}</span>
-                <span class="verdict">{{ verdictLabel(axis.verdict) }}</span>
               </li>
             }
           </ul>
+
+          <!-- The demo's answers were seeded from a stated persona rather than
+               chosen by anybody, so the profile is a correct fit to invented
+               evidence. The fit is real; what it was fitted to is not. -->
+          <plotted-demo-note>
+            Fitted from answers generated for this demo account, not from comparisons you made.
+          </plotted-demo-note>
 
           <p class="footnote">
             Fitted from {{ fitted.observations }}
@@ -201,10 +247,46 @@ import { PilotService } from '../../core/pilot/pilot.service';
       font-size: 1.1rem;
     }
 
-    .pair {
+    .fork {
+      display: grid;
+      grid-template-columns: 7rem minmax(0, 1fr);
+      align-items: stretch;
+      gap: 0;
+    }
+
+    .fork-lines {
+      width: 7rem;
+      height: 100%;
+    }
+
+    .fork-lines .origin { fill: var(--plotted-accent); }
+
+    .fork-lines .branch {
+      stroke: var(--plotted-border-strong);
+      stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .choices {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1rem;
+    }
+
+    /* The neutral direction spans both columns: it is one road, not a third
+       poster, and it must not look like a smaller version of a choice. */
+    .neither {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    /* The fork drawing carries no information a screen reader needs and stops
+       being legible once the branches are shorter than the posters. */
+    @media (max-width: 40rem) {
+      .fork { grid-template-columns: minmax(0, 1fr); }
+      .fork-lines { display: none; }
     }
 
     .option {
@@ -212,18 +294,27 @@ import { PilotService } from '../../core/pilot/pilot.service';
       flex-direction: column;
       gap: 0.4rem;
       padding: 0.75rem;
-      border: 1px solid var(--plotted-border, rgba(255, 255, 255, 0.15));
+      border: 1px solid var(--plotted-border);
       border-radius: 0.75rem;
       background: var(--plotted-surface-raised);
       color: inherit;
       cursor: pointer;
       text-align: left;
       font: inherit;
+      transition: border-color 0.15s ease;
     }
 
+    /* Hover goes orange on the two branches because hovering here really is
+       "this is the way I would go". The neutral road stays grey for the same
+       reason: choosing it expresses no preference. */
     .option:hover:not(:disabled),
     .option:focus-visible {
-      border-color: var(--plotted-accent, #ffb300);
+      border-color: var(--plotted-accent);
+    }
+
+    .neither:hover:not(:disabled),
+    .neither:focus-visible {
+      border-color: var(--plotted-text-faint);
     }
 
     .option:disabled {
@@ -242,7 +333,7 @@ import { PilotService } from '../../core/pilot/pilot.service';
     .poster-fallback {
       display: grid;
       place-items: center;
-      background: rgba(255, 255, 255, 0.06);
+      background: var(--plotted-surface-raised);
     }
 
     .name {
@@ -254,16 +345,40 @@ import { PilotService } from '../../core/pilot/pilot.service';
       color: var(--plotted-text-faint);
     }
 
-    .skip {
-      margin-top: 1rem;
-      width: 100%;
+    .poles {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.62rem;
     }
 
-    .skip-note {
-      margin: 0.4rem 0 0;
+    .axis-track {
+      position: relative;
+      display: block;
+      height: 1px;
+      background: var(--plotted-border-strong);
+      margin: 0.5rem 0;
+    }
+
+    .axis-point {
+      position: absolute;
+      top: 50%;
+      width: 0.5rem;
+      height: 0.5rem;
+      margin: -0.25rem 0 0 -0.25rem;
+      border-radius: 50%;
+      background: var(--plotted-accent);
+    }
+
+    .axis-unknown {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--plotted-bg);
+      padding: 0 0.35rem;
+      font-family: var(--plotted-mono);
       font-size: 0.75rem;
       color: var(--plotted-text-faint);
-      text-align: center;
     }
 
     .ended {
@@ -283,30 +398,35 @@ import { PilotService } from '../../core/pilot/pilot.service';
       list-style: none;
       padding: 0;
       display: grid;
-      gap: 0.5rem;
+      gap: 1.1rem;
     }
 
     .axes li {
-      display: grid;
-      grid-template-columns: 8rem 1fr auto;
-      gap: 0.75rem;
-      align-items: baseline;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      display: block;
+      padding: 0 0 0.75rem;
+      border-bottom: 1px solid var(--plotted-border);
     }
 
-    .axes li.unstated {
-      opacity: 0.6;
+    /* Dimmed rather than hidden. An axis nobody asked about is part of the
+       answer, and the footnote below explains why it looks different. */
+    .axes li.verdict-not_asked {
+      opacity: 0.55;
+    }
+
+    /* Measured and balanced. The point is real and sits where the fit put it,
+       but it is grey: orange is a claim, and "no strong feeling" is the
+       explicit absence of one. */
+    .axes li.verdict-no_preference .axis-point {
+      background: var(--plotted-text-faint);
+    }
+
+    .sentence {
+      font-size: 0.85rem;
+      color: var(--plotted-text-muted);
     }
 
     .label {
       font-weight: 600;
-    }
-
-    .verdict {
-      font-size: 0.75rem;
-      color: var(--plotted-text-faint);
-      white-space: nowrap;
     }
 
     .footnote {
@@ -323,15 +443,9 @@ import { PilotService } from '../../core/pilot/pilot.service';
     }
 
     .form-error {
-      color: var(--mat-sys-error, #b3261e);
+      color: var(--plotted-critical);
     }
 
-    @media (max-width: 30rem) {
-      .axes li {
-        grid-template-columns: 1fr;
-        gap: 0.15rem;
-      }
-    }
   `,
 })
 export class PilotPage implements OnInit {
@@ -419,6 +533,23 @@ export class PilotPage implements OnInit {
       next: (fitted) => this.profile.set(fitted),
       error: () => this.profile.set(null),
     });
+  }
+
+  /**
+   * Where the point sits on its axis, as a percentage from the negative pole.
+   *
+   * `tanh` rather than a linear scale against some assumed maximum: the fitted
+   * weight is unbounded, so any linear mapping needs a cap, and a capped point
+   * silently stops moving once someone's preference is strong enough. This
+   * squashes smoothly — 0 lands dead centre, strong preferences approach the
+   * ends without ever reaching or exceeding them.
+   *
+   * Only ever called for a *stated* axis. An unstated one renders a question
+   * mark instead, because placing a dot at the centre would claim we measured
+   * indifference when we simply never asked.
+   */
+  protected position(axis: AxisOpinion): number {
+    return 50 + 50 * Math.tanh(axis.weight);
   }
 
   protected verdictLabel(verdict: string): string {

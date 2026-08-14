@@ -2,6 +2,7 @@ package app.plotted.watchlist.domain
 
 import app.plotted.platform.spi.AvailabilityDirectory
 import app.plotted.platform.spi.TitleDirectory
+import app.plotted.solver.CoveredTitle
 import app.plotted.watchlist.persistence.WatchlistRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -44,8 +45,14 @@ class CoverageService(
 ) {
     @Transactional(readOnly = true)
     fun forUser(userId: UUID, regionCode: String): CoverageReport {
-        val watchlist = watchlists.findOrCreateDefault(userId)
-        val outstanding = watchlists.findItems(watchlist.id).filter { it.status.isOutstanding }
+        // Reads the list; never provisions one. This method is `readOnly`, so an
+        // insert here is not caught by a check -- Postgres refuses it outright
+        // and the dashboard answers 500. It stayed hidden because the failure
+        // heals itself: by the second request some read-write endpoint has
+        // created the row, and the screen works forever after.
+        val outstanding = watchlists.findDefault(userId)
+            ?.let { list -> watchlists.findItems(list.id).filter { it.status.isOutstanding } }
+            .orEmpty()
 
         if (outstanding.isEmpty()) {
             return CoverageReport(

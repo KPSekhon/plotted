@@ -1,4 +1,4 @@
-package app.plotted.optimisation.domain
+package app.plotted.solver
 
 import java.util.UUID
 

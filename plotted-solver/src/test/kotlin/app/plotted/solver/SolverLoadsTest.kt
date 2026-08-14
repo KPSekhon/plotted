@@ -1,4 +1,4 @@
-package app.plotted.optimisation
+package app.plotted.solver
 
 import com.google.ortools.Loader
 import com.google.ortools.sat.CpModel
@@ -13,10 +13,10 @@ import org.junit.jupiter.api.condition.EnabledIf
  *
  * OR-Tools is a JNI binding, so "the dependency resolved" and "the solver runs"
  * are different claims, and only the second one matters. Gated on
- * [app.plotted.support.SolverSupport] because on a Windows box with an outdated
+ * [app.plotted.solver.SolverSupport] because on a Windows box with an outdated
  * Visual C++ redistributable the solve does not throw, it kills the JVM.
  */
-@EnabledIf("app.plotted.support.SolverSupport#isSolverAvailable")
+@EnabledIf("app.plotted.solver.SolverSupport#isSolverAvailable")
 class SolverLoadsTest {
     @Test
     fun `cp-sat solves a trivial model`() {
