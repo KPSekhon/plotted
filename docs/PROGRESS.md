@@ -241,6 +241,66 @@ machine — so the boundary is verified at the service level and by CI.
 
 ---
 
+## 2026-08-14 — the optimiser has its own process, and the crash was finally watched
+
+`/api/v1/plan` used to kill the API. Not fail — kill: CP-SAT is JNI, a native
+fault is an `EXCEPTION_ACCESS_VIOLATION` rather than an exception, and nothing in
+Kotlin catches it. Every other endpoint, every in-flight request and the
+scheduled jobs went with it, and the only evidence was an `hs_err_pid*.log`.
+
+This had been filed as a developer-machine annoyance because CI and production
+are Linux. It was not one. The failure mode is what happens when a native solver
+shares a process with a web application; the Windows install only makes it happen
+on demand.
+
+**The optimiser is now `plotted-solver`** — its own Gradle module, run as a child
+process, one request in on stdin and one answer out on stdout. `plotted-api`
+depends on it for the model types and `PlanChecker` and **excludes OR-Tools**, so
+the native library is not on the API's classpath at all.
+[ADR 0010](adr/0010-optimiser-runs-in-its-own-process.md) has the reasoning.
+
+### What that made observable
+
+Measured here on 2026-08-14, driving the request that used to end the process:
+
+| | Before | After |
+|---|---|---|
+| `GET /api/v1/plan` | process death | **503** `OPTIMISER_UNAVAILABLE` |
+| `/alerts`, `/watchlist`, `/watchlist/coverage` | gone with it | 200 |
+| `/tonight`, `/analytics/end-credits`, `/subscriptions` | gone with it | 200 |
+| `/actuator/health` | gone with it | 200 |
+| API restarts | 1 | 0 |
+
+**The optimiser's failure path had never been executed anywhere until now**, and
+it was executable here precisely because this is the machine where OR-Tools is
+broken. The thing that made Cancel Culture untestable locally is what made its
+containment testable.
+
+### Three things worth keeping
+
+**A crashing JVM writes to stdout, not stderr.** The `hs_err` report goes to the
+same stream the answer does, so the parent checks exit status *before* parsing —
+otherwise a dead solver is reported as a JSON parse error.
+
+**The Gradle exclusion is the whole guarantee, so a test holds it.**
+`SolverIsolationTest` asserts `com.google.ortools.Loader` cannot be resolved from
+the API, and was watched fail with the `exclude` removed. Four words in a build
+file that read like tidying up are otherwise one refactor away from being
+deleted.
+
+**The new module compiled, reported a green build, and ran no tests at all.**
+`kotest-runner-junit5` supplies Kotest's engine, not JUnit Jupiter's, and Spring
+Boot's test starter had been quietly providing that in `plotted-api`. Nine test
+classes sat there passing by not existing. That is the eighth mechanism in this
+project to report success while doing nothing, and it was caught only by counting
+the tests rather than reading the build result.
+
+**300 API and solver tests pass locally, 140 skip** — the Docker-gated ones plus
+the CP-SAT ones, which now skip in their own module and run in CI, where the
+agreement test against `PlanChecker` executes.
+
+---
+
 ## What is still open, and how to finish it
 
 Read this first if you are picking the project up. Every item below is either

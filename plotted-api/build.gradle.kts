@@ -35,7 +35,17 @@ dependencies {
     implementation(libs.jackson.module.kotlin)
     implementation(libs.kotlin.reflect)
 
-    implementation(libs.ortools.java)
+    // The optimiser, for its model types and PlanChecker -- but not for CP-SAT.
+    // OR-Tools is excluded, so the native library that can kill a JVM is not on
+    // this application's classpath at all and cannot be loaded here even by
+    // accident. It runs in `plotted-solver`'s own process instead; see
+    // docs/adr/0010-optimiser-runs-in-its-own-process.md.
+    //
+    // The exclusion is load-bearing rather than tidy, so `SolverIsolationTest`
+    // asserts it and was watched fail without it.
+    implementation(project(":plotted-solver")) {
+        exclude(group = "com.google.ortools")
+    }
 
     // Phase 8: the learned ranker runs in-process. ONNX rather than a Python
     // sidecar because a second service on the request path buys a deployment,
@@ -168,6 +178,16 @@ springBoot {
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName = "plotted-api.jar"
+}
+
+// The optimiser is a separate process now, so running the API from source means
+// having built the thing it launches. The working directory is pinned to the
+// repository root so `plotted.optimiser.worker-directory`'s relative default
+// resolves the same way from `gradlew` as it does from the Docker image, where
+// the path is absolute.
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    dependsOn(":plotted-solver:build")
+    workingDir = rootProject.projectDir
 }
 
 // Phase 8: write a training set using the serving feature extractor, so the

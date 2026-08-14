@@ -5,6 +5,9 @@ import app.plotted.platform.spi.AvailabilityDirectory
 import app.plotted.platform.spi.SubscriptionDirectory
 import app.plotted.platform.spi.TitleDirectory
 import app.plotted.platform.spi.WatchlistDirectory
+import app.plotted.solver.PlanObjective
+import app.plotted.solver.PlanOutcome
+import app.plotted.solver.PlanRequest
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe

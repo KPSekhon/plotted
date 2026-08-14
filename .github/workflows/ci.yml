@@ -42,6 +42,14 @@ jobs:
       - name: Test
         run: ./gradlew :plotted-api:test --no-daemon
 
+      # The optimiser, in its own module and its own process. This is the only
+      # place CP-SAT actually runs: `SolverSupport` skips the native tests on
+      # Windows, where OR-Tools crashes the JVM, so the agreement test that
+      # compares the solver against `PlanChecker` has never executed on the
+      # development machine and executes here.
+      - name: Test the optimiser
+        run: ./gradlew :plotted-solver:test --no-daemon
+
       # The contract test above regenerates the document. If it now differs from
       # the committed copy, the API changed without the specification following,
       # and the generated Angular client would be wrong.

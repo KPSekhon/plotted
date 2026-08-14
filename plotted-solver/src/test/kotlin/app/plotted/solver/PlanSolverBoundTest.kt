@@ -1,4 +1,4 @@
-package app.plotted.optimisation.domain
+package app.plotted.solver
 
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
@@ -25,9 +25,9 @@ import java.util.UUID
  * Gated like every other solver test: CP-SAT kills the JVM on the Windows dev
  * machine, so this runs in CI.
  */
-@EnabledIf("app.plotted.support.SolverSupport#isSolverAvailable")
+@EnabledIf("app.plotted.solver.SolverSupport#isSolverAvailable")
 class PlanSolverBoundTest {
-    private val solver = PlanSolver()
+    private val solver = PlanModel()
 
     private val netflix = UUID.randomUUID()
     private val crave = UUID.randomUUID()

@@ -2,6 +2,7 @@ package app.plotted.watchlist.domain
 
 import app.plotted.platform.spi.AvailabilityDirectory
 import app.plotted.platform.spi.TitleDirectory
+import app.plotted.solver.CoveredTitle
 import app.plotted.watchlist.persistence.WatchlistRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

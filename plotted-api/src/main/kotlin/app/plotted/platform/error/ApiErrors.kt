@@ -29,6 +29,16 @@ enum class ErrorCode(
      * difference.
      */
     UPSTREAM_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Upstream service unavailable"),
+
+    /**
+     * The optimiser worker could not be run, or died trying.
+     *
+     * 503 rather than 500 because it is a statement about one subsystem being
+     * down rather than about the request being wrong, and it is worth retrying.
+     * Kept apart from [UPSTREAM_UNAVAILABLE] so a native solver crash cannot be
+     * read, in logs or on a dashboard, as TMDB having a bad afternoon.
+     */
+    OPTIMISER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Optimiser unavailable"),
     ;
 
     /** RFC 9457 `type` URI. Resolves to the published error reference. */

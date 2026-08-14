@@ -1,12 +1,12 @@
 package app.plotted.optimisation.api
 
 import app.plotted.optimisation.domain.CancelCultureService
-import app.plotted.optimisation.domain.PlanWeights
 import app.plotted.platform.error.ApiException
 import app.plotted.platform.error.ErrorCode
 import app.plotted.platform.ratelimit.RateLimitGuard
 import app.plotted.platform.ratelimit.RateLimits
 import app.plotted.platform.security.currentUser
+import app.plotted.solver.PlanWeights
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import org.springframework.http.ResponseEntity

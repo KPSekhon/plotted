@@ -1,4 +1,4 @@
-package app.plotted.optimisation.domain
+package app.plotted.solver
 
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.shouldBe

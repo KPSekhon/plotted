@@ -5,6 +5,12 @@ import app.plotted.platform.spi.AvailabilityDirectory
 import app.plotted.platform.spi.SubscriptionDirectory
 import app.plotted.platform.spi.TitleDirectory
 import app.plotted.platform.spi.WatchlistDirectory
+import app.plotted.solver.PlanConstraints
+import app.plotted.solver.PlanOutcome
+import app.plotted.solver.PlanRequest
+import app.plotted.solver.PlanWeights
+import app.plotted.solver.ServiceOption
+import app.plotted.solver.TitleDemand
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Clock

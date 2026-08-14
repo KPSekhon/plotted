@@ -62,8 +62,12 @@ selling.
    the only exclusion the user can clear themselves.
 3. ~~Fix the auth 500.~~ *Done 2026-08-08, and it was not where it was thought
    to be — see `PROGRESS.md`.*
-4. Isolate CP-SAT from the API JVM. A native solver crash currently takes every
-   endpoint with it. **Not started** — design notes below.
+4. ~~Isolate CP-SAT from the API JVM.~~ *Done 2026-08-14.* The optimiser is
+   `plotted-solver`, its own module and its own process; `plotted-api` excludes
+   OR-Tools so it cannot load the natives at all. A crash costs one solve and
+   returns 503. See [ADR 0010](adr/0010-optimiser-runs-in-its-own-process.md).
+   Temporal is still the destination for durable execution — the outline below
+   stands, this closed the blast radius half of it.
 5. Turn on `PLOTTED_SNAPSHOT_ENABLED`. Still the only clock that cannot be
    rewound, and still blocked on an environment that runs continuously.
 6. ~~Fix or remove `verify:api`.~~ *Done 2026-08-08.*

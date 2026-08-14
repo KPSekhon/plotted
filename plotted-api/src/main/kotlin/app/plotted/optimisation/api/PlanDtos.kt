@@ -2,10 +2,10 @@ package app.plotted.optimisation.api
 
 import app.plotted.optimisation.domain.ExcludedDemand
 import app.plotted.optimisation.domain.ExcludedTitle
-import app.plotted.optimisation.domain.MonthPlan
-import app.plotted.optimisation.domain.PlanOutcome
 import app.plotted.optimisation.domain.PlanReport
-import app.plotted.optimisation.domain.Sensitivity
+import app.plotted.solver.MonthPlan
+import app.plotted.solver.PlanOutcome
+import app.plotted.solver.Sensitivity
 import io.swagger.v3.oas.annotations.media.Schema
 import java.util.UUID
 

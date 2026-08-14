@@ -31,8 +31,15 @@ import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 class ModuleBoundaryTest {
     /**
      * Feature modules do not reference each other. `platform` is the shared
-     * kernel and `generated` is jOOQ output, so both are legitimate dependencies
-     * for anyone.
+     * kernel, `generated` is jOOQ output, and `solver` is a different Gradle
+     * module entirely, so all three are legitimate dependencies for anyone.
+     *
+     * `app.plotted.solver` is here because these slices are cut on package name
+     * and it looks like a feature from the outside. It is not one: it is the
+     * optimiser, which runs in its own process, and this application depends on
+     * it for the model types and `PlanChecker` while excluding OR-Tools so the
+     * native library cannot be loaded on this side. See
+     * `SolverIsolationTest` and ADR 0010.
      */
     @ArchTest
     val featureModulesAreIndependent: ArchRule =
@@ -43,7 +50,11 @@ class ModuleBoundaryTest {
             .should().notDependOnEachOther()
             .ignoreDependency(
                 alwaysTrue(),
-                resideInAnyPackage("app.plotted.platform..", "app.plotted.generated.."),
+                resideInAnyPackage(
+                    "app.plotted.platform..",
+                    "app.plotted.generated..",
+                    "app.plotted.solver..",
+                ),
             )
 
     @ArchTest
