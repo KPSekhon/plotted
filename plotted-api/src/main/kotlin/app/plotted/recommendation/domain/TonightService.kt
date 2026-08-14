@@ -98,7 +98,7 @@ class TonightService(
 
         val selected = ranker.diversify(scored, SLOTS)
         val alternatives = scored.filterNot { chosen -> selected.any { it.candidate.titleId == chosen.candidate.titleId } }
-        val picks = ranker.explore(selected, alternatives)
+        val picks = withNextEpisode(userId, ranker.explore(selected, alternatives))
 
         val served = Recommendation.Served(
             picks = picks,
@@ -154,6 +154,45 @@ class TonightService(
         }
     }
 
+    /**
+     * Names the episode, for the handful of titles actually being shown.
+     *
+     * ### Why this happens after ranking rather than during `gather`
+     *
+     * Resolving "what is next" costs a query per series. Doing it in `gather`
+     * would run it for every outstanding watchlist entry — dozens — before the
+     * filters have thrown most of them away, on the endpoint with the tightest
+     * latency budget in the product (median 15.8 ms). Here it is at most three.
+     *
+     * ### What that costs, stated rather than hidden
+     *
+     * The runtime *filter* upstream still reads the series' typical episode,
+     * because that is the only figure available before this point. So a 45-minute
+     * evening can be offered a series whose next episode is a 61-minute finale.
+     * The card shows that episode's real runtime, so the user sees the true
+     * number rather than the average — but the filter did not use it.
+     *
+     * Closing that properly means resolving the next episode for every candidate
+     * in one batched query and filtering on it, which is a `DISTINCT ON` over a
+     * per-series position and is owed. It is written down here rather than left
+     * to be discovered, because the failure is quiet: a slightly wrong runtime on
+     * a card looks like a rounding difference rather than like a filter reading
+     * the wrong number, which is exactly how the `watchMinutes` defect survived.
+     */
+    private fun withNextEpisode(userId: UUID, picks: List<Pick>): List<Pick> {
+        val series = picks.map { it.candidate }.filter { it.mediaType == SERIES_MEDIA_TYPE }.map { it.titleId }
+        if (series.isEmpty()) return picks
+
+        val nextUp = watchlists.seriesProgress(userId, series)
+        if (nextUp.isEmpty()) return picks
+
+        return picks.map { pick ->
+            nextUp[pick.candidate.titleId]
+                ?.let { pick.copy(candidate = pick.candidate.copy(nextUp = it)) }
+                ?: pick
+        }
+    }
+
     private fun elapsedMs(startedAt: Long): Int = ((System.nanoTime() - startedAt) / 1_000_000).toInt()
 
     data class TonightRequest(
@@ -164,6 +203,8 @@ class TonightService(
     private companion object {
         /** One pick and two backups. */
         const val SLOTS = 3
+
+        const val SERIES_MEDIA_TYPE = "series"
 
         /**
          * Stamped on every logged decision. Phase 7 must never pool rows from

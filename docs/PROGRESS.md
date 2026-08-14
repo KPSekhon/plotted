@@ -301,6 +301,80 @@ agreement test against `PlanChecker` executes.
 
 ---
 
+## 2026-08-14 — Tonight names the episode
+
+`Tonight` could say *Chainsaw Man, about 24 minutes an episode* and then leave
+the user to open another app and work out which episode they were on. That is
+exactly the decision this product exists to remove, and it was the largest
+remaining gap between what Plotted claims and what it does.
+
+`user_series_progress` (V19) is one row per user and series. Against the seeded
+catalogue, recording One Piece S1 E61 and asking for a 45-minute evening now
+returns:
+
+```
+1. Beyblade X                     Start with S1 E1  "X"                  25 min, 131 left
+2. Demon Slayer: Kimetsu no Yaiba Start with S1 E1  "Cruelty"            23 min,  63 left
+3. One Piece                      You are up to S2 E62 "…Laboon Appears!" 25 min, 1112 left
+```
+
+### Decisions worth not undoing
+
+**Position, not an episode id.** The obvious column is
+`last_completed_episode_id UUID REFERENCES episodes`, and episode ids are in fact
+stable — `SeasonRepository.upsert` conflicts on (season_id, episode_number). The
+position is still better: "what is next" is an `ORDER BY (season_number,
+episode_number)` over rows after this one, which needs the numbers rather than
+the identity, and a position keeps ordering correctly if an episode is ever
+removed upstream. The cost is that the database cannot check the episode exists,
+so `SeriesProgressService` does — and refuses a position the catalogue has never
+heard of, which One Piece proved immediately: S1 E1053 does not exist, because
+TMDB splits it across 23 seasons.
+
+**Position, not pace.** One last-completed episode says *where*, never *how
+fast*. Written into V19, the service and `NEXT.md`, because a timestamp on a row
+invites exactly the wrong inference. Anything downstream may say "at your
+configured three hours a week"; nothing may say "at your current pace".
+
+**Specials are never next**, following `recalculateTotalRuntime`, which already
+excludes season 0 from the runtime a series is judged by. Otherwise next-up steps
+out of the story into a Christmas episode and back again.
+
+**An unaired episode is not next, an undated one is.** A series caught up to its
+broadcast has nothing next — a real state, distinct from finished. A null air
+date is a gap in Plotted's data rather than evidence of an unreleased episode,
+and refusing on it would hide most older series entirely.
+
+**Not started still has a next episode.** It is episode one. Collapsing that into
+null would make "you have not begun" and "there is nothing left" the same value,
+and they are opposite answers to the only question being asked.
+
+**Progress may move backwards.** Correcting a mistake and starting a rewatch both
+do, and a marker that only ratchets forward is one the user cannot fix. Pinned by
+a test, because "progress only increases" is the obvious invariant to add later.
+
+### What this does not do yet, said plainly
+
+The runtime **filter** still reads the series' typical episode, not the episode
+being offered. Resolving next-up for every candidate before filtering would put
+an N+1 on the endpoint with the tightest latency budget in the product, so
+resolution happens after ranking for the three picks only. A 45-minute evening
+can therefore be offered a series whose next episode is a 61-minute finale; the
+card shows that episode's real runtime, so the number on screen is true, but the
+filter did not use it.
+
+Closing it means one batched `DISTINCT ON` over a per-series position and
+filtering on that. It is written into `TonightService` rather than left to be
+found, because the failure is quiet — a slightly wrong runtime on a card looks
+like rounding rather than like a filter reading the wrong number, which is
+precisely how the `watchMinutes` defect survived for months.
+
+**308 tests pass locally, 150 skip.** The new SQL — season boundaries, specials,
+unaired episodes, the count-versus-minutes asymmetry — is covered by
+`NextEpisodeIntegrationTest`, which is Docker-gated and runs in CI.
+
+---
+
 ## What is still open, and how to finish it
 
 Read this first if you are picking the project up. Every item below is either

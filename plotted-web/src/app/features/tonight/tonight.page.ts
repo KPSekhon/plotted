@@ -180,6 +180,25 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
                   <a [routerLink]="['/titles', pick.titleId]">{{ pick.name }}</a>
                 </h2>
 
+                <!-- The whole point of series progress. "Chainsaw Man, about 24
+                     minutes an episode" leaves you to open another app and work
+                     out where you were; this does not. The started flag
+                     separates resuming from beginning, because "Start with
+                     S1 E1" and "You are up to S1 E8" are different sentences. -->
+                @if (pick.nextEpisode; as next) {
+                  <p class="next-episode">
+                    <span class="next-episode__label coordinates">
+                      {{ next.started ? 'You are up to' : 'Start with' }}
+                    </span>
+                    <span class="next-episode__code readout">
+                      S{{ next.seasonNumber }} E{{ next.episodeNumber }}
+                    </span>
+                    @if (next.name) {
+                      <span class="next-episode__name">{{ next.name }}</span>
+                    }
+                  </p>
+                }
+
                 <dl class="vitals coordinates">
                   <div>
                     <dt>Format</dt>
@@ -192,13 +211,25 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
                        know before starting One Piece. Showing only the total
                        was the bug; showing only the episode would hide what you
                        are signing up for. -->
-                  @if (pick.sessionMinutes) {
+                  <!-- The named episode's own runtime wins over the typical
+                       one. A 61-minute finale in a 24-minute show is exactly
+                       the case where an average misleads, and the label says
+                       which figure it is rather than leaving them to look the
+                       same. -->
+                  @if (episodeMinutes(pick); as minutes) {
                     <div>
-                      <dt>{{ pick.perEpisode ? 'Per episode' : 'Runtime' }}</dt>
-                      <dd class="readout">{{ formatMinutes(pick.sessionMinutes) }}</dd>
+                      <dt>{{ pick.nextEpisode ? 'This episode' : pick.perEpisode ? 'Per episode' : 'Runtime' }}</dt>
+                      <dd class="readout">{{ formatMinutes(minutes) }}</dd>
                     </div>
                   }
-                  @if (pick.perEpisode && pick.watchMinutes) {
+                  @if (pick.nextEpisode; as next) {
+                    <div>
+                      <dt>Left</dt>
+                      <dd class="readout">
+                        {{ next.remainingEpisodes }} {{ next.remainingEpisodes === 1 ? 'ep' : 'eps' }}
+                      </dd>
+                    </div>
+                  } @else if (pick.perEpisode && pick.watchMinutes) {
                     <div>
                       <dt>All of it</dt>
                       <dd class="readout">{{ formatMinutes(pick.watchMinutes) }}</dd>
@@ -278,7 +309,10 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
                       <span>{{ pick.mediaType === 'movie' ? 'Film' : 'Series' }}</span>
                       @if (pick.sessionMinutes) {
                         <span class="readout">
-                          {{ formatMinutes(pick.sessionMinutes) }}{{ pick.perEpisode ? '/ep' : '' }}
+                          @if (pick.nextEpisode; as next) {
+                            S{{ next.seasonNumber }} E{{ next.episodeNumber }} &middot;
+                          }
+                          {{ formatMinutes(episodeMinutes(pick) ?? pick.sessionMinutes) }}{{ pick.nextEpisode ? '' : pick.perEpisode ? '/ep' : '' }}
                         </span>
                       }
                       @if (pick.availableOn.length > 0) {
@@ -476,6 +510,35 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
       }
     }
 
+    // Sits directly under the title because it is part of the answer, not a
+    // detail about it. Accent on the code alone: orange means the plotted
+    // choice, and the episode is the choice once the title is decided.
+    .next-episode {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin: 0.15rem 0 0.6rem;
+      font-size: 0.9rem;
+    }
+
+    .next-episode__label {
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--plotted-text-faint);
+    }
+
+    .next-episode__code {
+      color: var(--plotted-accent);
+      font-weight: 600;
+    }
+
+    .next-episode__name {
+      color: var(--plotted-text-muted);
+      min-width: 0;
+    }
+
     .vitals {
       display: flex;
       flex-wrap: wrap;
@@ -670,6 +733,19 @@ export class TonightPage {
 
   protected policyLabel(policy: AccessPolicy): string {
     return ACCESS_POLICY_LABELS[policy];
+  }
+
+  /**
+   * How long the thing being suggested actually runs.
+   *
+   * The named episode's own runtime when the catalogue has it, and the typical
+   * episode otherwise. Deliberately not a silent fallback: the caller labels the
+   * result differently depending on which it got, because "this episode is 61
+   * minutes" and "episodes are usually 24 minutes" are different claims and only
+   * one of them is about tonight.
+   */
+  protected episodeMinutes(pick: Pick): number | null {
+    return pick.nextEpisode?.runtimeMinutes ?? pick.sessionMinutes;
   }
 
   protected formatMinutes(minutes: number): string {

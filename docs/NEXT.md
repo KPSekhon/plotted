@@ -72,10 +72,29 @@ selling.
    rewound, and still blocked on an environment that runs continuously.
 6. ~~Fix or remove `verify:api`.~~ *Done 2026-08-08.*
 
-**P1 — make the core promise true.** Minimal series progress; resolve a series
-recommendation to an actual episode; introduce candidate source; wider-catalogue
-candidate generation; populate `tasteMatch` in production; connect Pilot Season
-to discovery; specific no-route explanations.
+**P1 — make the core promise true.**
+
+1. ~~Minimal series progress.~~ *Done 2026-08-14.* `user_series_progress` (V19),
+   one row per user and series, keyed on the **position** rather than an episode
+   id — the next-episode query is positional anyway, and a position survives the
+   catalogue changing underneath it.
+2. ~~Resolve a series recommendation to an actual episode.~~ *Done 2026-08-14.*
+   Tonight says *One Piece, S2 E62, 25 min* rather than *~25 min an episode*.
+   **Owed:** the runtime filter still reads the series' typical episode, because
+   resolving every candidate before filtering would be an N+1 on the tightest
+   latency budget in the product. Batching that into one `DISTINCT ON` and
+   filtering on the real episode is written up in `TonightService`.
+3. Introduce candidate source.
+4. Wider-catalogue candidate generation.
+5. Populate `tasteMatch` in production.
+6. Connect Pilot Season to discovery.
+7. Specific no-route explanations.
+
+**Still not stored, deliberately: pace.** A position says where somebody is and
+nothing about how fast they got there. Plot Armour may say "at your configured
+three hours a week you would finish before 19 August" and must never say "at your
+current pace" — that needs completion events over time, which is a second table
+and a later decision.
 
 **P2 — validate the personalisation.** Shorten Pilot onboarding; run taste in
 shadow; gather acceptance and completion by source; build ranker v2; fresh

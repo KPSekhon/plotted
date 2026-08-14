@@ -4,9 +4,12 @@ import app.plotted.catalogue.domain.IngestedSeason
 import app.plotted.generated.jooq.tables.references.EPISODES
 import app.plotted.generated.jooq.tables.references.SEASONS
 import app.plotted.generated.jooq.tables.references.SERIES
+import org.jooq.Condition
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 import java.util.UUID
 
 @Repository
@@ -148,4 +151,96 @@ class SeasonRepository(
         .join(SEASONS).on(SEASONS.ID.eq(EPISODES.SEASON_ID))
         .where(SEASONS.SERIES_TITLE_ID.eq(seriesTitleId))
         .fetchOne(0, Int::class.java) ?: 0
+
+    fun episodeExists(seriesTitleId: UUID, seasonNumber: Int, episodeNumber: Int): Boolean = dsl.fetchExists(
+        dsl.selectOne()
+            .from(EPISODES)
+            .join(SEASONS).on(SEASONS.ID.eq(EPISODES.SEASON_ID))
+            .where(SEASONS.SERIES_TITLE_ID.eq(seriesTitleId))
+            .and(SEASONS.SEASON_NUMBER.eq(seasonNumber))
+            .and(EPISODES.EPISODE_NUMBER.eq(episodeNumber)),
+    )
+
+    /**
+     * The first episode of the main run after a position, or the first of all
+     * when [afterSeason] is null.
+     *
+     * Ordered by season then episode, which is the order somebody watches in
+     * rather than the order the rows happen to come back in.
+     */
+    fun nextEpisode(seriesTitleId: UUID, afterSeason: Int?, afterEpisode: Int?, today: LocalDate): NextEpisode? = dsl
+        .select(EPISODES.ID, SEASONS.SEASON_NUMBER, EPISODES.EPISODE_NUMBER, EPISODES.NAME, EPISODES.RUNTIME_MINUTES)
+        .from(EPISODES)
+        .join(SEASONS).on(SEASONS.ID.eq(EPISODES.SEASON_ID))
+        .where(SEASONS.SERIES_TITLE_ID.eq(seriesTitleId))
+        .and(mainRunAfter(afterSeason, afterEpisode))
+        .and(hasAired(today))
+        .orderBy(SEASONS.SEASON_NUMBER.asc(), EPISODES.EPISODE_NUMBER.asc())
+        .limit(1)
+        .fetchOne()
+        ?.let {
+            NextEpisode(
+                episodeId = it[EPISODES.ID]!!,
+                seasonNumber = it[SEASONS.SEASON_NUMBER]!!,
+                episodeNumber = it[EPISODES.EPISODE_NUMBER]!!,
+                name = it[EPISODES.NAME],
+                runtimeMinutes = it[EPISODES.RUNTIME_MINUTES],
+            )
+        }
+
+    /**
+     * What is left after a position: how many aired episodes, and how long.
+     *
+     * The runtime sum skips episodes with no runtime rather than substituting an
+     * average, while the count does not -- so "9 episodes, 3 h 12 m" can mean
+     * nine episodes of which seven are measured. That is the honest pair.
+     * Inventing runtimes here would put a made-up number into a sentence about
+     * whether somebody can finish before a removal date.
+     */
+    fun remaining(seriesTitleId: UUID, afterSeason: Int?, afterEpisode: Int?, today: LocalDate): RemainingEpisodes = dsl
+        .select(DSL.count(), DSL.sum(EPISODES.RUNTIME_MINUTES))
+        .from(EPISODES)
+        .join(SEASONS).on(SEASONS.ID.eq(EPISODES.SEASON_ID))
+        .where(SEASONS.SERIES_TITLE_ID.eq(seriesTitleId))
+        .and(mainRunAfter(afterSeason, afterEpisode))
+        .and(hasAired(today))
+        .fetchOne()
+        ?.let { RemainingEpisodes(episodes = it.value1(), minutes = it.value2()?.toInt()) }
+        ?: RemainingEpisodes(0, null)
+
+    /**
+     * Strictly after (season, episode) in watch order, and never a special.
+     *
+     * Season 0 is where TMDB files specials, excluded for the same reason
+     * [recalculateTotalRuntime] excludes it: somebody's place in the story is not
+     * the Christmas episode. Written as the lexicographic comparison it actually
+     * is -- a later season, or the same season and a later episode.
+     */
+    private fun mainRunAfter(afterSeason: Int?, afterEpisode: Int?): Condition {
+        val mainRun = SEASONS.SEASON_NUMBER.gt(0)
+        if (afterSeason == null || afterEpisode == null) return mainRun
+        return mainRun.and(
+            SEASONS.SEASON_NUMBER.gt(afterSeason)
+                .or(SEASONS.SEASON_NUMBER.eq(afterSeason).and(EPISODES.EPISODE_NUMBER.gt(afterEpisode))),
+        )
+    }
+
+    /**
+     * Aired, or undated.
+     *
+     * A null air date is a gap in Plotted's data rather than evidence that an
+     * episode is unreleased, and treating it as unreleased would hide most older
+     * series from "what is next" entirely.
+     */
+    private fun hasAired(today: LocalDate): Condition = EPISODES.AIR_DATE.isNull.or(EPISODES.AIR_DATE.le(today))
+
+    data class NextEpisode(
+        val episodeId: UUID,
+        val seasonNumber: Int,
+        val episodeNumber: Int,
+        val name: String?,
+        val runtimeMinutes: Int?,
+    )
+
+    data class RemainingEpisodes(val episodes: Int, val minutes: Int?)
 }

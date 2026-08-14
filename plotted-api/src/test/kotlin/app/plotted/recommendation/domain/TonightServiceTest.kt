@@ -8,12 +8,14 @@ import app.plotted.platform.spi.WatchlistDirectory
 import app.plotted.recommendation.persistence.RecommendationLogRepository
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
@@ -266,6 +268,66 @@ class TonightServiceTest {
 
     // --- fixtures ---------------------------------------------------------
 
+    /**
+     * The point of the whole progress feature, at the level the user sees it.
+     *
+     * "Chainsaw Man, about 24 minutes an episode" leaves somebody to open
+     * another app and work out where they were. "S1 E8" does not.
+     */
+    @Test
+    fun `a series pick names the episode to actually put on`() {
+        givenTheLogAccepts()
+        val chainsawMan = UUID.randomUUID()
+
+        every { watchlists.outstandingItems(userId) } returns listOf(entry(chainsawMan))
+        every { watchlists.blockedTitleIds(userId) } returns emptySet()
+        every { subscriptions.activeProviderIds(userId) } returns setOf(crave)
+        every { titles.findSummaries(any()) } returns
+            listOf(summary(chainsawMan, "Chainsaw Man", 288, mediaType = "series", sessionMinutes = 24))
+        every { availability.subscriptionCoverage(any(), "CA") } returns coverage(chainsawMan to crave)
+        every { watchlists.seriesProgress(userId, listOf(chainsawMan)) } returns mapOf(
+            chainsawMan to WatchlistDirectory.NextUp(
+                episodeId = UUID.randomUUID(),
+                seasonNumber = 1,
+                episodeNumber = 8,
+                name = "Gun Devil",
+                runtimeMinutes = 24,
+                started = true,
+                remainingEpisodes = 5,
+            ),
+        )
+
+        val served = service().recommend(userId, request(availableMinutes = 45)).recommendation
+            .shouldBeInstanceOf<Recommendation.Served>()
+
+        val next = served.picks.single().candidate.nextUp.shouldNotBeNull()
+        next.seasonNumber shouldBe 1
+        next.episodeNumber shouldBe 8
+    }
+
+    /**
+     * Resolution happens after ranking, for the picks only, so a film must not
+     * trigger the lookup at all. This is the assertion that keeps an N+1 off the
+     * endpoint with the tightest latency budget in the product.
+     */
+    @Test
+    fun `a film pick asks nothing about episodes`() {
+        givenTheLogAccepts()
+        val film = UUID.randomUUID()
+
+        every { watchlists.outstandingItems(userId) } returns listOf(entry(film))
+        every { watchlists.blockedTitleIds(userId) } returns emptySet()
+        every { subscriptions.activeProviderIds(userId) } returns setOf(crave)
+        every { titles.findSummaries(any()) } returns listOf(summary(film, "A Film", 100))
+        every { availability.subscriptionCoverage(any(), "CA") } returns coverage(film to crave)
+
+        val served = service().recommend(userId, request()).recommendation
+            .shouldBeInstanceOf<Recommendation.Served>()
+
+        served.picks.single().candidate.nextUp.shouldBeNull()
+        verify(exactly = 0) { watchlists.seriesProgress(any(), any()) }
+    }
+
     private fun givenTheLogAccepts(): UUID {
         val requestId = UUID.randomUUID()
         every { log.record(any(), any(), any(), any(), any()) } returns requestId
@@ -283,14 +345,20 @@ class TonightServiceTest {
         desiredByDate = null,
     )
 
-    private fun summary(titleId: UUID, name: String, watchMinutes: Int?) = TitleDirectory.TitleSummary(
+    private fun summary(
+        titleId: UUID,
+        name: String,
+        watchMinutes: Int?,
+        mediaType: String = "movie",
+        sessionMinutes: Int? = watchMinutes,
+    ) = TitleDirectory.TitleSummary(
         titleId = titleId,
-        mediaType = "movie",
+        mediaType = mediaType,
         name = name,
         releaseYear = 2024,
         posterUrl = null,
         watchMinutes = watchMinutes,
-        sessionMinutes = watchMinutes,
+        sessionMinutes = sessionMinutes,
         communityRating = 7.5,
     )
 

@@ -101,6 +101,14 @@ data class PickResponse(
     val sessionMinutes: Int?,
     @Schema(description = "True when sessionMinutes describes an episode rather than the whole title.")
     val perEpisode: Boolean,
+    @Schema(
+        description =
+        "Which episode this actually is, for a series whose episodes the catalogue holds. Null " +
+            "for a film, and for a series with nothing stored. When present its runtime is that " +
+            "episode's own, which can differ from sessionMinutes -- the latter is the typical " +
+            "episode the time budget was measured against.",
+    )
+    val nextEpisode: NextEpisodeRef?,
     @Schema(description = "Where it can be watched, under the access policy that was applied.")
     val availableOn: List<String>,
     @Schema(description = "0 to 1, after renormalising over the features this title actually has.")
@@ -128,6 +136,16 @@ data class PickResponse(
             watchMinutes = pick.candidate.watchMinutes,
             sessionMinutes = pick.candidate.sessionMinutes,
             perEpisode = pick.candidate.mediaType != "movie",
+            nextEpisode = pick.candidate.nextUp?.let {
+                NextEpisodeRef(
+                    seasonNumber = it.seasonNumber,
+                    episodeNumber = it.episodeNumber,
+                    name = it.name,
+                    runtimeMinutes = it.runtimeMinutes,
+                    started = it.started,
+                    remainingEpisodes = it.remainingEpisodes,
+                )
+            },
             availableOn = pick.candidate.offers.map { it.providerName }.distinct().sorted(),
             score = pick.score,
             // Only contributions that meaningfully moved the score. A reason
@@ -157,4 +175,22 @@ data class RejectionResponse(
     val reason: String,
     val explanation: String,
     val count: Int,
+)
+
+@Schema(
+    description =
+    "The episode to actually put on. Without this the answer is \"Chainsaw Man, about 24 minutes " +
+        "an episode\", which leaves the user to open another app and work out where they were -- " +
+        "the decision this product exists to remove.",
+)
+data class NextEpisodeRef(
+    val seasonNumber: Int,
+    val episodeNumber: Int,
+    val name: String?,
+    @Schema(description = "This episode's own runtime, or null when upstream never gave one. Never an average.")
+    val runtimeMinutes: Int?,
+    @Schema(description = "False when nothing has been finished yet, so this is episode one rather than a resumption.")
+    val started: Boolean,
+    @Schema(description = "Aired episodes still ahead, including this one.")
+    val remainingEpisodes: Int,
 )

@@ -1,5 +1,6 @@
 package app.plotted.recommendation.domain
 
+import app.plotted.platform.spi.WatchlistDirectory
 import java.time.LocalDate
 import java.util.UUID
 
@@ -53,6 +54,14 @@ data class Candidate(
      * sees rather than what the database holds.
      */
     val tasteMatch: Double? = null,
+    /**
+     * Which episode of a series this pick actually is, when the catalogue knows.
+     *
+     * Null for a film, and for a series with no episodes stored. Attached after
+     * ranking rather than before it -- see `TonightService.recommend` for why the
+     * filter still reads the typical episode.
+     */
+    val nextUp: WatchlistDirectory.NextUp? = null,
 ) {
     data class Offer(
         val providerId: UUID,
