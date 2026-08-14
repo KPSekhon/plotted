@@ -68,3 +68,16 @@ CREATE TABLE user_series_progress (
 
 COMMENT ON TABLE user_series_progress IS
     'The last episode the user finished, per series. Position only -- pace needs completion events over time and is deliberately not stored here.';
+
+-- The primary key is (user_id, series_title_id), which covers lookups by user
+-- because user_id leads it -- and covers nothing at all by series.
+--
+-- That matters for the direction nobody queries in: `ON DELETE CASCADE` on
+-- series_title_id means removing a title makes Postgres find every progress row
+-- pointing at it, and with no index on that column it sequentially scans the
+-- whole table to do it. Rare, and it gets slower exactly as the table grows.
+--
+-- CI asserts this rather than trusting anyone to remember: the migrations job
+-- fails on any foreign key without a covering non-partial index, which is how
+-- this omission was found rather than shipped.
+CREATE INDEX user_series_progress_series_idx ON user_series_progress (series_title_id);
