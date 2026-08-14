@@ -253,7 +253,19 @@ class DemoRepositoryIntegrationTest {
         // A flag that disagrees with the date beside it is a bug the demo would
         // be demonstrating rather than avoiding.
         row.cannotCancel shouldBe true
-        row.actualPrice shouldBe null
+        // Asserted `null` until V18, so the persona paid the plan's cited figure
+        // rather than a made-up personal rate. Right while every price was
+        // equally trusted; wrong afterwards, because the optimiser now spends
+        // only prices somebody confirmed, and a null here leaves the demo's
+        // services priced REFERENCE and Cancel Culture with nothing to say on
+        // the one account that exists to demonstrate it.
+        //
+        // Still not an invented number — it is the same researched figure,
+        // copied off the plan. What changed is the claim attached to it, and on
+        // an account whose subscriptions screen says the data was generated, the
+        // persona confirming a fixture price is as legitimate as its fixture
+        // watchlist. Compared by value: the column's scale is not the literal's.
+        row.actualPrice.shouldNotBeNull().compareTo(BigDecimal("18.99")) shouldBe 0
         // Renewal has to be in the future even though the start date is not.
         (row.renewsOn!!.isAfter(LocalDate.now())) shouldBe true
     }
