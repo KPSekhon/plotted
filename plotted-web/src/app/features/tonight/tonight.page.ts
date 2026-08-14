@@ -12,10 +12,13 @@ import { messageFrom } from '../../core/error/problem-detail';
 import {
   ACCESS_POLICY_LABELS,
   AccessPolicy,
+  NextEpisodeRef,
   Pick,
   TonightResponse,
 } from '../../core/tonight/tonight.models';
 import { TonightService } from '../../core/tonight/tonight.service';
+import { SeriesProgress } from '../../core/watchlist/watchlist.models';
+import { WatchlistService } from '../../core/watchlist/watchlist.service';
 import { ContributionPlotComponent } from '../../shared/map/contribution-plot.component';
 import { PlottedIconComponent } from '../../shared/map/plotted-icon.component';
 import { PlottedXComponent } from '../../shared/map/plotted-x.component';
@@ -185,7 +188,7 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
                      out where you were; this does not. The started flag
                      separates resuming from beginning, because "Start with
                      S1 E1" and "You are up to S1 E8" are different sentences. -->
-                @if (pick.nextEpisode; as next) {
+                @if (episodeFor(pick); as next) {
                   <p class="next-episode">
                     <span class="next-episode__label coordinates">
                       {{ next.started ? 'You are up to' : 'Start with' }}
@@ -197,6 +200,30 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
                       <span class="next-episode__name">{{ next.name }}</span>
                     }
                   </p>
+
+                  <!-- One meaning only: this episode is finished, advance by
+                       one. The card updates in place, so the answer to "what
+                       now" is already on screen rather than a reload away.
+                       Undo because a mis-tap here silently moves somebody's
+                       place in a story, which is expensive to notice and
+                       annoying to repair by hand. -->
+                  @if (justWatched()[pick.titleId]; as previous) {
+                    <p class="watched-undo">
+                      <span>Marked S{{ previous.seasonNumber }} E{{ previous.episodeNumber }} watched.</span>
+                      <button type="button" class="link-button" (click)="undoWatched(pick.titleId)">
+                        Undo
+                      </button>
+                    </p>
+                  } @else {
+                    <button
+                      type="button"
+                      class="watched"
+                      [disabled]="markingWatched() === pick.titleId"
+                      (click)="markWatched(pick.titleId, next)"
+                    >
+                      Watched it &#10003;
+                    </button>
+                  }
                 }
 
                 <dl class="vitals coordinates">
@@ -218,11 +245,11 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
                        same. -->
                   @if (episodeMinutes(pick); as minutes) {
                     <div>
-                      <dt>{{ pick.nextEpisode ? 'This episode' : pick.perEpisode ? 'Per episode' : 'Runtime' }}</dt>
+                      <dt>{{ episodeFor(pick) ? 'This episode' : pick.perEpisode ? 'Per episode' : 'Runtime' }}</dt>
                       <dd class="readout">{{ formatMinutes(minutes) }}</dd>
                     </div>
                   }
-                  @if (pick.nextEpisode; as next) {
+                  @if (episodeFor(pick); as next) {
                     <div>
                       <dt>Left</dt>
                       <dd class="readout">
@@ -309,7 +336,7 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
                       <span>{{ pick.mediaType === 'movie' ? 'Film' : 'Series' }}</span>
                       @if (pick.sessionMinutes) {
                         <span class="readout">
-                          @if (pick.nextEpisode; as next) {
+                          @if (episodeFor(pick); as next) {
                             S{{ next.seasonNumber }} E{{ next.episodeNumber }} &middot;
                           }
                           {{ formatMinutes(episodeMinutes(pick) ?? pick.sessionMinutes) }}{{ pick.nextEpisode ? '' : pick.perEpisode ? '/ep' : '' }}
@@ -539,6 +566,56 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
       min-width: 0;
     }
 
+    // Quiet and secondary to "This is the one". Accepting a recommendation and
+    // finishing an episode are different decisions, and the primary action on
+    // this card is still the first one.
+    .watched {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin: 0 0 0.75rem;
+      padding: 0.25rem 0.6rem;
+      border: 1px solid var(--plotted-border);
+      border-radius: 999px;
+      background: none;
+      color: var(--plotted-text-muted);
+      font: inherit;
+      font-size: 0.8125rem;
+      cursor: pointer;
+      transition: color 0.12s ease, border-color 0.12s ease;
+
+      &:hover:not(:disabled) {
+        color: var(--plotted-text);
+        border-color: var(--plotted-border-strong);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+    }
+
+    .watched-undo {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin: 0 0 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--plotted-text-muted);
+    }
+
+    .link-button {
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--plotted-accent);
+      font: inherit;
+      font-size: inherit;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
     .vitals {
       display: flex;
       flex-wrap: wrap;
@@ -693,6 +770,7 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
 })
 export class TonightPage {
   private readonly tonight = inject(TonightService);
+  private readonly watchlist = inject(WatchlistService);
 
   protected readonly result = signal<TonightResponse | null>(null);
   protected readonly loading = signal(false);
@@ -701,6 +779,15 @@ export class TonightPage {
   /** The title accepted from the current answer, or null. One decision per set of picks. */
   protected readonly accepted = signal<string | null>(null);
   protected readonly accepting = signal(false);
+
+  /** Which title is mid-request, so one card's spinner does not disable the rest. */
+  protected readonly markingWatched = signal<string | null>(null);
+
+  /** What was marked this session, keyed by title, so undo knows what to restore. */
+  protected readonly justWatched = signal<Record<string, NextEpisodeRef>>({});
+
+  /** Where each card has moved to since the answer was fetched. */
+  protected readonly advanced = signal<Record<string, NextEpisodeRef | null>>({});
 
   protected readonly policies: readonly AccessPolicy[] = [
     'active_subscriptions_only',
@@ -745,7 +832,20 @@ export class TonightPage {
    * one of them is about tonight.
    */
   protected episodeMinutes(pick: Pick): number | null {
-    return pick.nextEpisode?.runtimeMinutes ?? pick.sessionMinutes;
+    return this.episodeFor(pick)?.runtimeMinutes ?? pick.sessionMinutes;
+  }
+
+  /**
+   * The episode this card is currently offering.
+   *
+   * Overlaid with anything marked watched during this session, so pressing
+   * "Watched it" advances the card immediately rather than after a refetch. The
+   * server is still the source of truth -- this is what it just returned, held
+   * locally so the screen and the database do not disagree while a round trip is
+   * in flight.
+   */
+  protected episodeFor(pick: Pick): NextEpisodeRef | null {
+    return this.advanced()[pick.titleId] ?? pick.nextEpisode;
   }
 
   protected formatMinutes(minutes: number): string {
@@ -785,6 +885,87 @@ export class TonightPage {
    * have that somebody agreed, and marking it locally when the server did not
    * record it would put a gap in the one measurement that matters.
    */
+  /**
+   * Marks the offered episode finished and moves the card to the next one.
+   *
+   * Deliberately one meaning. It does not accept the recommendation, and it does
+   * not mark the series complete -- both are separate decisions with their own
+   * controls, and a button that quietly does more than it says is how somebody
+   * loses their place in a story.
+   */
+  protected markWatched(titleId: string, episode: NextEpisodeRef): void {
+    this.markingWatched.set(titleId);
+    this.error.set(null);
+    this.watchlist.recordProgress(titleId, episode.seasonNumber, episode.episodeNumber).subscribe({
+      next: (progress) => {
+        this.justWatched.update((all) => ({ ...all, [titleId]: episode }));
+        this.advanced.update((all) => ({ ...all, [titleId]: this.toRef(progress) }));
+        this.markingWatched.set(null);
+      },
+      error: (failure: unknown) => {
+        this.error.set(messageFrom(failure));
+        this.markingWatched.set(null);
+      },
+    });
+  }
+
+  /**
+   * Puts the marker back where it was.
+   *
+   * Restores the *previous* position rather than deleting progress: the episode
+   * before the one that was just marked. Clearing outright would send somebody
+   * who mis-tapped on episode 40 back to episode one, which is a far worse
+   * outcome than the mistake being undone.
+   */
+  protected undoWatched(titleId: string): void {
+    const marked = this.justWatched()[titleId];
+    if (!marked) return;
+
+    this.markingWatched.set(titleId);
+    const restore =
+      marked.episodeNumber > 1
+        ? this.watchlist.recordProgress(titleId, marked.seasonNumber, marked.episodeNumber - 1)
+        : // The first episode of a season has no earlier episode in it, and the
+          // previous season's length is not known here. Clearing is correct for
+          // S1 E1 and is the honest approximation elsewhere; the title page's
+          // picker is the precise repair.
+          this.watchlist.clearProgress(titleId);
+
+    restore.subscribe({
+      next: (progress) => {
+        this.justWatched.update((all) => {
+          const rest = { ...all };
+          delete rest[titleId];
+          return rest;
+        });
+        this.advanced.update((all) => ({ ...all, [titleId]: this.toRef(progress) }));
+        this.markingWatched.set(null);
+      },
+      error: (failure: unknown) => {
+        this.error.set(messageFrom(failure));
+        this.markingWatched.set(null);
+      },
+    });
+  }
+
+  private toRef(progress: SeriesProgress): NextEpisodeRef | null {
+    const next = progress.next;
+    if (!next) return null;
+    return {
+      seasonNumber: next.seasonNumber,
+      episodeNumber: next.episodeNumber,
+      name: next.name,
+      runtimeMinutes: next.runtimeMinutes,
+      // `!= null`, not `!== null`. The API omits the field rather than sending
+      // an explicit null, so it arrives as `undefined` -- and `undefined !== null`
+      // is true, which made undo on episode one report "You are up to S1 E1"
+      // when the correct answer is "Start with S1 E1". The type says
+      // `EpisodeRef | null`; the wire says absent. Loose equality covers both.
+      started: progress.lastCompleted != null,
+      remainingEpisodes: progress.remaining.episodes,
+    };
+  }
+
   protected accept(requestId: string, titleId: string): void {
     this.accepting.set(true);
     this.error.set(null);

@@ -79,11 +79,13 @@ selling.
    id — the next-episode query is positional anyway, and a position survives the
    catalogue changing underneath it.
 2. ~~Resolve a series recommendation to an actual episode.~~ *Done 2026-08-14.*
-   Tonight says *One Piece, S2 E62, 25 min* rather than *~25 min an episode*.
-   **Owed:** the runtime filter still reads the series' typical episode, because
-   resolving every candidate before filtering would be an N+1 on the tightest
-   latency budget in the product. Batching that into one `DISTINCT ON` and
-   filtering on the real episode is written up in `TonightService`.
+   Tonight says *One Piece, S2 E62, 25 min* rather than *~25 min an episode*,
+   and **the runtime filter now reads that episode's own runtime** — resolved for
+   every candidate before screening, batched with `DISTINCT ON` so it costs a
+   fixed number of queries rather than one per series. A 45-minute window can no
+   longer admit a 61-minute finale on a 25-minute average.
+   *The UI to record progress landed 2026-08-14 as well: "Watched it" with undo
+   on the Tonight card, and a season/episode picker on the title page.*
 3. Introduce candidate source.
 4. Wider-catalogue candidate generation.
 5. Populate `tasteMatch` in production.

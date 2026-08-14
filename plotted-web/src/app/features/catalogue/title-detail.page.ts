@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -9,6 +10,7 @@ import { Availability, Title } from '../../core/catalogue/catalogue.models';
 import { CatalogueService } from '../../core/catalogue/catalogue.service';
 import { messageFrom } from '../../core/error/problem-detail';
 import { UserSettingsService } from '../../core/user/user-settings.service';
+import { SeriesProgress } from '../../core/watchlist/watchlist.models';
 import { WatchlistService } from '../../core/watchlist/watchlist.service';
 import { RuntimeRouteComponent } from '../../shared/map/runtime-route.component';
 import { AvailabilityPanelComponent } from './availability-panel.component';
@@ -25,6 +27,7 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
   standalone: true,
   imports: [
     DatePipe,
+    FormsModule,
     RouterLink,
     MatButtonModule,
     MatIconModule,
@@ -97,6 +100,57 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
             [isSeries]="loaded.mediaType === 'series'"
             [availableMinutes]="usualEvening()"
           />
+
+          <!-- Where you are, and the way to correct it. The Tonight card
+               advances by one; this is the repair when that was wrong, or when
+               you watched three episodes somewhere else. Deliberately not a
+               per-episode checklist: Plotted needs one position, and a grid of
+               tick boxes is a progress manager rather than a decision. -->
+          @if (loaded.mediaType === 'series') {
+            <section class="progress" aria-label="Your place in this series">
+              @if (progress(); as place) {
+                <p class="progress__state">
+                  @if (place.caughtUp && place.lastCompleted) {
+                    <span class="coordinates">Completed</span>
+                    <span class="muted">Nothing aired is left.</span>
+                  } @else {
+                    <!-- Nested rather than aliased on the @else if: the block
+                         syntax only binds an "as" alias on a leading @if, and
+                         this file's own header records the same trap. -->
+                    @if (place.next; as next) {
+                      <span class="coordinates">{{ place.lastCompleted ? 'You are here' : 'Not started' }}</span>
+                      <span class="progress__code readout">S{{ next.seasonNumber }} E{{ next.episodeNumber }}</span>
+                      @if (next.name) {
+                        <span class="muted">{{ next.name }}</span>
+                      }
+                      <span class="muted">&middot; {{ place.remaining.episodes }} left</span>
+                    }
+                  }
+                </p>
+
+                <form class="progress__form" (ngSubmit)="saveProgress()">
+                  <label>
+                    <span class="coordinates">Season</span>
+                    <input type="number" min="1" [(ngModel)]="progressSeason" name="progressSeason" />
+                  </label>
+                  <label>
+                    <span class="coordinates">Episode</span>
+                    <input type="number" min="1" [(ngModel)]="progressEpisode" name="progressEpisode" />
+                  </label>
+                  <button type="submit" [disabled]="savingProgress()">Set progress</button>
+                  @if (place.lastCompleted) {
+                    <button type="button" class="link-button" [disabled]="savingProgress()" (click)="resetProgress()">
+                      Not started
+                    </button>
+                  }
+                </form>
+
+                @if (progressError(); as failure) {
+                  <p class="error" role="alert">{{ failure }}</p>
+                }
+              }
+            </section>
+          }
 
           @if (!loaded.watchMinutes) {
             <p class="incomplete-note">
@@ -248,6 +302,74 @@ import { AvailabilityPanelComponent } from './availability-panel.component';
       }
     }
 
+    .progress {
+      margin: 1rem 0 0;
+      padding: 0.85rem 1rem;
+      border: 1px solid var(--plotted-border);
+      border-radius: var(--plotted-radius-sm);
+      background: var(--plotted-surface);
+    }
+
+    .progress__state {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin: 0 0 0.7rem;
+      font-size: 0.9rem;
+    }
+
+    .progress__code {
+      color: var(--plotted-accent);
+      font-weight: 600;
+    }
+
+    .progress__form {
+      display: flex;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        font-size: 0.7rem;
+      }
+
+      input {
+        width: 4.5rem;
+        padding: 0.3rem 0.4rem;
+        border: 1px solid var(--plotted-border);
+        border-radius: 2px;
+        background: var(--plotted-bg);
+        color: var(--plotted-text);
+        font: inherit;
+      }
+
+      button[type='submit'] {
+        padding: 0.35rem 0.75rem;
+        border: 1px solid var(--plotted-border-strong);
+        border-radius: 999px;
+        background: none;
+        color: var(--plotted-text);
+        font: inherit;
+        font-size: 0.8125rem;
+        cursor: pointer;
+      }
+    }
+
+    .link-button {
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--plotted-accent);
+      font: inherit;
+      font-size: 0.8125rem;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
     .incomplete-note {
       display: flex;
       gap: 0.4rem;
@@ -316,6 +438,12 @@ export class TitleDetailPage implements OnInit {
    * screen that the user never set and would then read as their own.
    */
   protected readonly usualEvening = signal<number | null>(null);
+
+  protected readonly progress = signal<SeriesProgress | null>(null);
+  protected readonly savingProgress = signal(false);
+  protected readonly progressError = signal<string | null>(null);
+  protected progressSeason: number | null = null;
+  protected progressEpisode: number | null = null;
 
   protected readonly onList = signal(false);
   protected readonly adding = signal(false);
@@ -401,6 +529,18 @@ export class TitleDetailPage implements OnInit {
       error: () => this.availabilityError.set(true),
     });
 
+    // Series progress, loaded independently and failing silently like the
+    // others: a signed-out visitor gets a 401, and a film has no progress to
+    // show. Neither is worth an error banner on a page about a title.
+    this.watchlists.progress(this.titleId()).subscribe({
+      next: (place) => {
+        this.progress.set(place);
+        this.progressSeason = place.lastCompleted?.seasonNumber ?? place.next?.seasonNumber ?? 1;
+        this.progressEpisode = place.lastCompleted?.episodeNumber ?? null;
+      },
+      error: () => this.progress.set(null),
+    });
+
     this.watchlists.blocked().subscribe({
       next: (blocked) => this.blocked.set(blocked.blocked.some((it) => it.titleId === this.titleId())),
       // A signed-out visitor gets a 401 here. Leaving the control in its
@@ -423,5 +563,53 @@ export class TitleDetailPage implements OnInit {
     const hours = Math.floor(minutes / 60);
     const rest = minutes % 60;
     return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+  }
+
+  /**
+   * Records where they actually are.
+   *
+   * The correction path, as opposed to Tonight's "Watched it", which advances by
+   * one. Somebody who watched four episodes on a plane needs to say so once
+   * rather than press a button four times, and somebody who mis-tapped needs to
+   * put the marker back exactly.
+   */
+  protected saveProgress(): void {
+    const season = this.progressSeason;
+    const episode = this.progressEpisode;
+    if (season === null || episode === null) return;
+
+    this.savingProgress.set(true);
+    this.progressError.set(null);
+    this.watchlists.recordProgress(this.titleId(), season, episode).subscribe({
+      next: (place) => {
+        this.progress.set(place);
+        this.savingProgress.set(false);
+      },
+      error: (failure: unknown) => {
+        // Surfaced rather than swallowed, unlike the initial load: the user just
+        // asked for something specific, and a season that does not exist is a
+        // 400 naming it.
+        this.progressError.set(messageFrom(failure, 'That episode could not be recorded.'));
+        this.savingProgress.set(false);
+      },
+    });
+  }
+
+  /** Back to not started, which is a state rather than an absence of one. */
+  protected resetProgress(): void {
+    this.savingProgress.set(true);
+    this.progressError.set(null);
+    this.watchlists.clearProgress(this.titleId()).subscribe({
+      next: (place) => {
+        this.progress.set(place);
+        this.progressEpisode = null;
+        this.progressSeason = place.next?.seasonNumber ?? 1;
+        this.savingProgress.set(false);
+      },
+      error: (failure: unknown) => {
+        this.progressError.set(messageFrom(failure, 'Progress could not be cleared.'));
+        this.savingProgress.set(false);
+      },
+    });
   }
 }

@@ -306,9 +306,8 @@ class TonightServiceTest {
     }
 
     /**
-     * Resolution happens after ranking, for the picks only, so a film must not
-     * trigger the lookup at all. This is the assertion that keeps an N+1 off the
-     * endpoint with the tightest latency budget in the product.
+     * A watchlist of films must not ask about episodes at all, so the common
+     * case pays nothing for a feature that cannot apply to it.
      */
     @Test
     fun `a film pick asks nothing about episodes`() {
@@ -326,6 +325,95 @@ class TonightServiceTest {
 
         served.picks.single().candidate.nextUp.shouldBeNull()
         verify(exactly = 0) { watchlists.seriesProgress(any(), any()) }
+    }
+
+    /**
+     * No progress for anything, unless a test says otherwise.
+     *
+     * Series candidates now resolve their next episode *before* the filters run,
+     * because the runtime filter has to measure the episode being offered rather
+     * than the series' average. Most tests here are about films and never reach
+     * it; this keeps them from having to know that.
+     */
+    /**
+     * The defect this fix exists for.
+     *
+     * A 25-minute average admitted the series; the episode actually being
+     * offered is a 61-minute finale. Before the filter read the real episode,
+     * this passed the 45-minute window and the card then displayed 61 min --
+     * the right number, arrived at after the decision that should have used it.
+     *
+     * Exactly the shape of the `watchMinutes` defect: a filter measuring
+     * something adjacent to the question it is supposed to answer.
+     */
+    @Test
+    fun `a long episode is refused even when the series average would fit`() {
+        givenTheLogAccepts()
+        val series = UUID.randomUUID()
+
+        every { watchlists.outstandingItems(userId) } returns listOf(entry(series))
+        every { watchlists.blockedTitleIds(userId) } returns emptySet()
+        every { subscriptions.activeProviderIds(userId) } returns setOf(crave)
+        every { titles.findSummaries(any()) } returns
+            listOf(summary(series, "Mostly short", 600, mediaType = "series", sessionMinutes = 25))
+        every { availability.subscriptionCoverage(any(), "CA") } returns coverage(series to crave)
+        every { watchlists.seriesProgress(userId, listOf(series)) } returns mapOf(
+            series to WatchlistDirectory.NextUp(
+                episodeId = UUID.randomUUID(),
+                seasonNumber = 1,
+                episodeNumber = 12,
+                name = "The long one",
+                runtimeMinutes = 61,
+                started = true,
+                remainingEpisodes = 1,
+            ),
+        )
+
+        val nothing = service().recommend(userId, request(availableMinutes = 45)).recommendation
+            .shouldBeInstanceOf<Recommendation.NothingFits>()
+
+        nothing.reasons shouldBe mapOf(Rejection.TOO_LONG to 1)
+    }
+
+    /**
+     * The fallback, pinned in the other direction.
+     *
+     * A series whose next episode has no stored runtime must fall back to the
+     * typical one rather than becoming unrecommendable -- two thirds of the
+     * seeded series catalogue had no episode runtime at all until ingest started
+     * deriving it, and refusing on a gap upstream would hide them all again.
+     */
+    @Test
+    fun `an episode with no runtime falls back to the typical one`() {
+        givenTheLogAccepts()
+        val series = UUID.randomUUID()
+
+        every { watchlists.outstandingItems(userId) } returns listOf(entry(series))
+        every { watchlists.blockedTitleIds(userId) } returns emptySet()
+        every { subscriptions.activeProviderIds(userId) } returns setOf(crave)
+        every { titles.findSummaries(any()) } returns
+            listOf(summary(series, "Unmeasured episode", 600, mediaType = "series", sessionMinutes = 25))
+        every { availability.subscriptionCoverage(any(), "CA") } returns coverage(series to crave)
+        every { watchlists.seriesProgress(userId, listOf(series)) } returns mapOf(
+            series to WatchlistDirectory.NextUp(
+                episodeId = UUID.randomUUID(),
+                seasonNumber = 1,
+                episodeNumber = 3,
+                name = null,
+                runtimeMinutes = null,
+                started = false,
+                remainingEpisodes = 20,
+            ),
+        )
+
+        val served = service().recommend(userId, request(availableMinutes = 45)).recommendation
+            .shouldBeInstanceOf<Recommendation.Served>()
+
+        served.picks.single().candidate.sessionMinutes shouldBe 25
+    }
+
+    private fun givenNoSeriesProgress() {
+        every { watchlists.seriesProgress(any(), any()) } returns emptyMap()
     }
 
     private fun givenTheLogAccepts(): UUID {

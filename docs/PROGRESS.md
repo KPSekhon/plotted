@@ -375,6 +375,74 @@ unaired episodes, the count-versus-minutes asymmetry — is covered by
 
 ---
 
+## 2026-08-14 — the loop closes, and the filter reads the right number
+
+Two gaps from the morning's work, both closed.
+
+### The feature had no way to be used
+
+Progress was storable, resolvable and displayable, and there was **no control
+anywhere in the app to record it**. The One Piece demonstration worked because
+the position was set with `curl`. For a real account every series would have said
+*Start with S1 E1* forever.
+
+"Watched it" now sits beside the named episode on the Tonight card and means one
+thing: this episode is finished, advance by one. The card updates in place, so
+the answer to "what now" is already on screen. Undo restores the *previous*
+position rather than clearing — somebody who mis-taps on episode 40 must not be
+sent back to episode one. The title page carries the correction path: a
+season/episode picker plus a "Not started" reset, for when four episodes were
+watched somewhere else.
+
+Verified in the browser, end to end:
+
+```
+Start with S1 E1 "X"                    ->  Watched it
+You are up to S1 E2 "Multi-Colored Ambush"  ->  Undo
+Start with S1 E1 "X"
+```
+
+### The filter was measuring the average, not the episode
+
+The morning's version resolved the next episode *after* ranking, for the three
+picks, to avoid an N+1. That left the runtime filter reading the series' typical
+episode while the card displayed the real one — a 45-minute evening could be
+offered a 61-minute finale, with the true number shown only after the decision
+that should have used it. The same shape as the `watchMinutes` defect: a filter
+measuring something adjacent to the question.
+
+Resolution now happens in `gather`, before screening, for every series candidate,
+batched into a `DISTINCT ON` over `(series, season, episode)` with a `LEFT JOIN`
+onto `user_series_progress` — so it costs a fixed number of queries regardless of
+watchlist size, and a film-only watchlist pays nothing at all. A series whose
+next episode has no stored runtime falls back to the typical one rather than
+becoming unrecommendable.
+
+Both directions are pinned, and the refusal was watched fail with the fix
+reverted.
+
+### `undefined !== null` is true
+
+Undo on episode one reported *"You are up to S1 E1"* when the answer is *"Start
+with S1 E1"*. The check was `progress.lastCompleted !== null`, and the API had
+sent no `lastCompleted` field at all.
+
+`application.yml` sets `default-property-inclusion: non_null`, project-wide and
+deliberately, so **every** nullable field is omitted rather than serialised as
+null — while every TypeScript model in `plotted-web/src/app/core` declares those
+fields as `X | null`. The declared types have been systematically slightly wrong
+for the life of the frontend; most call sites use truthy checks and never
+noticed. `verify:api` cannot catch it either, because it checks paths and methods
+and never shapes.
+
+Fixed here with `!= null`. The general repair — either serialise nulls explicitly
+or admit `undefined` in the types, plus a rule against strict null comparison on
+API data — is a decision rather than a bug fix and is queued separately.
+
+**310 tests pass locally, 150 skip; 47 frontend.**
+
+---
+
 ## What is still open, and how to finish it
 
 Read this first if you are picking the project up. Every item below is either
