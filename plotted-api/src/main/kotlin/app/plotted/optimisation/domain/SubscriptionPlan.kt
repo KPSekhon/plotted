@@ -194,11 +194,23 @@ data class ExcludedDemand(
     val neverChecked: List<ExcludedTitle>,
     /** Only on services with no known price. Guessing the price would put invented money in the objective. */
     val unpricedService: List<ExcludedTitle>,
+    /**
+     * Only on services whose price Plotted researched but nobody confirmed.
+     *
+     * Kept apart from [unpricedService] because the two ask different things of
+     * the user. A missing price is Plotted's problem. A researched one is a
+     * figure that exists, is probably close, and is still not what *this* person
+     * is billed -- legacy rates, bundles, student and promotional pricing all
+     * move it, and all of them move it down, so optimising against list prices
+     * overstates what cancelling would save. One field on the subscriptions
+     * screen closes it, and saying which service is what makes that possible.
+     */
+    val unconfirmedPrice: List<ExcludedTitle>,
 ) {
-    val total: Int get() = freeToWatch.size + neverChecked.size + unpricedService.size
+    val total: Int get() = freeToWatch.size + neverChecked.size + unpricedService.size + unconfirmedPrice.size
 
     companion object {
-        val NONE = ExcludedDemand(emptyList(), emptyList(), emptyList())
+        val NONE = ExcludedDemand(emptyList(), emptyList(), emptyList(), emptyList())
     }
 }
 

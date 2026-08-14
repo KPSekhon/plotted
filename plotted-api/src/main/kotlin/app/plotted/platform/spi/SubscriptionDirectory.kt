@@ -38,6 +38,13 @@ interface SubscriptionDirectory {
      * (see `docs/seed/provider-plans.md`). Where the user has told us what they
      * actually pay, [currentSubscriptions] overrides this — a grandfathered rate
      * is the real number and the optimiser must minimise against it.
+     *
+     * Each plan states its own [PriceProvenance] and callers are expected to
+     * read it. Today every row is `REFERENCE`, so in practice nothing here may
+     * be optimised against at all — which is the point. Returning the price
+     * anyway is deliberate: it is still the right figure to show on a screen and
+     * to pre-fill a form with, and withholding it would push callers towards
+     * inventing one.
      */
     fun availablePlans(regionCode: String): List<Plan>
 
@@ -53,6 +60,13 @@ interface SubscriptionDirectory {
         val monthlyCents: Long,
         /** Months from today during which this cannot be cancelled. Zero when free to cancel. */
         val committedMonths: Int,
+        /**
+         * Where [monthlyCents] came from. Holding a subscription does not make
+         * its price confirmed: the repository reads
+         * `COALESCE(actual_price, provider_plans.price)`, so one the user never
+         * priced quietly adopts the researched list figure.
+         */
+        val priceProvenance: PriceProvenance,
     )
 
     data class Plan(
@@ -60,5 +74,58 @@ interface SubscriptionDirectory {
         val providerName: String,
         val planName: String,
         val monthlyCents: Long,
+        val priceProvenance: PriceProvenance,
     )
+
+    /**
+     * How far a price can be trusted, and therefore what may be done with it.
+     *
+     * A trust boundary rather than a display detail. Cancel Culture turns a
+     * price into a recommendation to cancel a service, so a figure nobody
+     * confirmed becomes financial advice the moment it enters the objective —
+     * and unlike a wrong ranking, a wrong price does not look wrong.
+     *
+     * A published list price is not the same number as somebody's bill. Legacy
+     * rates, student pricing, bundles, promotional periods, annual plans and
+     * family arrangements all move it, and they all move it *down*, so
+     * optimising against list prices systematically overstates what cancelling
+     * would save.
+     */
+    enum class PriceProvenance {
+        /** The user told us what they pay. The best source available. */
+        USER_ENTERED,
+
+        /**
+         * Plotted checked it against a live source, with a date. Nothing
+         * produces this yet — there is no pricing ingestion — and the value
+         * exists so the eventual one has somewhere to land.
+         */
+        VERIFIED,
+
+        /**
+         * Researched from a published source, per `docs/seed/provider-plans.md`.
+         * Fine to display, fine to pre-fill a form with, never to optimise
+         * against.
+         */
+        REFERENCE,
+        ;
+
+        /**
+         * Whether the optimiser may spend this number.
+         *
+         * A property of the provenance rather than a condition at the call
+         * site, so a new value has to answer the question rather than falling
+         * through whichever branch happened to be written last — and the
+         * failure mode of that branch is spending money nobody confirmed.
+         */
+        val mayBeOptimisedAgainst: Boolean get() = this == USER_ENTERED || this == VERIFIED
+
+        companion object {
+            fun fromDb(value: String): PriceProvenance = when (value) {
+                "reference" -> REFERENCE
+                "verified" -> VERIFIED
+                else -> error("Unknown price_provenance '$value'")
+            }
+        }
+    }
 }

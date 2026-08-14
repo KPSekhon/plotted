@@ -54,11 +54,12 @@ Kanwar's decisions, recorded so they are not re-litigated:
 selling.
 
 1. ~~Label the demo's fixture data.~~ *Done 2026-08-08.*
-2. Stop unverified prices reaching Cancel Culture. Three provenance states —
-   user-entered, verified-current, reference — and only the first two may enter
-   the objective. A reference-only price becomes `UNKNOWN` for optimisation and
-   is reported as an exclusion with its reason, beside the three that already
-   are. **Not started.**
+2. ~~Stop unverified prices reaching Cancel Culture.~~ *Done 2026-08-13.*
+   `provider_plans.price_provenance` (V18), three states, and only
+   `USER_ENTERED` and `VERIFIED` reach the objective. A reference-only price
+   makes its service uncostable, and the titles that depend on it are reported
+   under `unconfirmedPrice` — kept apart from `unpricedService` because it is
+   the only exclusion the user can clear themselves.
 3. ~~Fix the auth 500.~~ *Done 2026-08-08, and it was not where it was thought
    to be — see `PROGRESS.md`.*
 4. Isolate CP-SAT from the API JVM. A native solver crash currently takes every

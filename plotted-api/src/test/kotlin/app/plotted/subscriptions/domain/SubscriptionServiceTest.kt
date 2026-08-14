@@ -1,6 +1,7 @@
 package app.plotted.subscriptions.domain
 
 import app.plotted.platform.integration.tmdb.TmdbProperties
+import app.plotted.platform.spi.SubscriptionDirectory
 import app.plotted.subscriptions.persistence.SubscriptionRepository
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -153,6 +154,7 @@ class SubscriptionServiceTest {
         cannotCancel = false,
         commitmentEndsOn = null,
         notes = null,
+        priceProvenance = SubscriptionDirectory.PriceProvenance.USER_ENTERED,
     )
 
     private fun tmdbProperties(): TmdbProperties = mockk<TmdbProperties>().also {

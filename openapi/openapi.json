@@ -2168,7 +2168,7 @@
         "description" : "A streaming service. No price: the user supplies what they pay."
       },
       "ExcludedResponse" : {
-        "required" : [ "freeToWatch", "neverChecked", "unpricedService" ],
+        "required" : [ "freeToWatch", "neverChecked", "unconfirmedPrice", "unpricedService" ],
         "type" : "object",
         "properties" : {
           "freeToWatch" : {
@@ -2188,6 +2188,13 @@
           "unpricedService" : {
             "type" : "array",
             "description" : "Only on services with no established price. Guessing one would put invented money in the objective.",
+            "items" : {
+              "$ref" : "#/components/schemas/ExcludedTitleResponse"
+            }
+          },
+          "unconfirmedPrice" : {
+            "type" : "array",
+            "description" : "Only on services whose price Plotted researched but the user never confirmed. Kept apart from unpricedService because this one closes with a single field: a published list price is not a bill, and optimising against it overstates what cancelling would save.",
             "items" : {
               "$ref" : "#/components/schemas/ExcludedTitleResponse"
             }
@@ -2213,7 +2220,7 @@
             }
           }
         },
-        "description" : "Only on services with no established price. Guessing one would put invented money in the objective."
+        "description" : "A watchlist title the optimiser was not shown, and the services carrying it."
       },
       "MonthResponse" : {
         "required" : [ "month", "monthlyCents", "started", "stopped", "subscribed" ],

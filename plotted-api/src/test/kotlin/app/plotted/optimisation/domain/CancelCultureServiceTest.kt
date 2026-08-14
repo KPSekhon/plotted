@@ -131,6 +131,54 @@ class CancelCultureServiceTest {
         excluded.providerNames shouldContainExactly listOf("Obscure Channel")
     }
 
+    /**
+     * The failure this closes was not a missing price. It was a price that
+     * existed, was researched rather than confirmed, and reached the objective
+     * function looking exactly like one somebody had typed — because the
+     * repository read `COALESCE(actual_price, provider_plans.price)` and nothing
+     * downstream could tell which branch it came from.
+     */
+    @Test
+    fun `a researched price is not spent, and the service it belongs to is named`() {
+        val wanted = titleId()
+        givenHeld()
+        givenPlans(plan(netflix, "Netflix", 1_899, SubscriptionDirectory.PriceProvenance.REFERENCE))
+        givenWatchlist(entry(wanted, priority = 1))
+        givenTitles(wanted to "On Netflix")
+        givenCoverage(wanted to listOf(providerRef(netflix, "Netflix")))
+
+        val report = service.plan(userId, CancelCultureService.PlanOptions.DEFAULT)
+
+        (report.outcome is PlanOutcome.NothingToPlan) shouldBe true
+        // Reported apart from `unpricedService`, because the two ask different
+        // things of the user: one is a gap in Plotted's data, this one closes
+        // with a single field.
+        report.excluded.unpricedService.shouldBeEmpty()
+        val excluded = report.excluded.unconfirmedPrice.single()
+        excluded.name shouldBe "On Netflix"
+        excluded.providerNames shouldContainExactly listOf("Netflix")
+    }
+
+    @Test
+    fun `a held subscription that never had its price confirmed is not spent either`() {
+        val wanted = titleId()
+        // The user holds Netflix but never told Plotted what they pay, so the
+        // repository handed back the researched figure. Holding a service is not
+        // the same as having confirmed its price, and this is the case that
+        // would otherwise slip through, because it looks like a real
+        // subscription all the way down.
+        givenHeld(held(netflix, "Netflix", 1_899, provenance = SubscriptionDirectory.PriceProvenance.REFERENCE))
+        givenPlans(plan(netflix, "Netflix", 1_899, SubscriptionDirectory.PriceProvenance.REFERENCE))
+        givenWatchlist(entry(wanted, priority = 1))
+        givenTitles(wanted to "On Netflix")
+        givenCoverage(wanted to listOf(providerRef(netflix, "Netflix")))
+
+        val report = service.plan(userId, CancelCultureService.PlanOptions.DEFAULT)
+
+        (report.outcome is PlanOutcome.NothingToPlan) shouldBe true
+        report.excluded.unconfirmedPrice.single().name shouldBe "On Netflix"
+    }
+
     @Test
     fun `what the user actually pays beats the researched list price`() {
         val wanted = titleId()
@@ -300,10 +348,24 @@ class CancelCultureServiceTest {
             AvailabilityDirectory.Coverage(byTitle = entries.toMap(), unknownTitleIds = emptySet())
     }
 
-    private fun held(providerId: UUID, name: String, cents: Long, committedMonths: Int = 0) =
-        SubscriptionDirectory.Held(providerId, name, cents, committedMonths)
+    // Default USER_ENTERED, because these fixtures exist to exercise the
+    // optimiser rather than the trust boundary in front of it. The boundary has
+    // its own tests, and they pass REFERENCE explicitly -- a default of
+    // REFERENCE here would silently empty every other case in this file.
+    private fun held(
+        providerId: UUID,
+        name: String,
+        cents: Long,
+        committedMonths: Int = 0,
+        provenance: SubscriptionDirectory.PriceProvenance = SubscriptionDirectory.PriceProvenance.USER_ENTERED,
+    ) = SubscriptionDirectory.Held(providerId, name, cents, committedMonths, provenance)
 
-    private fun plan(providerId: UUID, name: String, cents: Long) = SubscriptionDirectory.Plan(providerId, name, "Standard", cents)
+    private fun plan(
+        providerId: UUID,
+        name: String,
+        cents: Long,
+        provenance: SubscriptionDirectory.PriceProvenance = SubscriptionDirectory.PriceProvenance.USER_ENTERED,
+    ) = SubscriptionDirectory.Plan(providerId, name, "Standard", cents, provenance)
 
     private fun entry(titleId: UUID, priority: Int) = WatchlistDirectory.WatchlistEntry(titleId, priority, desiredByDate = null)
 

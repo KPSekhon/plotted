@@ -72,6 +72,12 @@ export interface Excluded {
   readonly freeToWatch: readonly ExcludedTitle[];
   readonly neverChecked: readonly ExcludedTitle[];
   readonly unpricedService: readonly ExcludedTitle[];
+  /**
+   * On a service Plotted researched a price for, which the user has not
+   * confirmed. Separate from `unpricedService` because it is the only exclusion
+   * the user can clear themselves, in one field.
+   */
+  readonly unconfirmedPrice: readonly ExcludedTitle[];
 }
 
 export interface PlanDiagnosis {

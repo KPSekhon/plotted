@@ -1,5 +1,6 @@
 package app.plotted.subscriptions.domain
 
+import app.plotted.platform.spi.SubscriptionDirectory
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.UUID
@@ -38,6 +39,15 @@ data class Subscription(
     val cannotCancel: Boolean,
     val commitmentEndsOn: LocalDate?,
     val notes: String?,
+    /**
+     * Where [price] came from. `USER_ENTERED` when they typed it, otherwise
+     * whatever the plan row claims -- which today is always `REFERENCE`.
+     *
+     * Carried rather than derived at the point of use, because the fallback to
+     * the plan's list price happens in the repository and every caller
+     * downstream of it saw a bare number with no way to tell the difference.
+     */
+    val priceProvenance: SubscriptionDirectory.PriceProvenance,
 ) {
     /**
      * What this costs per month, for comparing plans billed on different cycles.

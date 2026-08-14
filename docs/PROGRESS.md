@@ -172,6 +172,75 @@ and 44.
 
 ---
 
+## 2026-08-13 — a researched price was reaching the optimiser as a confirmed one
+
+`V11__provider_plan_prices.sql` seeds prices read from published sources and says
+so at length: *researched, not verified*. `docs/seed/provider-plans.md` says it
+too. Both were warnings in comments, and one join undid them.
+
+`SubscriptionRepository` read a held subscription's price as
+`COALESCE(user_subscriptions.actual_price, provider_plans.price)`. So a
+subscription the user never priced silently adopted the researched figure, and
+by the time it reached Cancel Culture's objective function nothing downstream
+could tell which branch it came from. The optimiser minimised real money against
+it and the result was presented as advice.
+
+This is the failure the project keeps naming — invented money producing
+confident, wrong financial advice — except the money was not invented. It was
+*cited*, which is worse, because the citation made it look handled.
+
+**A published list price is not a bill.** Legacy rates, student pricing, bundles,
+promotional periods, annual plans and family arrangements all move it, and every
+one moves it *down*. Optimising against list prices therefore overstates what
+cancelling would save, in the direction that flatters the advice.
+
+`price_provenance` is a column now (V18), and the rule is a property of the
+value rather than a condition at the call site:
+
+| Provenance | Source | Optimised against |
+|---|---|---|
+| `USER_ENTERED` | `actual_price` — they typed it | yes |
+| `VERIFIED` | Checked against a live source, with a date | yes; nothing produces it yet |
+| `REFERENCE` | Researched, per `provider-plans.md` | **no** |
+
+A reference-only service is uncostable, and the titles depending on it come back
+under `excluded.unconfirmedPrice`, kept apart from `unpricedService` because the
+two ask different things: a missing price is Plotted's gap, an unconfirmed one
+closes with a single field. The plan screen says which services and links to the
+form.
+
+**Reference prices are still shown and still pre-fill that form.** Withholding
+them would push somebody towards inventing one.
+
+**The demo needed a decision, and it is not a special case.** Demo subscriptions
+had `actual_price` deliberately null so the persona paid the cited figure — right
+when every price was equally trusted, wrong afterwards, because it left the demo
+account's services `REFERENCE` and Cancel Culture with nothing to say on the
+account that exists to demonstrate it. They now carry `actual_price` copied from
+the plan's own researched figure: the same cited number, and the persona
+confirming a fixture price is exactly as legitimate as its fixture watchlist. The
+subscriptions screen already says the data was generated.
+
+**Both new tests were watched fail first.** With `mayBeOptimisedAgainst` forced
+to `true`, exactly the two new cases fail and the other nineteen pass. The second
+is the one that would have slipped through: a *held* subscription that never had
+its price confirmed looks like a real subscription all the way down.
+
+**And regenerating the document turned up a springdoc wart.** Every field of
+`ExcludedResponse` is a `List<ExcludedTitleResponse>`, and springdoc applies a
+collection property's `@Schema(description = …)` to the *item* type rather than
+the array — so the published schema described `ExcludedTitleResponse` as "Only on
+services with no established price", one bucket's reason standing in for the
+shape all four share. A milder relative of the `CoveredTitleResponse` collision:
+the document was internally consistent and matched itself, so the drift check had
+nothing to object to. Fixed with a class-level description.
+
+**299 API tests pass locally**, 47 frontend. `/api/v1/plan` was not exercised
+end to end here and could not be — CP-SAT still takes the JVM down on this
+machine — so the boundary is verified at the service level and by CI.
+
+---
+
 ## What is still open, and how to finish it
 
 Read this first if you are picking the project up. Every item below is either

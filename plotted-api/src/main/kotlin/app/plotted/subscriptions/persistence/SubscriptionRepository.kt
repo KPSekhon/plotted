@@ -3,6 +3,7 @@ package app.plotted.subscriptions.persistence
 import app.plotted.generated.jooq.tables.references.PROVIDERS
 import app.plotted.generated.jooq.tables.references.PROVIDER_PLANS
 import app.plotted.generated.jooq.tables.references.USER_SUBSCRIPTIONS
+import app.plotted.platform.spi.SubscriptionDirectory
 import app.plotted.subscriptions.domain.BillingPeriod
 import app.plotted.subscriptions.domain.Subscription
 import app.plotted.subscriptions.domain.SubscriptionStatus
@@ -227,6 +228,7 @@ class SubscriptionRepository(
         PROVIDER_PLANS.NAME,
         PROVIDER_PLANS.BILLING_PERIOD,
         PROVIDER_PLANS.PRICE,
+        PROVIDER_PLANS.PRICE_PROVENANCE,
     )
         .from(PROVIDER_PLANS)
         .join(PROVIDERS).on(PROVIDERS.ID.eq(PROVIDER_PLANS.PROVIDER_ID))
@@ -241,6 +243,7 @@ class SubscriptionRepository(
                 planName = it[PROVIDER_PLANS.NAME]!!,
                 billingPeriod = BillingPeriod.fromDb(it[PROVIDER_PLANS.BILLING_PERIOD]!!),
                 price = it[PROVIDER_PLANS.PRICE]!!,
+                priceProvenance = SubscriptionDirectory.PriceProvenance.fromDb(it[PROVIDER_PLANS.PRICE_PROVENANCE]!!),
             )
         }
 
@@ -250,6 +253,7 @@ class SubscriptionRepository(
         val planName: String,
         val billingPeriod: BillingPeriod,
         val price: BigDecimal,
+        val priceProvenance: SubscriptionDirectory.PriceProvenance,
     ) {
         /** Normalised so plans on different cycles are comparable. */
         val monthlyCents: Long get() = billingPeriod.toMonthly(price).movePointRight(2).toLong()
@@ -272,6 +276,14 @@ class SubscriptionRepository(
         // rate or a bundle discount is what they actually pay, and that is the
         // number the optimiser has to minimise.
         price = record[USER_SUBSCRIPTIONS.ACTUAL_PRICE] ?: record[PROVIDER_PLANS.PRICE]!!,
+        // The fallback above is exactly where a researched figure used to become
+        // indistinguishable from a confirmed one. Recording which branch was
+        // taken is what lets the optimiser refuse the second.
+        priceProvenance = if (record[USER_SUBSCRIPTIONS.ACTUAL_PRICE] != null) {
+            SubscriptionDirectory.PriceProvenance.USER_ENTERED
+        } else {
+            SubscriptionDirectory.PriceProvenance.fromDb(record[PROVIDER_PLANS.PRICE_PROVENANCE]!!)
+        },
         currency = record[USER_SUBSCRIPTIONS.CURRENCY]!!.trim(),
         status = SubscriptionStatus.fromDb(record[USER_SUBSCRIPTIONS.STATUS]!!),
         startedOn = record[USER_SUBSCRIPTIONS.STARTED_ON]!!,

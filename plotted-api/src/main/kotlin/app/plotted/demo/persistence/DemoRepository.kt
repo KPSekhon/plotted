@@ -206,10 +206,27 @@ class DemoRepository(
                 commitmentEndsOn != null && commitmentEndsOn.isAfter(LocalDate.now(clock)),
             )
             .set(USER_SUBSCRIPTIONS.AUTO_RENEWS, true)
-            // Deliberately null: the persona pays the researched list price
-            // rather than a made-up personal rate. An invented actual_price
-            // would override a cited figure with an uncited one.
-            .set(USER_SUBSCRIPTIONS.ACTUAL_PRICE, null as BigDecimal?)
+            // Set to the plan's own researched price rather than left null.
+            //
+            // This used to be null so the persona paid the cited figure rather
+            // than a made-up personal rate, which was right while every price
+            // was equally trusted. It is not right now: since V18 the optimiser
+            // only spends prices somebody confirmed, and a null here leaves the
+            // demo's services priced REFERENCE, excluded from the model, and
+            // Cancel Culture with nothing to say on the account that exists to
+            // demonstrate it.
+            //
+            // The number is not invented -- it is the same researched figure,
+            // copied. What changes is the claim: on a synthetic account the
+            // persona confirming a fixture price is exactly as legitimate as
+            // the rest of the fixture, and the subscriptions screen says in so
+            // many words that this data was generated.
+            .set(
+                USER_SUBSCRIPTIONS.ACTUAL_PRICE,
+                DSL.field(
+                    dsl.select(PROVIDER_PLANS.PRICE).from(PROVIDER_PLANS).where(PROVIDER_PLANS.ID.eq(planId)),
+                ),
+            )
             .set(USER_SUBSCRIPTIONS.CREATED_AT, now)
             .set(USER_SUBSCRIPTIONS.UPDATED_AT, now)
             .execute()

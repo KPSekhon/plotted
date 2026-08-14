@@ -66,6 +66,43 @@ Save your inserts to `docs/seed/provider-plans.local.sql`. That path is
 git-ignored: prices are point-in-time facts about a market, and a stale committed
 price is worse than no committed price.
 
+## Provenance, and why a researched price is not spent (V18)
+
+Every price in `provider_plans` carries `price_provenance`, and every seeded row
+is `reference`. **The optimiser will not spend a `reference` price.**
+
+That is a stronger rule than the warnings above, and it exists because the
+warnings were not enough. `SubscriptionRepository` read a held subscription's
+price as `COALESCE(user_subscriptions.actual_price, provider_plans.price)`, so a
+subscription the user never priced silently adopted the researched figure and
+reached Cancel Culture's objective function indistinguishable from one they had
+confirmed. This document said "researched, not verified"; the code could not tell.
+
+| Provenance | Where from | May be optimised against |
+|---|---|---|
+| `USER_ENTERED` | `user_subscriptions.actual_price` — they typed it | **Yes** |
+| `VERIFIED` | Checked by Plotted against a live source, with a date | **Yes** — nothing produces it yet |
+| `REFERENCE` | Researched from a published source, per this document | **No** |
+
+A published list price is not a bill. Legacy rates, student pricing, bundles,
+promotional periods, annual plans and family arrangements all move it, and every
+one of them moves it *down* — so optimising against list prices systematically
+overstates what cancelling would save, in the direction that flatters the advice.
+
+Reference prices are still displayed, and still pre-fill the subscription form.
+Withholding them would push somebody towards inventing one, which is worse. What
+changed is that Cancel Culture now names the services it could not cost instead
+of planning around them silently: *"Paramount+ was not considered, because you
+have not told Plotted what you pay for it."*
+
+**The demo account looks like an exception and is not one.** Demo subscriptions
+are created with `actual_price` set to the plan's own researched figure, so the
+persona has confirmed its fixture price the same way it has a fixture watchlist.
+The number is not invented — it is the same cited figure, copied — and the
+subscriptions screen says in so many words that the data was generated. Without
+this, the account that exists to demonstrate Cancel Culture would have nothing to
+demonstrate it with.
+
 ## Providers seeded in V8
 
 | Slug | Type |

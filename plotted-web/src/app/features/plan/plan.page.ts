@@ -332,6 +332,27 @@ import { PlanTransitMapComponent } from './plan-transit-map.component';
               </ul>
             }
 
+            @if (plan.excluded.unconfirmedPrice.length > 0) {
+              <h3>On a service whose price you have not confirmed</h3>
+              <p class="why-excluded">
+                Plotted researched a price for these, but a published price is not
+                your bill &mdash; legacy rates, bundles and promotions all move it,
+                and always downward, so planning against one would overstate what
+                cancelling saves. Enter what you actually pay and these come back in.
+              </p>
+              <ul class="titles">
+                @for (title of plan.excluded.unconfirmedPrice; track title.titleId) {
+                  <li>
+                    <a [routerLink]="['/titles', title.titleId]">{{ title.name }}</a>
+                    <span class="why">on {{ title.providerNames.join(', ') }}</span>
+                  </li>
+                }
+              </ul>
+              <p class="why-excluded">
+                <a routerLink="/subscriptions">Add your prices</a>
+              </p>
+            }
+
             @if (plan.excluded.unpricedService.length > 0) {
               <h3>On a service with no established price</h3>
               <p class="why-excluded">
@@ -768,7 +789,10 @@ export class PlanPage {
     if (!plan) return 0;
     const excluded = plan.excluded;
     return (
-      excluded.freeToWatch.length + excluded.neverChecked.length + excluded.unpricedService.length
+      excluded.freeToWatch.length +
+      excluded.neverChecked.length +
+      excluded.unpricedService.length +
+      excluded.unconfirmedPrice.length
     );
   });
 
