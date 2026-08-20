@@ -84,18 +84,41 @@ class SeriesProgressService(
     }
 
     /**
-     * The same, for many series at once.
+     * The same, for many series at once, in three queries regardless of how many.
      *
-     * Tonight needs this for a whole candidate list, so the positions come back
-     * in one query. The per-series episode lookups are still one each — that is
-     * the honest cost of the ordering, and it is bounded by the number of series
-     * on a shortlist rather than by the catalogue.
+     * Tonight calls this for every series candidate *before* the filters run,
+     * because the runtime filter has to measure the episode being offered rather
+     * than the series' average. A lookup per series would be an N+1 on the
+     * endpoint with the tightest latency budget in the product, so the positions,
+     * the next episodes and the remainders each come back batched.
      */
     @Transactional(readOnly = true)
     fun viewAll(userId: UUID, titleIds: Collection<UUID>): Map<UUID, SeriesView> {
         if (titleIds.isEmpty()) return emptyMap()
         val positions = progress.findAll(userId)
-        return titleIds.associateWith { buildView(it, positions[it]) }
+        val next = progress.nextEpisodes(userId, titleIds)
+        val remaining = progress.remainingFor(userId, titleIds)
+
+        return titleIds.associateWith { titleId ->
+            SeriesView(
+                seriesTitleId = titleId,
+                progress = positions[titleId],
+                next = next[titleId]?.let {
+                    EpisodeDirectory.Episode(
+                        episodeId = it.episodeId,
+                        seasonNumber = it.seasonNumber,
+                        episodeNumber = it.episodeNumber,
+                        name = it.name,
+                        runtimeMinutes = it.runtimeMinutes,
+                    )
+                },
+                // Absent from the aggregate means no rows matched, which is
+                // nothing left rather than unknown.
+                remaining = remaining[titleId]
+                    ?.let { EpisodeDirectory.Remaining(it.episodes, it.minutes) }
+                    ?: EpisodeDirectory.Remaining(0, null),
+            )
+        }
     }
 
     private fun buildView(titleId: UUID, current: SeriesProgress?): SeriesView {

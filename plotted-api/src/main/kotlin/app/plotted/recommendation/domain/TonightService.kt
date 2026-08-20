@@ -98,7 +98,7 @@ class TonightService(
 
         val selected = ranker.diversify(scored, SLOTS)
         val alternatives = scored.filterNot { chosen -> selected.any { it.candidate.titleId == chosen.candidate.titleId } }
-        val picks = withNextEpisode(userId, ranker.explore(selected, alternatives))
+        val picks = ranker.explore(selected, alternatives)
 
         val served = Recommendation.Served(
             picks = picks,
@@ -131,15 +131,40 @@ class TonightService(
         val summaries = titles.findSummaries(titleIds).associateBy { it.titleId }
         val coverage = availability.subscriptionCoverage(titleIds, context.regionCode)
 
+        // Resolved here, before the filters, and batched so it costs a fixed
+        // number of queries rather than one per series.
+        //
+        // It has to happen before screening because the runtime filter is a
+        // promise about *this evening*, and the thing being offered is one
+        // episode rather than the series' average. Doing it afterwards -- which
+        // is how this worked first -- let a 45-minute window admit a series on a
+        // 25-minute average and then show a 61-minute finale on the card. The
+        // number displayed was right and the filter had not used it, which is
+        // the same shape as the `watchMinutes` defect: a filter measuring
+        // something adjacent to the question.
+        val seriesIds = entries.mapNotNull { entry ->
+            entry.titleId.takeIf { summaries[it]?.mediaType == SERIES_MEDIA_TYPE }
+        }
+        // Skipped entirely for a watchlist of films, so the common case pays
+        // nothing at all for a feature that cannot apply to it.
+        val nextUp = if (seriesIds.isEmpty()) emptyMap() else watchlists.seriesProgress(userId, seriesIds)
+
         return entries.mapNotNull { entry ->
             val summary = summaries[entry.titleId] ?: return@mapNotNull null
+            val next = nextUp[entry.titleId]
             Candidate(
                 titleId = entry.titleId,
                 name = summary.name,
                 mediaType = summary.mediaType,
                 posterUrl = summary.posterUrl,
                 watchMinutes = summary.watchMinutes,
-                sessionMinutes = summary.sessionMinutes,
+                // The episode being offered, when it is known, and the typical
+                // one otherwise. A series whose next episode has no stored
+                // runtime falls back rather than becoming unrecommendable --
+                // that would remove two thirds of the series catalogue for a
+                // gap upstream.
+                sessionMinutes = next?.runtimeMinutes ?: summary.sessionMinutes,
+                nextUp = next,
                 priority = entry.priority,
                 desiredByDate = entry.desiredByDate,
                 communityRating = summary.communityRating,
@@ -151,45 +176,6 @@ class TonightService(
                     )
                 },
             )
-        }
-    }
-
-    /**
-     * Names the episode, for the handful of titles actually being shown.
-     *
-     * ### Why this happens after ranking rather than during `gather`
-     *
-     * Resolving "what is next" costs a query per series. Doing it in `gather`
-     * would run it for every outstanding watchlist entry — dozens — before the
-     * filters have thrown most of them away, on the endpoint with the tightest
-     * latency budget in the product (median 15.8 ms). Here it is at most three.
-     *
-     * ### What that costs, stated rather than hidden
-     *
-     * The runtime *filter* upstream still reads the series' typical episode,
-     * because that is the only figure available before this point. So a 45-minute
-     * evening can be offered a series whose next episode is a 61-minute finale.
-     * The card shows that episode's real runtime, so the user sees the true
-     * number rather than the average — but the filter did not use it.
-     *
-     * Closing that properly means resolving the next episode for every candidate
-     * in one batched query and filtering on it, which is a `DISTINCT ON` over a
-     * per-series position and is owed. It is written down here rather than left
-     * to be discovered, because the failure is quiet: a slightly wrong runtime on
-     * a card looks like a rounding difference rather than like a filter reading
-     * the wrong number, which is exactly how the `watchMinutes` defect survived.
-     */
-    private fun withNextEpisode(userId: UUID, picks: List<Pick>): List<Pick> {
-        val series = picks.map { it.candidate }.filter { it.mediaType == SERIES_MEDIA_TYPE }.map { it.titleId }
-        if (series.isEmpty()) return picks
-
-        val nextUp = watchlists.seriesProgress(userId, series)
-        if (nextUp.isEmpty()) return picks
-
-        return picks.map { pick ->
-            nextUp[pick.candidate.titleId]
-                ?.let { pick.copy(candidate = pick.candidate.copy(nextUp = it)) }
-                ?: pick
         }
     }
 
