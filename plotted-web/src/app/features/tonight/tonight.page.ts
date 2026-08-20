@@ -12,6 +12,7 @@ import { messageFrom } from '../../core/error/problem-detail';
 import {
   ACCESS_POLICY_LABELS,
   AccessPolicy,
+  CandidateSource,
   NextEpisodeRef,
   Pick,
   TonightResponse,
@@ -167,6 +168,12 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
               <div class="body">
                 <p class="slot coordinates">
                   Destination
+                  <!-- Says which kind of answer this is. "Continuing" and "on
+                       your list" rank identically and mean different things, and
+                       once discovery proposes titles the user never chose, not
+                       saying so would be the interface passing off a suggestion
+                       as their own decision. -->
+                  <span class="source">&middot; {{ sourceLabel(pick.source) }}</span>
                   @if (pick.exploration) {
                     <!-- Surfaced rather than hidden: a deliberate wildcard
                          should say that it is one. -->
@@ -540,6 +547,11 @@ import { PlottedXComponent } from '../../shared/map/plotted-x.component';
     // Sits directly under the title because it is part of the answer, not a
     // detail about it. Accent on the code alone: orange means the plotted
     // choice, and the episode is the choice once the title is decided.
+    .source {
+      margin-left: 0.35rem;
+      color: var(--plotted-text-faint);
+    }
+
     .next-episode {
       display: flex;
       align-items: baseline;
@@ -831,6 +843,17 @@ export class TonightPage {
    * minutes" and "episodes are usually 24 minutes" are different claims and only
    * one of them is about tonight.
    */
+  protected sourceLabel(source: CandidateSource): string {
+    switch (source) {
+      case 'continuing':
+        return 'Continuing';
+      case 'discovery':
+        return 'Discovered for you';
+      default:
+        return 'On your list';
+    }
+  }
+
   protected episodeMinutes(pick: Pick): number | null {
     return this.episodeFor(pick)?.runtimeMinutes ?? pick.sessionMinutes;
   }

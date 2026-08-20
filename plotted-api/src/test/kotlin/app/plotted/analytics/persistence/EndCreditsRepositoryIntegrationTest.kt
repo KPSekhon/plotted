@@ -6,6 +6,7 @@ import app.plotted.generated.jooq.tables.references.TITLES
 import app.plotted.generated.jooq.tables.references.USERS
 import app.plotted.generated.jooq.tables.references.WATCHLISTS
 import app.plotted.generated.jooq.tables.references.WATCHLIST_ITEMS
+import app.plotted.recommendation.domain.CandidateSource
 import app.plotted.recommendation.persistence.RecommendationLogRepository
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -248,6 +249,12 @@ class EndCreditsRepositoryIntegrationTest {
             .set(RECOMMENDATION_ITEMS.POSITION, 1.toShort())
             .set(RECOMMENDATION_ITEMS.SCORE, BigDecimal("0.80000"))
             .set(RECOMMENDATION_ITEMS.PROPENSITY, BigDecimal("0.9000000"))
+            // Stated, because V20 deliberately gives this column no default: a
+            // writer that can omit the source is a writer that can attribute a
+            // discovered pick to the watchlist without anyone noticing. These
+            // fixtures are about End Credits' arithmetic rather than about
+            // provenance, so watchlist is the honest value for them.
+            .set(RECOMMENDATION_ITEMS.CANDIDATE_SOURCE, CandidateSource.WATCHLIST.dbValue)
             .set(RECOMMENDATION_ITEMS.FEATURE_CONTRIBUTIONS, JSONB.valueOf("{}"))
             .execute()
 

@@ -86,7 +86,12 @@ selling.
    longer admit a 61-minute finale on a 25-minute average.
    *The UI to record progress landed 2026-08-14 as well: "Watched it" with undo
    on the Tonight card, and a season/episode picker on the title page.*
-3. Introduce candidate source.
+3. ~~Introduce candidate source.~~ *Done 2026-08-19.* `candidate_source` on
+   `recommendation_items` (V20), recorded per served item, with two live values
+   from the first decision: `watchlist` and `continuing` (a series already under
+   way). `discovery` exists and nothing produces it yet — which is the point, as
+   the comparison needs a baseline logged before discovery existed. Never read by
+   the ranker, or the measurement would be circular.
 4. Wider-catalogue candidate generation.
 5. Populate `tasteMatch` in production.
 6. Connect Pilot Season to discovery.

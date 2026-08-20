@@ -165,6 +165,12 @@ class TonightService(
                 // gap upstream.
                 sessionMinutes = next?.runtimeMinutes ?: summary.sessionMinutes,
                 nextUp = next,
+                // Two real values from day one rather than a column with one.
+                // A series someone has already begun is a different
+                // recommendation from one they have not, even when the two rank
+                // identically, and pooling them would measure two behaviours as
+                // though they were one.
+                source = if (next?.started == true) CandidateSource.CONTINUING else CandidateSource.WATCHLIST,
                 priority = entry.priority,
                 desiredByDate = entry.desiredByDate,
                 communityRating = summary.communityRating,

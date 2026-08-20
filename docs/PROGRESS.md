@@ -443,6 +443,70 @@ API data — is a decision rather than a bug fix and is queued separately.
 
 ---
 
+## 2026-08-19 — candidate source, and a migration CI could not have caught
+
+### The seed validation finally ran, and its headline was misleading
+
+408 derived ids against TMDB: **0 fail to resolve, 0 are the wrong media type, 0
+films lack a runtime**, and 152 series carry no `episode_run_time`.
+
+The script reported that last figure as one undifferentiated "152 runtime-less"
+count, which reads as a third of the seed being unusable. It is not. TMDB leaves
+`episode_run_time` empty for most shows and `recalculateTotalRuntime` stopped
+depending on it — it derives the typical episode from the episodes it is already
+summing, which took the catalogue from 77 of 260 series with an episode length to
+260 of 260. **Films are the case that would genuinely block**, because there is
+nothing to derive from, and there are none.
+
+The validator splits the two now and says what each means. A number that sends
+somebody to fix data that fixes itself is worse than no number.
+
+### Candidate source, before there is anything to discover
+
+`candidate_source` on `recommendation_items` (V20), written per served item.
+`propensity` is the precedent: a fact about a decision at the moment it was made,
+which cannot be reconstructed afterwards.
+
+It has **two live values from the first decision**, which matters more than it
+looks — a column with one value is dead weight nobody trusts:
+
+| | |
+|---|---|
+| `watchlist` | explicitly listed; the user said they wanted it |
+| `continuing` | a series already under way, resolved to its next episode |
+| `discovery` | nothing produces this yet (ADR 0009) |
+
+Verified live: marking Beyblade X S1 E1 watched flips that pick from `watchlist`
+to `continuing` on the next request, and both land in the log.
+
+**Never read by the ranker.** Letting a source raise a score would make the
+comparison it exists to enable circular by construction — the failure
+`EVALUATION.md` already records for the simulation's ground truth.
+
+### The migration bug a green pipeline would have shipped
+
+The first version of V20 added the column `NOT NULL` with no default, on the
+stated assumption that the table was empty everywhere. That assumption was
+written without checking and was wrong in seconds: the development database had
+69 rows and the migration failed with `23502`.
+
+**The part worth keeping is why CI would not have caught it.** The migrations job
+applies every file to a *clean* database, where a `NOT NULL` column with no
+default is always satisfiable because there are no rows to violate. So this class
+of migration passes CI unconditionally and fails the first time it meets a
+populated database — which, on the current trajectory, would have been the
+production one, shortly after the first real users.
+
+A local database with real rows in it caught what a green pipeline could not.
+V20 now adds the column nullable, backfills (`watchlist` is a fact rather than a
+guess — nothing has ever produced another source), then sets `NOT NULL`, and
+still declines a `DEFAULT` so no future writer can omit a source and have it
+silently recorded as the wrong one.
+
+**312 tests pass locally, 150 skip; 47 frontend.**
+
+---
+
 ## What is still open, and how to finish it
 
 Read this first if you are picking the project up. Every item below is either

@@ -227,6 +227,15 @@ jobs:
             exit 1
           fi
 
+      # Static, and it catches something this job structurally cannot. Every
+      # migration here is applied to a *clean* database, where a NOT NULL column
+      # with no default is always satisfiable because there are no rows to
+      # violate it -- so that mistake passes CI forever and fails the first time
+      # it meets a populated database, which is production. V20 was written that
+      # way and only the development database caught it.
+      - name: Refuse a NOT NULL column added to a populated table
+        run: python tools/migrations/check_add_column.py
+
       # Postgres does not index foreign keys automatically. The omission shows up
       # first as a slow cascading delete, long after the migration was written.
       # Partial indexes do not count: they do not cover the rows outside their

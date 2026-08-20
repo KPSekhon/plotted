@@ -109,6 +109,15 @@ data class PickResponse(
             "episode the time budget was measured against.",
     )
     val nextEpisode: NextEpisodeRef?,
+    @Schema(
+        description =
+        "Where this candidate came from: watchlist (you listed it), continuing (a series you " +
+            "have started), discovery (proposed from the wider catalogue). Shown so the answer " +
+            "can say which it is, and logged per served item so acceptance and completion can be " +
+            "compared per source.",
+        allowableValues = ["watchlist", "continuing", "discovery"],
+    )
+    val source: String,
     @Schema(description = "Where it can be watched, under the access policy that was applied.")
     val availableOn: List<String>,
     @Schema(description = "0 to 1, after renormalising over the features this title actually has.")
@@ -136,6 +145,7 @@ data class PickResponse(
             watchMinutes = pick.candidate.watchMinutes,
             sessionMinutes = pick.candidate.sessionMinutes,
             perEpisode = pick.candidate.mediaType != "movie",
+            source = pick.candidate.source.dbValue,
             nextEpisode = pick.candidate.nextUp?.let {
                 NextEpisodeRef(
                     seasonNumber = it.seasonNumber,
