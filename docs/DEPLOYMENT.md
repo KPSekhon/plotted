@@ -214,7 +214,7 @@ not a checkbox, and `SameSite=None` requires `Secure` and a reason.
 
 ### Seeding
 
-First boot only, with `PLOTTED_SEED_ENABLED=true`. It resolves **519 seed entries**
+First boot only, with `PLOTTED_SEED_ENABLED=true`. It resolves **527 seed entries**
 — 400 by tmdb id, 119 by TMDB search — and ingests each with its Canadian
 availability, which is free quota but takes several minutes. Then **turn it off**:
 it is idempotent, so leaving it on is not destructive, but it re-pulls the whole
@@ -223,7 +223,7 @@ minutes.
 
 The run reports created, refreshed, unmatched and incomplete. **That report is
 the number to quote for how many titles the catalogue actually has**, because the
-519 entries overlap — the curated names resolve to ids some of which the derived
+527 entries overlap — the curated names resolve to ids some of which the derived
 half already lists.
 
 ---

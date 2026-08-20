@@ -49,7 +49,7 @@ The demo persona is built from whatever is in the database, so the shots above
 depend on the seed having run. In order:
 
 1. **Seed the catalogue.** `PLOTTED_SEED_ENABLED=true` with a TMDB token. Free
-   quota; takes several minutes for 519 entries with their seasons. Read the
+   quota; takes several minutes for 527 entries with their seasons. Read the
    report it prints — the number of titles actually created is what you should
    quote, not the entry count.
 2. **Check the persona is interesting.** Start a demo session and look at

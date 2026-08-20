@@ -109,7 +109,7 @@ stating because it is the clearest reason to have both:
 | | Linear ranker | Learned ranker |
 |---|---|---|
 | Missing feature | Weight **redistributed** over what is present | Model is **told it is absent** and learns its own split |
-| Measured effect | +0.0170 NDCG@3 — see [EVALUATION.md](EVALUATION.md) | not yet measurable |
+| Measured effect | +0.0184 NDCG@3 — see [EVALUATION.md](EVALUATION.md) | not yet measurable |
 
 ---
 

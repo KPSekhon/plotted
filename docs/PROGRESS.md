@@ -516,7 +516,7 @@ first, on purpose, so that what remains is finishable.
 
 | # | What is missing | Blocked on | Effort |
 |---|---|---|---|
-| 2 | Seed list is built (519 entries); `make seed` has never run | A database to ingest into | an hour |
+| 2 | Seed list is built (527 entries); `make seed` has never run | A database to ingest into | an hour |
 | 2 | `PLOTTED_SNAPSHOT_ENABLED` never turned on | An environment that runs continuously | one env var |
 | 6 | Never deployed | A person with a cloud account | half a day |
 | 6 | No demo video | A person, a seeded database, a deployment | an hour |
@@ -537,7 +537,7 @@ turns the extension-permission risk into a five-second check.
 
 ### Phase 2 — the seed is built; the pipeline has still never run
 
-**Done: the list.** 519 entries — 400 derived from a live Watchmode enumeration
+**Done: the list.** 527 entries — 408 derived from a live Watchmode enumeration
 of what is actually streaming in Canada, plus the 119 curated names kept. About
 500 unique titles once the overlap resolves at ingest; the seed run's own report
 is the number to quote, because the curated half is names and the derived half is
@@ -1618,7 +1618,7 @@ the data. `./gradlew :plotted-api:evaluate` regenerates
 [EVALUATION.md](EVALUATION.md) with no Spring context and no database.
 
 **The one result that is not circular.** Renormalising over present features is
-worth **0.0170 NDCG@3 (95% CI 0.0145–0.0194, n=2000)** at a 30% metadata
+worth **0.0184 NDCG@3 (95% CI 0.0158–0.0207, n=2000)** at a 30% metadata
 censoring rate. It matters that this is an ablation of *one* thing: it rescales
 the shipped scorer rather than reimplementing it, and a test asserts the two
 produce identical rankings when nothing is missing.
