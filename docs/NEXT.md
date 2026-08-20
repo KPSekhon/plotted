@@ -368,7 +368,7 @@ never runs, which looks exactly like it running and finding nothing.
 ### Phase 7 — Evaluation harness (built; needs data, not code)
 
 The harness is done and tested, and it produced one result it can defend:
-renormalisation is worth 0.0170 NDCG@3. Everything else in `EVALUATION.md` is a
+renormalisation is worth 0.0184 NDCG@3. Everything else in `EVALUATION.md` is a
 smoke test, because the simulation's ground truth is the model's own score.
 
 **What would make it a real evaluation, in order:**
@@ -387,7 +387,7 @@ smoke test, because the simulation's ground truth is the model's own score.
 4. **Then a claim about beating popularity**, and not before.
 
 **The finding worth carrying into phase 8:** sorting by watchlist priority alone
-comes within 0.0125 NDCG@3 of the five-feature model and beats it on precision@3.
+comes within 0.0139 NDCG@3 of the five-feature model and beats it on precision@3.
 Some of that is circularity, but the residue says the other four features buy
 less than their combined 0.65 weight suggests. A learned model should be measured
 against *that* baseline, not against random.

@@ -38,7 +38,18 @@ where there is none is worse than no evaluation section.
 
 ---
 
-## The result: renormalisation is worth 0.019 NDCG@3
+## The result: renormalisation is worth 0.018 NDCG@3
+
+> **Corrected 2026-08-20.** This page quoted 0.0191 until then, which the code
+> had stopped producing. `./gradlew :plotted-api:evaluate` *prints* the report
+> rather than writing it, and `EvaluationReportTest` checks that two runs agree
+> with each other — not that either agrees with the file committed here. So the
+> figures drifted as the feature schema changed and nothing objected.
+>
+> `EvaluationDriftTest` now asserts the headline figure in this file is the one
+> the simulation currently produces, the same way the OpenAPI drift check works.
+> A report that can silently stop matching its own code is worse than no report,
+> because it is quoted.
 
 `FeatureVector.score()` divides the weighted sum by the weight *actually present*
 on a candidate. Without it, a candidate missing a 0.10-weight feature caps at
@@ -68,8 +79,8 @@ disappointment — see below and [MODEL.md](MODEL.md).
 
 Paired bootstrap over identical queries, 2,000 resamples, seed 20260806:
 
-> **linear-v1 ahead of linear-v1-no-renormalisation by 0.0191 NDCG@3
-> (95% CI 0.0166 – 0.0215, n = 2000).**
+> **linear-v1 ahead of linear-v1-no-renormalisation by 0.0184 NDCG@3
+> (95% CI 0.0158 – 0.0207, n = 2000).**
 
 The interval excludes zero, so the effect is real at this censoring rate. It is
 also small in absolute terms, and the section below explains why the absolute
@@ -102,7 +113,7 @@ relevance distribution.
 ### The full model loses on two of the three metrics it is winning on
 
 `watchlist-priority` sorts by nothing but the number the user typed in. It comes
-within 0.0134 NDCG@3 of the five-feature model and is **ahead on precision@3**
+within 0.0139 NDCG@3 of the five-feature model and is **ahead on precision@3**
 (0.9962 against 0.9875). The ablated model — the one this page is arguing is
 worse — **ties for the best MRR on the table** (0.9998 against 0.9980).
 
@@ -205,7 +216,7 @@ Listed rather than omitted, in rough order of how much they should worry you.
    obscure titles are both more likely to lack metadata and less likely to be
    wanted. Where those correlate, the un-normalised scorer is accidentally right
    some of the time, so **the real renormalisation effect is probably smaller
-   than 0.019.** This is the conservative direction to be wrong in, but it is
+   than 0.018.** This is the conservative direction to be wrong in, but it is
    still a direction.
 4. **One censoring rate (30%).** The effect size is a function of it. The
    direction is asserted by a test; the magnitude is not, because pinning it
