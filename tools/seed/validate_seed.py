@@ -68,12 +68,9 @@ def fetch(path: str, bearer: str) -> dict | None:
 
 
 def runtime_of(detail: dict, is_series: bool) -> int | None:
-    """Minutes, resolved the way the catalogue resolves them."""
+    """Minutes as TMDB states them, which is not the same as what Plotted ends up with."""
     if not is_series:
         return detail.get("runtime") or None
-    # A series carries per-episode runtimes; the catalogue sums real episodes at
-    # ingest. Here we only need to know whether *anything* is known, so the
-    # average is enough to answer "will this be usable in a time filter".
     runtimes = detail.get("episode_run_time") or []
     return runtimes[0] if runtimes else None
 
@@ -89,7 +86,22 @@ def main() -> None:
     print(f"Checking {len(entries)} derived ids against TMDB...")
 
     missing: list[tuple[int, str]] = []
-    no_runtime: list[tuple[int, str]] = []
+    # Split by media type, because the consequence is completely different and
+    # the first run of this script (2026-08-14) reported 152 titles as
+    # runtime-less without saying that every one of them was a series.
+    #
+    # A FILM with no `runtime` is genuinely unusable: Tonight's time filter is
+    # hard, there is nothing to derive a length from, and it will silently never
+    # be recommended into a window.
+    #
+    # A SERIES with no `episode_run_time` is not. TMDB leaves that field empty
+    # for most shows, and `SeasonRepository.recalculateTotalRuntime` stopped
+    # depending on it -- it derives the typical episode from the episodes it is
+    # already summing. That change took the seeded catalogue from 77 of 260
+    # series having an episode length to 260 of 260. Reporting these as a
+    # blocking problem would send somebody to fix data that fixes itself.
+    no_runtime_film: list[tuple[int, str]] = []
+    no_runtime_series: list[tuple[int, str]] = []
     wrong_type: list[tuple[int, str]] = []
     ok = 0
 
@@ -120,7 +132,7 @@ def main() -> None:
             continue
 
         if runtime_of(detail, is_series) is None:
-            no_runtime.append((tmdb_id, label))
+            (no_runtime_series if is_series else no_runtime_film).append((tmdb_id, label))
         else:
             ok += 1
 
@@ -135,18 +147,26 @@ def main() -> None:
         "",
         f"Checked {len(entries)} derived ids against TMDB. No database involved, free quota only.",
         "",
-        f"- **{ok}** resolve and have a runtime",
-        f"- **{len(no_runtime)}** resolve with no runtime — ingestible, but invisible to "
-        "Tonight Mode's time filter until TMDB fills it in",
+        f"- **{ok}** resolve and state a runtime",
+        f"- **{len(no_runtime_film)}** films state no runtime — **blocking**: Tonight's time "
+        "filter is hard and there is nothing to derive a length from, so these can never be "
+        "recommended into a window",
+        f"- **{len(no_runtime_series)}** series state no `episode_run_time` — **not blocking**: "
+        "ingest derives the typical episode from the episodes it already sums, which is what took "
+        "the seeded catalogue from 77 of 260 series with an episode length to 260 of 260",
         f"- **{len(wrong_type)}** exist under the *other* media type — the seed line is wrong",
         f"- **{len(missing)}** do not resolve at all",
+        "",
+        "Only the first two lines are worth acting on, and only the films are urgent. TMDB leaves "
+        "`episode_run_time` empty for most shows; Plotted stopped depending on it deliberately.",
         "",
     ]
 
     for heading, rows in (
         ("Wrong media type", wrong_type),
         ("Not found", missing),
-        ("No runtime", no_runtime),
+        ("Films with no runtime (blocking)", no_runtime_film),
+        ("Series with no episode_run_time (derived at ingest, not blocking)", no_runtime_series),
     ):
         if rows:
             lines += [f"## {heading}", ""]
@@ -154,7 +174,12 @@ def main() -> None:
             lines += [""]
 
     REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"\n{ok} good, {len(no_runtime)} runtime-less, {len(wrong_type)} wrong type, {len(missing)} missing")
+    print("")
+    print(
+        f"{ok} good, {len(no_runtime_film)} films with no runtime (blocking), "
+        f"{len(no_runtime_series)} series with no episode_run_time (derived at ingest), "
+        f"{len(wrong_type)} wrong type, {len(missing)} missing"
+    )
     print(f"Report: {REPORT.relative_to(ROOT)}")
 
 

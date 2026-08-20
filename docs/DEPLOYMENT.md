@@ -116,15 +116,29 @@ most — titles with **no runtime**, which ingest fine and are then invisible to
 Tonight Mode's time filter, because that filter is a hard one. A seed full of
 runtime-less titles produces a recommender that mysteriously refuses to answer.
 
-**This has never been run**: the TMDB token was empty for the whole of
-development, which is what `check-env` found.
+**Run 2026-08-14, and the result is the reason to run it.** 408 derived ids:
+**0 do not resolve, 0 are the wrong media type, 0 films lack a runtime**, and 152
+series carry no `episode_run_time`.
+
+That last number looks alarming and is not. TMDB leaves `episode_run_time` empty
+for most shows, and `SeasonRepository.recalculateTotalRuntime` stopped depending
+on it — it derives the typical episode from the episodes it is already summing,
+which is what took the seeded catalogue from 77 of 260 series with an episode
+length to 260 of 260. **Films are the case that would actually block**, because
+there is nothing to derive a length from, and there are none.
+
+The script's first version reported all 152 as one undifferentiated
+"runtime-less" count, which would have sent somebody to fix data that fixes
+itself. It splits them now, and `tools/seed/validation-report.md` is committed as
+the evidence.
 
 Two seconds, and it catches the class of mistake that otherwise surfaces from a
 log after a five-minute image build. The one worth naming: **a missing
 `TMDB_READ_ACCESS_TOKEN` boots perfectly happily** and then serves empty screens,
 because nothing on a developer machine without a database ever asks TMDB for
-anything. It was empty in `.env` for the whole of development and nothing
-noticed. A missing JWT secret at least fails loudly; this one does not.
+anything. It was empty in `.env` for most of development and nothing noticed;
+`check-env` is what found it, and it is set now. A missing JWT secret at least
+fails loudly; this one does not.
 
 ### 3. Decide what the deployment is for
 

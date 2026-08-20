@@ -1,0 +1,167 @@
+# Seed validation
+
+Checked 408 derived ids against TMDB. No database involved, free quota only.
+
+- **256** resolve and state a runtime
+- **0** films state no runtime — **blocking**: Tonight's time filter is hard and there is nothing to derive a length from, so these can never be recommended into a window
+- **152** series state no `episode_run_time` — **not blocking**: ingest derives the typical episode from the episodes it already sums, which is what took the seeded catalogue from 77 of 260 series with an episode length to 260 of 260
+- **0** exist under the *other* media type — the seed line is wrong
+- **0** do not resolve at all
+
+Only the first two lines are worth acting on, and only the films are urgent. TMDB leaves `episode_run_time` empty for most shows; Plotted stopped depending on it deliberately.
+
+## Series with no episode_run_time (derived at ingest, not blocking)
+
+- `tmdb:241372` — 56 Days — prime-video
+- `tmdb:224372` — A Knight of the Seven Kingdoms — crave
+- `tmdb:296206` — Agent Kim Reactivated — netflix
+- `tmdb:297438` — Akane-banashi — netflix
+- `tmdb:300054` — BAKI-DOU: The Invincible Samurai — netflix
+- `tmdb:299167` — Dutton Ranch — paramount-plus
+- `tmdb:281281` — Elite Force — netflix
+- `tmdb:254420` — Elle — prime-video
+- `tmdb:260592` — Every Year After — prime-video
+- `tmdb:287238` — Furious — disney-plus
+- `tmdb:245318` — Margo's Got Money Troubles — apple-tv-plus
+- `tmdb:290856` — Marshals — paramount-plus
+- `tmdb:291339` — Memory of a Killer — crave
+- `tmdb:284725` — Not Suitable for Work — disney-plus
+- `tmdb:273240` — Off Campus — prime-video
+- `tmdb:302074` — R.J. Decker — crave,disney-plus
+- `tmdb:241882` — Ride or Die — prime-video
+- `tmdb:240740` — Scarpetta — prime-video
+- `tmdb:295778` — Scrubs — crave,disney-plus
+- `tmdb:289763` — See You at Work Tomorrow! — prime-video
+- `tmdb:153217` — Sparks of Tomorrow — netflix
+- `tmdb:220102` — Spider-Noir — prime-video
+- `tmdb:298610` — Spooky in Love — netflix
+- `tmdb:252107` — Star City — apple-tv-plus
+- `tmdb:289219` — Star Wars: Maul - Shadow Lord — disney-plus
+- `tmdb:283297` — Sterling Point — prime-video
+- `tmdb:224941` — The Boroughs — netflix
+- `tmdb:300954` — The Husband — disney-plus
+- `tmdb:322430` — The Polygamist — netflix
+- `tmdb:298168` — The Shards — disney-plus
+- `tmdb:287527` — The Testaments — disney-plus
+- `tmdb:286709` — The Westies — paramount-plus
+- `tmdb:286345` — Though I Am an Inept Villainess — disney-plus
+- `tmdb:270476` — Widow's Bay — apple-tv-plus
+- `tmdb:198178` — Wonder Man — disney-plus
+- `tmdb:255661` — Young Sherlock — prime-video
+- `tmdb:284838` — 9-1-1: Nashville — crave,disney-plus
+- `tmdb:260458` — Adults — disney-plus
+- `tmdb:157239` — Alien: Earth — disney-plus
+- `tmdb:258742` — All's Fair — disney-plus
+- `tmdb:305379` — Badly in Love — netflix
+- `tmdb:284736` — Boston Blue — crave,paramount-plus
+- `tmdb:227114` — Butterfly — prime-video
+- `tmdb:202555` — Daredevil: Born Again — disney-plus
+- `tmdb:259909` — Dexter: Resurrection — paramount-plus
+- `tmdb:260823` — From Old Country Bumpkin to Master Swordsman — prime-video
+- `tmdb:301507` — Heated Rivalry — crave
+- `tmdb:243881` — House of David — prime-video
+- `tmdb:200875` — IT: Welcome to Derry — crave
+- `tmdb:138505` — Marvel Zombies — disney-plus
+- `tmdb:261363` — Mid-Century Modern — disney-plus
+- `tmdb:236429` — On Call — prime-video
+- `tmdb:245927` — Paradise — disney-plus
+- `tmdb:225171` — Pluribus — apple-tv-plus
+- `tmdb:240993` — Ransom Canyon — netflix
+- `tmdb:240459` — Spartacus: House of Ashur — prime-video
+- `tmdb:228305` — Task — crave
+- `tmdb:271267` — The Chair Company — crave
+- `tmdb:244447` — The Hunting Wives — crave
+- `tmdb:221079` — The Last Frontier — apple-tv-plus
+- `tmdb:226749` — The Librarians: The Next Chapter — crave
+- `tmdb:250307` — The Pitt — crave
+- `tmdb:247767` — The Studio — apple-tv-plus
+- `tmdb:219760` — The Terminal List: Dark Wolf — prime-video
+- `tmdb:253811` — Tougen Anki — prime-video
+- `tmdb:248852` — UNTAMED — netflix
+- `tmdb:215522` — We Were Liars — prime-video
+- `tmdb:219246` — When Life Gives You Tangerines — netflix
+- `tmdb:241609` — Your Friends & Neighbors — apple-tv-plus
+- `tmdb:218342` — A Good Girl's Guide to Murder — netflix
+- `tmdb:215072` — A Shop for Killers — disney-plus
+- `tmdb:82452` — Avatar: The Last Airbender — netflix
+- `tmdb:125909` — Batman: Caped Crusader — prime-video
+- `tmdb:246246` — Beauty in Black — netflix
+- `tmdb:213306` — Cross — paramount-plus,prime-video
+- `tmdb:240411` — Dandadan — netflix,prime-video
+- `tmdb:196322` — Dark Matter — apple-tv-plus
+- `tmdb:239770` — Doctor Who — disney-plus
+- `tmdb:226285` — Elsbeth — paramount-plus
+- `tmdb:106379` — Fallout — prime-video
+- `tmdb:243875` — Georgie & Mandy's First Marriage — crave
+- `tmdb:94954` — Hazbin Hotel — prime-video
+- `tmdb:226637` — High Potential — crave,disney-plus
+- `tmdb:157741` — Landman — paramount-plus
+- `tmdb:226174` — Matlock — paramount-plus
+- `tmdb:243006` — NCIS: Origins — paramount-plus
+- `tmdb:207333` — One Hundred Years of Solitude — netflix
+- `tmdb:126308` — Shōgun — disney-plus
+- `tmdb:203744` — Sugar — apple-tv-plus
+- `tmdb:236385` — T-P Bon — netflix
+- `tmdb:219971` — The Agency — paramount-plus
+- `tmdb:236235` — The Gentlemen — netflix
+- `tmdb:117830` — Tomb Raider: The Legend of Lara Croft — netflix
+- `tmdb:211288` — Tracker — crave,disney-plus,paramount-plus
+- `tmdb:245026` — Wizards Beyond Waverly Place — disney-plus
+- `tmdb:138502` — X-Men '97 — disney-plus
+- `tmdb:154385` — Beef — netflix
+- `tmdb:114922` — Citadel — prime-video
+- `tmdb:205715` — Gen V — prime-video
+- `tmdb:113962` — Lioness — paramount-plus,prime-video
+- `tmdb:202411` — Monarch: Legacy of Monsters — apple-tv-plus
+- `tmdb:199001` — My Life with the Walter Boys — netflix
+- `tmdb:111110` — ONE PIECE — netflix
+- `tmdb:103540` — Percy Jackson and the Olympians — disney-plus
+- `tmdb:136311` — Shrinking — apple-tv-plus
+- `tmdb:125988` — Silo — apple-tv-plus,prime-video
+- `tmdb:261145` — The Amazing Digital Circus — netflix
+- `tmdb:100088` — The Last of Us — crave
+- `tmdb:129552` — The Night Agent — netflix
+- `tmdb:211684` — The Walking Dead: Daryl Dixon — prime-video
+- `tmdb:194583` — The Walking Dead: Dead City — prime-video
+- `tmdb:218038` — Vivant — netflix
+- `tmdb:208569` — Will Trent — crave,disney-plus
+- `tmdb:195670` — XO, Kitty — netflix
+- `tmdb:203737` — 【OSHI NO KO】 — disney-plus
+- `tmdb:157744` — 1923 — netflix,paramount-plus
+- `tmdb:83867` — Andor — disney-plus
+- `tmdb:128904` — Dark Winds — crave
+- `tmdb:124364` — FROM — paramount-plus
+- `tmdb:202297` — Fire Country — crave,paramount-plus
+- `tmdb:52814` — Halo — paramount-plus
+- `tmdb:94997` — House of the Dragon — crave
+- `tmdb:128098` — Interview with the Vampire — crave
+- `tmdb:110492` — Peacemaker — crave
+- `tmdb:108978` — Reacher — prime-video
+- `tmdb:95396` — Severance — apple-tv-plus
+- `tmdb:95480` — Slow Horses — apple-tv-plus
+- `tmdb:103516` — Star Trek: Strange New Worlds — paramount-plus,prime-video
+- `tmdb:136315` — The Bear — disney-plus
+- `tmdb:135934` — The Legend of Vox Machina — prime-video
+- `tmdb:116799` — The Lincoln Lawyer — netflix
+- `tmdb:84773` — The Lord of the Rings: The Rings of Power — prime-video
+- `tmdb:194766` — The Summer I Turned Pretty — prime-video
+- `tmdb:120911` — The Terminal List — prime-video
+- `tmdb:153312` — Tulsa King — paramount-plus
+- `tmdb:119051` — Wednesday — netflix
+- `tmdb:125935` — Abbott Elementary — disney-plus
+- `tmdb:94605` — Arcane — netflix
+- `tmdb:93740` — Foundation — apple-tv-plus
+- `tmdb:126027` — Ghosts — netflix,paramount-plus
+- `tmdb:124101` — Hacks — crave
+- `tmdb:95557` — INVINCIBLE — prime-video
+- `tmdb:84958` — Loki — disney-plus
+- `tmdb:96677` — Lupin — netflix
+- `tmdb:97951` — Mayor of Kingstown — paramount-plus
+- `tmdb:107113` — Only Murders in the Building — disney-plus
+- `tmdb:96580` — Resident Alien — crave,netflix
+- `tmdb:93405` — Squid Game — netflix
+- `tmdb:111803` — The White Lotus — crave
+- `tmdb:91363` — What If...? — disney-plus
+- `tmdb:85937` — Demon Slayer: Kimetsu no Yaiba
+- `tmdb:76479` — The Boys
+
