@@ -16,6 +16,49 @@ data class TonightContext(
     val accessPolicy: AccessPolicy,
 )
 
+/**
+ * Where a candidate came from, and therefore what its acceptance means.
+ *
+ * Recorded per served item from the first decision onwards, before anything
+ * produces [DISCOVERY], because the question it exists to answer is comparative:
+ * *are the titles Plotted proposed accepted and finished as often as the ones
+ * the user chose themselves?* That comparison needs a baseline of watchlist
+ * decisions logged before discovery existed, and a source attached after the
+ * fact is a guess.
+ *
+ * Deliberately not a ranking feature. Knowing where a candidate came from must
+ * not become a reason to rank it higher — that would make the measurement circular
+ * by construction, which is the failure `EVALUATION.md` already records for the
+ * simulation's ground truth.
+ */
+enum class CandidateSource(val dbValue: String) {
+    /** Explicitly on the watchlist. The user said they wanted this. */
+    WATCHLIST("watchlist"),
+
+    /**
+     * A series already under way, resolved to its next episode.
+     *
+     * Separated from [WATCHLIST] because "carry on with this" and "start this"
+     * are different recommendations even when they rank identically, and a
+     * completion rate that pools them would be measuring two behaviours as one.
+     */
+    CONTINUING("continuing"),
+
+    /**
+     * Proposed from the wider catalogue rather than chosen by the user.
+     *
+     * Nothing produces this yet — see ADR 0009. The value exists so the column,
+     * the response and the decision log are all ready on the day something does.
+     */
+    DISCOVERY("discovery"),
+    ;
+
+    companion object {
+        fun fromDb(value: String): CandidateSource =
+            entries.firstOrNull { it.dbValue == value } ?: error("Unknown candidate source '$value'")
+    }
+}
+
 /** Everything the ranker knows about one thing the user might watch. */
 data class Candidate(
     val titleId: UUID,
@@ -62,6 +105,11 @@ data class Candidate(
      * filter still reads the typical episode.
      */
     val nextUp: WatchlistDirectory.NextUp? = null,
+    /**
+     * Where this candidate came from. Never read by the ranker; see
+     * [CandidateSource] for why that matters.
+     */
+    val source: CandidateSource = CandidateSource.WATCHLIST,
 ) {
     data class Offer(
         val providerId: UUID,

@@ -306,6 +306,61 @@ class TonightServiceTest {
     }
 
     /**
+     * The source dimension has two real values from the first decision logged.
+     *
+     * It exists before discovery does because the question it answers is
+     * comparative — are proposed titles accepted as often as chosen ones — and
+     * that needs a baseline of decisions recorded before anyone thought to ask.
+     * A source attached after the fact is a guess.
+     */
+    @Test
+    fun `a series already under way is recorded as continuing, not as watchlist`() {
+        givenTheLogAccepts()
+        val started = UUID.randomUUID()
+        val fresh = UUID.randomUUID()
+
+        every { watchlists.outstandingItems(userId) } returns listOf(entry(started), entry(fresh))
+        every { watchlists.blockedTitleIds(userId) } returns emptySet()
+        every { subscriptions.activeProviderIds(userId) } returns setOf(crave)
+        every { titles.findSummaries(any()) } returns listOf(
+            summary(started, "Half watched", 600, mediaType = "series", sessionMinutes = 25),
+            summary(fresh, "Never opened", 600, mediaType = "series", sessionMinutes = 25),
+        )
+        every { availability.subscriptionCoverage(any(), "CA") } returns
+            coverage(started to crave, fresh to crave)
+        every { watchlists.seriesProgress(userId, listOf(started, fresh)) } returns mapOf(
+            started to nextUp(season = 2, episode = 3, started = true),
+            fresh to nextUp(season = 1, episode = 1, started = false),
+        )
+
+        val served = service().recommend(userId, request(availableMinutes = 45)).recommendation
+            .shouldBeInstanceOf<Recommendation.Served>()
+
+        val sources = served.picks.associate { it.candidate.name to it.candidate.source }
+        sources["Half watched"] shouldBe CandidateSource.CONTINUING
+        // Not started is still the user's own choice, so it stays WATCHLIST --
+        // "carry on" and "begin" are the distinction, not series versus film.
+        sources["Never opened"] shouldBe CandidateSource.WATCHLIST
+    }
+
+    @Test
+    fun `a film is a watchlist candidate`() {
+        givenTheLogAccepts()
+        val film = UUID.randomUUID()
+
+        every { watchlists.outstandingItems(userId) } returns listOf(entry(film))
+        every { watchlists.blockedTitleIds(userId) } returns emptySet()
+        every { subscriptions.activeProviderIds(userId) } returns setOf(crave)
+        every { titles.findSummaries(any()) } returns listOf(summary(film, "A Film", 100))
+        every { availability.subscriptionCoverage(any(), "CA") } returns coverage(film to crave)
+
+        val served = service().recommend(userId, request()).recommendation
+            .shouldBeInstanceOf<Recommendation.Served>()
+
+        served.picks.single().candidate.source shouldBe CandidateSource.WATCHLIST
+    }
+
+    /**
      * A watchlist of films must not ask about episodes at all, so the common
      * case pays nothing for a feature that cannot apply to it.
      */
@@ -415,6 +470,16 @@ class TonightServiceTest {
     private fun givenNoSeriesProgress() {
         every { watchlists.seriesProgress(any(), any()) } returns emptyMap()
     }
+
+    private fun nextUp(season: Int, episode: Int, started: Boolean) = WatchlistDirectory.NextUp(
+        episodeId = UUID.randomUUID(),
+        seasonNumber = season,
+        episodeNumber = episode,
+        name = "Episode $episode",
+        runtimeMinutes = 25,
+        started = started,
+        remainingEpisodes = 10,
+    )
 
     private fun givenTheLogAccepts(): UUID {
         val requestId = UUID.randomUUID()

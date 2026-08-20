@@ -2116,7 +2116,7 @@
         "description" : "The episode to actually put on. Without this the answer is \"Chainsaw Man, about 24 minutes an episode\", which leaves the user to open another app and work out where they were -- the decision this product exists to remove."
       },
       "PickResponse" : {
-        "required" : [ "availableOn", "exploration", "mediaType", "name", "perEpisode", "position", "reasons", "score", "titleId" ],
+        "required" : [ "availableOn", "exploration", "mediaType", "name", "perEpisode", "position", "reasons", "score", "source", "titleId" ],
         "type" : "object",
         "properties" : {
           "position" : {
@@ -2153,6 +2153,11 @@
           },
           "nextEpisode" : {
             "$ref" : "#/components/schemas/NextEpisodeRef"
+          },
+          "source" : {
+            "type" : "string",
+            "description" : "Where this candidate came from: watchlist (you listed it), continuing (a series you have started), discovery (proposed from the wider catalogue). Shown so the answer can say which it is, and logged per served item so acceptance and completion can be compared per source.",
+            "enum" : [ "watchlist", "continuing", "discovery" ]
           },
           "availableOn" : {
             "type" : "array",

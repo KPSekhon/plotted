@@ -31,6 +31,14 @@ export interface Pick {
    * against.
    */
   readonly nextEpisode: NextEpisodeRef | null;
+  /**
+   * Where this candidate came from.
+   *
+   * `discovery` is not produced yet — see ADR 0009 — but the field is here from
+   * the first decision logged, because comparing accepted-and-completed rates
+   * per source needs a baseline recorded before discovery existed.
+   */
+  readonly source: CandidateSource;
   readonly availableOn: readonly string[];
   readonly score: number;
   /** Derived from the scored features, never generated prose. */
@@ -89,3 +97,6 @@ export interface NextEpisodeRef {
   /** Aired episodes still ahead, including this one. */
   readonly remainingEpisodes: number;
 }
+
+/** watchlist: you listed it. continuing: a series you started. discovery: Plotted proposed it. */
+export type CandidateSource = 'watchlist' | 'continuing' | 'discovery';

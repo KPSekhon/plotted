@@ -2,6 +2,7 @@ package app.plotted.recommendation.persistence
 
 import app.plotted.generated.jooq.tables.references.RECOMMENDATION_ITEMS
 import app.plotted.generated.jooq.tables.references.RECOMMENDATION_REQUESTS
+import app.plotted.recommendation.domain.CandidateSource
 import app.plotted.recommendation.domain.Recommendation
 import app.plotted.recommendation.domain.TonightContext
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -80,6 +81,7 @@ class RecommendationLogRepository(
                     .set(RECOMMENDATION_ITEMS.SCORE, pick.score.toBigDecimal(SCORE_SCALE))
                     .set(RECOMMENDATION_ITEMS.EXPLORATION, pick.exploration)
                     .set(RECOMMENDATION_ITEMS.PROPENSITY, pick.propensity.toBigDecimal(PROPENSITY_SCALE))
+                    .set(RECOMMENDATION_ITEMS.CANDIDATE_SOURCE, pick.candidate.source.dbValue)
                     .set(
                         RECOMMENDATION_ITEMS.FEATURE_CONTRIBUTIONS,
                         JSONB.valueOf(
@@ -156,6 +158,14 @@ class RecommendationLogRepository(
                 .set(RECOMMENDATION_ITEMS.SCORE, BigDecimal.ZERO.setScale(SCORE_SCALE))
                 .set(RECOMMENDATION_ITEMS.EXPLORATION, false)
                 .set(RECOMMENDATION_ITEMS.PROPENSITY, BigDecimal.ONE.setScale(PROPENSITY_SCALE))
+                // Manufactured history, so it is watchlist by construction: the
+                // demo persona's list is where every one of these came from.
+                // Stated rather than defaulted, because the day discovery starts
+                // producing rows a silent default here would attribute invented
+                // picks to a source they never had -- and these rows are already
+                // stamped `demo-fixture` precisely so nothing pools them with
+                // anything real.
+                .set(RECOMMENDATION_ITEMS.CANDIDATE_SOURCE, CandidateSource.WATCHLIST.dbValue)
                 .set(RECOMMENDATION_ITEMS.FEATURE_CONTRIBUTIONS, JSONB.valueOf("{}"))
                 .set(RECOMMENDATION_ITEMS.ACCEPTED_AT, acceptedAt)
                 .execute()
