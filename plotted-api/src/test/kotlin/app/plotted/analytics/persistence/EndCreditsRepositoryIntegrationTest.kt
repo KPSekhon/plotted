@@ -1,12 +1,12 @@
 package app.plotted.analytics.persistence
 
 import app.plotted.generated.jooq.tables.references.RECOMMENDATION_ITEMS
-import app.plotted.recommendation.domain.CandidateSource
 import app.plotted.generated.jooq.tables.references.RECOMMENDATION_REQUESTS
 import app.plotted.generated.jooq.tables.references.TITLES
 import app.plotted.generated.jooq.tables.references.USERS
 import app.plotted.generated.jooq.tables.references.WATCHLISTS
 import app.plotted.generated.jooq.tables.references.WATCHLIST_ITEMS
+import app.plotted.recommendation.domain.CandidateSource
 import app.plotted.recommendation.persistence.RecommendationLogRepository
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
